@@ -1,0 +1,6 @@
+/* App-Wrapper – alles Weitere wird via Tailwind/Design-Tokens gestyled. */
+html,
+body,
+#root {
+    height: 100%;
+}

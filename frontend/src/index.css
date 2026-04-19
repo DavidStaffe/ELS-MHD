@@ -1,0 +1,262 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* =====================================================================
+   ELS MHD – Designsystem V0.1
+   Tokens definiert als HSL-Tripel fuer Tailwind-Bruecke.
+   Referenz: aktuell/els-figma-komponenten-briefing-v0.1.md
+   ===================================================================== */
+
+@layer base {
+    :root {
+        /* ---------- Dark Mode (Cockpit / Leitstelle) – Standard ---------- */
+        --background: 222 20% 7%;
+        --foreground: 210 16% 92%;
+
+        --card: 222 18% 10%;
+        --card-foreground: 210 16% 92%;
+
+        --popover: 222 18% 11%;
+        --popover-foreground: 210 16% 92%;
+
+        --surface-raised: 222 14% 14%;
+        --surface-sunken: 222 24% 5%;
+
+        --primary: 205 90% 55%;
+        --primary-foreground: 222 30% 8%;
+
+        --secondary: 222 14% 18%;
+        --secondary-foreground: 210 16% 92%;
+
+        --muted: 222 14% 16%;
+        --muted-foreground: 215 12% 62%;
+
+        --accent: 205 90% 55%;
+        --accent-foreground: 222 30% 8%;
+
+        --destructive: 0 72% 54%;
+        --destructive-foreground: 0 0% 100%;
+
+        --border: 222 14% 20%;
+        --input: 222 14% 18%;
+        --ring: 205 90% 55%;
+
+        /* ---------- Status-Farben (Sichtung S1–S4 + operativ) ---------- */
+        --status-red: 0 72% 54%;         /* S1 – sofort / Blocker */
+        --status-red-fg: 0 0% 100%;
+        --status-yellow: 42 95% 55%;     /* S2 – dringend / Warnung */
+        --status-yellow-fg: 40 90% 10%;
+        --status-green: 142 60% 45%;     /* S3 – normal / OK */
+        --status-green-fg: 142 30% 96%;
+        --status-gray: 220 8% 55%;       /* S4 – leicht / neutral */
+        --status-gray-fg: 0 0% 100%;
+
+        --status-info: 205 90% 55%;
+        --status-info-fg: 222 30% 8%;
+
+        /* ---------- Chart ---------- */
+        --chart-1: 205 90% 55%;
+        --chart-2: 142 60% 45%;
+        --chart-3: 42 95% 55%;
+        --chart-4: 0 72% 54%;
+        --chart-5: 280 60% 60%;
+
+        /* ---------- Typographie (3 Groessen laut Spec) ---------- */
+        --font-sans: "IBM Plex Sans", -apple-system, BlinkMacSystemFont,
+            "Segoe UI", Roboto, sans-serif;
+        --font-mono: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo,
+            Consolas, monospace;
+
+        --fs-caption: 0.8rem;   /* 12.8px */
+        --fs-body: 0.9rem;      /* 14.4px */
+        --fs-heading: 1rem;     /* 16px */
+        --fs-display: 1.25rem;  /* 20px – fuer KPI-Zahlen */
+        --fs-kpi: 1.75rem;      /* 28px – grosse KPI */
+
+        /* ---------- Radius & Spacing ---------- */
+        --radius: 0.375rem;
+        --radius-sm: 0.25rem;
+        --radius-lg: 0.5rem;
+
+        /* ---------- Layout ---------- */
+        --sidebar-w: 15rem;
+        --header-h: 3.5rem;
+    }
+
+    /* ---------- Light Mode (Tagesbetrieb) ---------- */
+    .light {
+        --background: 210 20% 98%;
+        --foreground: 222 30% 10%;
+
+        --card: 0 0% 100%;
+        --card-foreground: 222 30% 10%;
+
+        --popover: 0 0% 100%;
+        --popover-foreground: 222 30% 10%;
+
+        --surface-raised: 210 20% 96%;
+        --surface-sunken: 210 20% 94%;
+
+        --primary: 205 85% 45%;
+        --primary-foreground: 0 0% 100%;
+
+        --secondary: 210 20% 93%;
+        --secondary-foreground: 222 30% 10%;
+
+        --muted: 210 20% 95%;
+        --muted-foreground: 215 12% 42%;
+
+        --accent: 205 85% 45%;
+        --accent-foreground: 0 0% 100%;
+
+        --destructive: 0 72% 48%;
+        --destructive-foreground: 0 0% 100%;
+
+        --border: 214 15% 88%;
+        --input: 214 15% 88%;
+        --ring: 205 85% 45%;
+
+        --status-red: 0 72% 48%;
+        --status-yellow: 40 95% 50%;
+        --status-yellow-fg: 40 90% 10%;
+        --status-green: 142 65% 36%;
+        --status-gray: 220 8% 46%;
+        --status-info: 205 85% 45%;
+    }
+}
+
+/* =====================================================================
+   Base Styles
+   ===================================================================== */
+@layer base {
+    * {
+        @apply border-border;
+    }
+
+    html,
+    body {
+        margin: 0;
+        padding: 0;
+        font-family: var(--font-sans);
+        font-size: var(--fs-body);
+        line-height: 1.45;
+        -webkit-font-smoothing: antialiased;
+        -moz-osx-font-smoothing: grayscale;
+        font-feature-settings: "tnum" 1, "ss01" 1;
+    }
+
+    body {
+        @apply bg-background text-foreground;
+        background-image:
+            radial-gradient(
+                1200px 600px at 100% -10%,
+                hsl(var(--primary) / 0.06),
+                transparent 60%
+            ),
+            radial-gradient(
+                800px 400px at 0% 110%,
+                hsl(var(--primary) / 0.04),
+                transparent 60%
+            );
+        background-attachment: fixed;
+    }
+
+    .light body {
+        background-image: none;
+    }
+
+    code,
+    .font-mono,
+    [data-mono="true"] {
+        font-family: var(--font-mono);
+        font-feature-settings: "tnum" 1;
+    }
+
+    /* Typo-Utilities laut Spec */
+    .text-caption {
+        font-size: var(--fs-caption);
+        line-height: 1.35;
+        letter-spacing: 0.01em;
+    }
+    .text-body {
+        font-size: var(--fs-body);
+        line-height: 1.45;
+    }
+    .text-heading {
+        font-size: var(--fs-heading);
+        line-height: 1.3;
+        font-weight: 600;
+        letter-spacing: -0.005em;
+    }
+    .text-display {
+        font-size: var(--fs-display);
+        line-height: 1.2;
+        font-weight: 600;
+        letter-spacing: -0.01em;
+    }
+    .text-kpi {
+        font-size: var(--fs-kpi);
+        line-height: 1.1;
+        font-weight: 600;
+        font-family: var(--font-mono);
+        letter-spacing: -0.02em;
+    }
+
+    /* Tabellen-Ziffern grundsaetzlich gleich breit */
+    table,
+    .tabular {
+        font-variant-numeric: tabular-nums;
+    }
+
+    /* Scrollbar sanft */
+    ::-webkit-scrollbar {
+        width: 10px;
+        height: 10px;
+    }
+    ::-webkit-scrollbar-track {
+        background: hsl(var(--background));
+    }
+    ::-webkit-scrollbar-thumb {
+        background: hsl(var(--border));
+        border-radius: 5px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+        background: hsl(var(--muted-foreground) / 0.5);
+    }
+
+    /* Selection */
+    ::selection {
+        background: hsl(var(--primary) / 0.35);
+        color: hsl(var(--foreground));
+    }
+
+    [data-debug-wrapper="true"] {
+        display: contents !important;
+    }
+}
+
+/* =====================================================================
+   Komponenten-Utilities
+   ===================================================================== */
+@layer components {
+    .els-surface {
+        background-color: hsl(var(--card));
+        border: 1px solid hsl(var(--border));
+        border-radius: var(--radius);
+    }
+
+    .els-surface-raised {
+        background-color: hsl(var(--surface-raised));
+        border: 1px solid hsl(var(--border));
+        border-radius: var(--radius);
+    }
+
+    .els-focus-ring {
+        outline: 2px solid transparent;
+        outline-offset: 2px;
+    }
+    .els-focus-ring:focus-visible {
+        outline-color: hsl(var(--ring));
+    }
+}
