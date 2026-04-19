@@ -130,9 +130,9 @@ export function CommandPaletteProvider({
             { id: "nav-lage", icon: ICON_MAP.patienten, label: "Lage (aktiver Incident)", path: "/lage", available: true, shortcut: "G L" },
             { id: "nav-patienten", icon: ICON_MAP.patienten, label: "Patienten", path: "/patienten", available: true, shortcut: "G P" },
             { id: "nav-transport", icon: ICON_MAP.transport, label: "Transport", path: "/transport", available: true, shortcut: "G T" },
-            { id: "nav-ressourcen", icon: ICON_MAP.ressourcen, label: "Ressourcen", path: "/ressourcen", available: false, step: "06" },
-            { id: "nav-kommunikation", icon: ICON_MAP.kommunikation, label: "Kommunikation", path: "/kommunikation", available: false, step: "06" },
-            { id: "nav-konflikte", icon: ICON_MAP.konflikte, label: "Konflikte", path: "/konflikte", available: false, step: "06" },
+            { id: "nav-ressourcen", icon: ICON_MAP.ressourcen, label: "Ressourcen", path: "/ressourcen", available: true, shortcut: "G R" },
+            { id: "nav-kommunikation", icon: ICON_MAP.kommunikation, label: "Kommunikation", path: "/kommunikation", available: true, shortcut: "G K" },
+            { id: "nav-konflikte", icon: ICON_MAP.konflikte, label: "Konflikte", path: "/konflikte", available: true, shortcut: "G X" },
             { id: "nav-abschluss", icon: ICON_MAP.abschluss, label: "Auswertung & Abschluss", path: "/abschluss", available: false, step: "09" }
         ],
         []

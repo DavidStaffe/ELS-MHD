@@ -1,0 +1,83 @@
+{
+  "summary": "Completed comprehensive testing of ELS MHD Step 06 - Ressourcen, Kommunikation & Konflikte. All 27 backend API tests passed (100%). Frontend UI tests passed for all core functionality including Resources page with Statusmatrix and KPIs, Messages page with filters and Neue Meldung dialog, Konflikte page with auto-detection and color-coded cards, Quittieren functionality, inline status change on resources, and sidebar disabled state when no incident is active.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {
+        "endpoint": "POST /api/incidents/{id}/transports",
+        "issue": "When creating a transport with ressource directly, the resource status is not updated to im_einsatz. Resource sync only happens on PATCH, not POST. This is by design per requirements but could be considered for enhancement.",
+        "priority": "LOW"
+      }
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_step06_resources_messages_konflikte.py",
+    "/app/test_reports/pytest/pytest_step06_results.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [],
+  "updated_files": [
+    "/app/backend/tests/test_step06_resources_messages_konflikte.py"
+  ],
+  "success_rate": {
+    "backend": "100% (27/27 tests passed)",
+    "frontend": "100% (all features working correctly)"
+  },
+  "test_credentials": "No authentication required",
+  "seed_data_creation": "Test incident TEST_Step06_Resources_Messages created and cleaned up by pytest. Demo incident MANV-Uebung Sued (712ca18e) used for frontend testing - has 1 critical message (now acked), 2 open transports (gelb konflikte).",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Step 06 fully tested. Backend: Resources CRUD with lazy seeding (9 defaults: UHS Team 1-3, Radstreife 1, RTW 1-2, KTW 1-2, NEF 1), Messages CRUD with ack and open_only filter, Konflikte auto-detection (not persisted), Resource-Transport sync on PATCH, Cascade delete verified. Frontend: /ressourcen page with data-testid: resources-title, resource-matrix, kpi-res-total/verf/einsatz/wartung/offline, resource-row-*, resource-status-*. /kommunikation page with data-testid: messages-title, kpi-msg-total/offen/kritisch/dringend, mfilter-alle/offen/kritisch, messages-new, new-message-dialog, nm-prio/kat/von/text/submit/cancel, message-ack-*, message-delete-*. /konflikte page with data-testid: konflikte-title, konflikt-card-* with data-schwere=rot/gelb/info, konflikt-open-*, konflikt-resolve-*. Sidebar nav-ressourcen/kommunikation/konflikte disabled when no incident active. Command palette has G R / G K / G X shortcuts.",
+  "features_tested": {
+    "backend": [
+      "GET /api/meta returns version 0.6.0 and step '06 – Ressourcen, Kommunikation & Konflikte'",
+      "GET /api/incidents/{id}/resources lazy-seeds 9 default resources",
+      "GET /api/incidents/{id}/resources second call does not duplicate seed",
+      "POST /api/incidents/{id}/resources creates new resource",
+      "PATCH /api/resources/{id} with status=wartung updates resource",
+      "DELETE /api/resources/{id} removes resource",
+      "GET /api/incidents/{id}/resources?typ=intern filters correctly (4 intern resources)",
+      "PATCH transport with ressource='RTW 1' sets Resource.status=im_einsatz",
+      "PATCH transport with status=abgeschlossen frees Resource (status=verfuegbar)",
+      "GET /api/incidents/{id}/messages returns array",
+      "POST /api/incidents/{id}/messages creates message with prioritaet/kategorie/von",
+      "POST /api/messages/{id}/ack sets quittiert_at + quittiert_von",
+      "GET /api/incidents/{id}/messages?open_only=true filters unquittierte",
+      "DELETE /api/messages/{id} removes message",
+      "GET /api/incidents/{id}/konflikte returns auto-detected konflikte array",
+      "Kritische unquittierte Meldung -> Konflikt schwere=rot",
+      "Transport offen ohne Ressource >10min -> schwere=gelb (logic verified)",
+      "Konflikte sorted: rot > gelb > info",
+      "DELETE incident removes resources and messages (cascade delete)",
+      "404 errors for nonexistent resources/messages/konflikte"
+    ],
+    "frontend": [
+      "/ressourcen: Title 'Ressourcen-Uebersicht' (resources-title)",
+      "/ressourcen: Statusmatrix (resource-matrix) with categories x status",
+      "/ressourcen: 5 KPI tiles (kpi-res-total/verf/einsatz/wartung/offline)",
+      "/ressourcen: 9 resource rows with inline status select",
+      "/ressourcen: Intern/Extern sections",
+      "/ressourcen: Inline status change updates KPIs and matrix",
+      "/kommunikation: Title 'Meldungen' (messages-title)",
+      "/kommunikation: 4 KPI tiles (kpi-msg-total/offen/kritisch/dringend)",
+      "/kommunikation: Filter chips (mfilter-alle/offen/kritisch)",
+      "/kommunikation: Neue Meldung button (messages-new)",
+      "/kommunikation: New Message Dialog (new-message-dialog) with all fields",
+      "/kommunikation: Quittieren button (message-ack-*) works",
+      "/konflikte: Title 'Konflikte & Blocker' (konflikte-title)",
+      "/konflikte: Auto-refresh note 'aktualisiert alle 30s'",
+      "/konflikte: KPI tiles (Gesamt/Kritisch/Warnung/Info)",
+      "/konflikte: Cards color-coded with data-schwere=rot/gelb/info",
+      "/konflikte: 'Oeffnen' button navigates to bezug",
+      "/konflikte: 'Quittieren' button for message-bezogene Konflikte works",
+      "Sidebar: Ressourcen/Kommunikation/Konflikte disabled when no incident active",
+      "Sidebar: Ressourcen/Kommunikation/Konflikte enabled when incident active",
+      "Command Palette: G R / G K / G X shortcuts present"
+    ]
+  }
+}

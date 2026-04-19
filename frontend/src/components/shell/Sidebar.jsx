@@ -65,24 +65,24 @@ const NAV_GROUPS = (hasIncident) => [
                 icon: Boxes,
                 label: "Ressourcen",
                 testId: "nav-ressourcen",
-                disabled: true,
-                step: "06"
+                disabled: !hasIncident,
+                hint: hasIncident ? null : "inaktiv"
             },
             {
                 to: "/kommunikation",
                 icon: Radio,
                 label: "Kommunikation",
                 testId: "nav-kommunikation",
-                disabled: true,
-                step: "06"
+                disabled: !hasIncident,
+                hint: hasIncident ? null : "inaktiv"
             },
             {
                 to: "/konflikte",
                 icon: AlertOctagon,
                 label: "Konflikte",
                 testId: "nav-konflikte",
-                disabled: true,
-                step: "06"
+                disabled: !hasIncident,
+                hint: hasIncident ? null : "inaktiv"
             }
         ]
     },

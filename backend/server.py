@@ -111,6 +111,12 @@ TransportStatus = Literal[
     "abgeschlossen",
 ]
 
+ResourceKategorie = Literal["uhs", "rtw", "ktw", "nef", "bike", "sonstiges"]
+ResourceStatus = Literal["verfuegbar", "im_einsatz", "wartung", "offline"]
+
+MessagePrio = Literal["kritisch", "dringend", "normal"]
+MessageKat = Literal["info", "lage", "anforderung", "warnung"]
+
 
 class IncidentBase(BaseModel):
     model_config = ConfigDict(extra="ignore")
@@ -161,8 +167,8 @@ async def meta():
     return {
         "app": "ELS MHD",
         "name": "Einsatzleitsystem Malteser Hilfsdienst",
-        "version": "0.5.0",
-        "step": "05 – Transportuebersicht",
+        "version": "0.6.0",
+        "step": "06 – Ressourcen, Kommunikation & Konflikte",
     }
 
 
@@ -204,6 +210,7 @@ async def create_incident(payload: IncidentCreate):
             doc[k] = iso(doc[k])
 
     await db.incidents.insert_one(doc)
+    await _seed_default_resources(obj.id)
     return serialize_incident(doc)
 
 
@@ -247,6 +254,7 @@ async def create_demo_incident():
             doc[k] = iso(doc[k])
 
     await db.incidents.insert_one(doc)
+    await _seed_default_resources(obj.id)
     logger.info("Demo-Incident erstellt: %s (%s)", obj.name, obj.id)
     return serialize_incident(doc)
 
@@ -293,9 +301,10 @@ async def delete_incident(incident_id: str):
     result = await db.incidents.delete_one({"id": incident_id})
     if result.deleted_count == 0:
         raise HTTPException(status_code=404, detail="Incident nicht gefunden")
-    # Zugehoerige Patienten und Transporte mit entfernen
     await db.patients.delete_many({"incident_id": incident_id})
     await db.transports.delete_many({"incident_id": incident_id})
+    await db.resources.delete_many({"incident_id": incident_id})
+    await db.messages.delete_many({"incident_id": incident_id})
     return None
 
 
@@ -733,6 +742,40 @@ async def update_transport(transport_id: str, payload: TransportUpdate):
         return_document=True,
         projection={"_id": 0},
     )
+
+    # Ressourcen-Status synchronisieren
+    existing_ressource = existing.get("ressource")
+    new_ressource = result.get("ressource")
+    new_status = result.get("status")
+
+    # Alte Ressource: wenn Transport abgeschlossen oder Ressource-Wechsel -> freigeben (wenn nicht anderweitig belegt)
+    async def _release_if_free(ressource_name: str):
+        if not ressource_name:
+            return
+        # Pruefe ob andere aktive Transporte diese Ressource nutzen
+        other = await db.transports.find_one(
+            {
+                "incident_id": result["incident_id"],
+                "ressource": ressource_name,
+                "id": {"$ne": transport_id},
+                "status": {"$in": ["zugewiesen", "unterwegs"]},
+            },
+            {"_id": 0},
+        )
+        if not other:
+            await _update_resource_status_by_name(
+                result["incident_id"], ressource_name, "verfuegbar"
+            )
+
+    if existing_ressource and existing_ressource != new_ressource:
+        await _release_if_free(existing_ressource)
+    if new_ressource and new_status in ("zugewiesen", "unterwegs"):
+        await _update_resource_status_by_name(
+            result["incident_id"], new_ressource, "im_einsatz"
+        )
+    if new_status == "abgeschlossen" and new_ressource:
+        await _release_if_free(new_ressource)
+
     return result
 
 
@@ -742,6 +785,322 @@ async def delete_transport(transport_id: str):
     if result.deleted_count == 0:
         raise HTTPException(status_code=404, detail="Transport nicht gefunden")
     return None
+
+
+# ---------------------------------------------------------------------------
+# Ressourcen
+# ---------------------------------------------------------------------------
+
+DEFAULT_RESOURCES = [
+    {"name": "UHS Team 1", "typ": "intern", "kategorie": "uhs"},
+    {"name": "UHS Team 2", "typ": "intern", "kategorie": "uhs"},
+    {"name": "UHS Team 3", "typ": "intern", "kategorie": "uhs"},
+    {"name": "Radstreife 1", "typ": "intern", "kategorie": "bike"},
+    {"name": "RTW 1", "typ": "extern", "kategorie": "rtw"},
+    {"name": "RTW 2", "typ": "extern", "kategorie": "rtw"},
+    {"name": "KTW 1", "typ": "extern", "kategorie": "ktw"},
+    {"name": "KTW 2", "typ": "extern", "kategorie": "ktw"},
+    {"name": "NEF 1", "typ": "extern", "kategorie": "nef"},
+]
+
+
+class ResourceBase(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    name: str = Field(min_length=1, max_length=80)
+    typ: TransportTyp
+    kategorie: ResourceKategorie = "sonstiges"
+    status: ResourceStatus = "verfuegbar"
+    notiz: str = Field(default="", max_length=1000)
+
+
+class ResourceCreate(ResourceBase):
+    pass
+
+
+class ResourceUpdate(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    name: Optional[str] = None
+    typ: Optional[TransportTyp] = None
+    kategorie: Optional[ResourceKategorie] = None
+    status: Optional[ResourceStatus] = None
+    notiz: Optional[str] = None
+
+
+class Resource(ResourceBase):
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    incident_id: str
+    created_at: datetime = Field(default_factory=now_utc)
+    updated_at: datetime = Field(default_factory=now_utc)
+
+
+def _serialize_resource(doc: dict) -> dict:
+    doc = {k: v for k, v in doc.items() if k != "_id"}
+    for k in ("created_at", "updated_at"):
+        if k in doc and isinstance(doc[k], datetime):
+            doc[k] = iso(doc[k])
+    return doc
+
+
+async def _seed_default_resources(incident_id: str):
+    existing = await db.resources.count_documents({"incident_id": incident_id})
+    if existing > 0:
+        return
+    docs = []
+    for defn in DEFAULT_RESOURCES:
+        r = Resource(incident_id=incident_id, **defn)
+        d = r.model_dump()
+        for k in ("created_at", "updated_at"):
+            if isinstance(d.get(k), datetime):
+                d[k] = iso(d[k])
+        docs.append(d)
+    if docs:
+        await db.resources.insert_many(docs)
+
+
+async def _update_resource_status_by_name(incident_id: str, name: str, status: str):
+    now = now_utc()
+    await db.resources.update_one(
+        {"incident_id": incident_id, "name": name},
+        {"$set": {"status": status, "updated_at": iso(now)}},
+    )
+
+
+@api_router.get("/incidents/{incident_id}/resources", response_model=List[dict])
+async def list_resources(incident_id: str, typ: Optional[str] = None, status: Optional[str] = None):
+    inc = await db.incidents.find_one({"id": incident_id}, {"_id": 0})
+    if not inc:
+        raise HTTPException(status_code=404, detail="Incident nicht gefunden")
+    # Lazy seed
+    await _seed_default_resources(incident_id)
+    query: dict = {"incident_id": incident_id}
+    if typ:
+        query["typ"] = {"$in": [v.strip() for v in typ.split(",") if v.strip()]}
+    if status:
+        query["status"] = {"$in": [v.strip() for v in status.split(",") if v.strip()]}
+    cursor = db.resources.find(query, {"_id": 0}).sort([("typ", 1), ("name", 1)])
+    return await cursor.to_list(500)
+
+
+@api_router.post("/incidents/{incident_id}/resources", response_model=dict, status_code=201)
+async def create_resource(incident_id: str, payload: ResourceCreate):
+    inc = await db.incidents.find_one({"id": incident_id}, {"_id": 0})
+    if not inc:
+        raise HTTPException(status_code=404, detail="Incident nicht gefunden")
+    r = Resource(incident_id=incident_id, **payload.model_dump(exclude_none=True))
+    d = r.model_dump()
+    for k in ("created_at", "updated_at"):
+        if isinstance(d.get(k), datetime):
+            d[k] = iso(d[k])
+    await db.resources.insert_one(d)
+    return _serialize_resource(d)
+
+
+@api_router.patch("/resources/{resource_id}", response_model=dict)
+async def update_resource(resource_id: str, payload: ResourceUpdate):
+    upd = payload.model_dump(exclude_none=True)
+    if not upd:
+        raise HTTPException(status_code=400, detail="Keine Aenderungen")
+    upd["updated_at"] = iso(now_utc())
+    res = await db.resources.find_one_and_update(
+        {"id": resource_id},
+        {"$set": upd},
+        return_document=True,
+        projection={"_id": 0},
+    )
+    if not res:
+        raise HTTPException(status_code=404, detail="Ressource nicht gefunden")
+    return res
+
+
+@api_router.delete("/resources/{resource_id}", status_code=204)
+async def delete_resource(resource_id: str):
+    r = await db.resources.delete_one({"id": resource_id})
+    if r.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="Ressource nicht gefunden")
+    return None
+
+
+# ---------------------------------------------------------------------------
+# Kommunikation (Messages)
+# ---------------------------------------------------------------------------
+
+
+class MessageBase(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    text: str = Field(min_length=1, max_length=4000)
+    prioritaet: MessagePrio = "normal"
+    kategorie: MessageKat = "info"
+    von: str = Field(default="", max_length=80)
+
+
+class MessageCreate(MessageBase):
+    pass
+
+
+class Message(MessageBase):
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    incident_id: str
+    quittiert_at: Optional[datetime] = None
+    quittiert_von: Optional[str] = None
+    created_at: datetime = Field(default_factory=now_utc)
+
+
+def _serialize_message(doc: dict) -> dict:
+    doc = {k: v for k, v in doc.items() if k != "_id"}
+    for k in ("created_at", "quittiert_at"):
+        if k in doc and isinstance(doc[k], datetime):
+            doc[k] = iso(doc[k])
+    return doc
+
+
+@api_router.get("/incidents/{incident_id}/messages", response_model=List[dict])
+async def list_messages(incident_id: str, open_only: bool = False):
+    inc = await db.incidents.find_one({"id": incident_id}, {"_id": 0})
+    if not inc:
+        raise HTTPException(status_code=404, detail="Incident nicht gefunden")
+    query: dict = {"incident_id": incident_id}
+    if open_only:
+        query["quittiert_at"] = None
+    cursor = db.messages.find(query, {"_id": 0}).sort("created_at", -1)
+    return await cursor.to_list(500)
+
+
+@api_router.post("/incidents/{incident_id}/messages", response_model=dict, status_code=201)
+async def create_message(incident_id: str, payload: MessageCreate):
+    inc = await db.incidents.find_one({"id": incident_id}, {"_id": 0})
+    if not inc:
+        raise HTTPException(status_code=404, detail="Incident nicht gefunden")
+    m = Message(incident_id=incident_id, **payload.model_dump(exclude_none=True))
+    d = m.model_dump()
+    for k in ("created_at", "quittiert_at"):
+        if isinstance(d.get(k), datetime):
+            d[k] = iso(d[k])
+    await db.messages.insert_one(d)
+    return _serialize_message(d)
+
+
+@api_router.post("/messages/{message_id}/ack", response_model=dict)
+async def ack_message(message_id: str, by: Optional[str] = None):
+    now = now_utc()
+    result = await db.messages.find_one_and_update(
+        {"id": message_id},
+        {"$set": {"quittiert_at": iso(now), "quittiert_von": by or "Einsatzleiter"}},
+        return_document=True,
+        projection={"_id": 0},
+    )
+    if not result:
+        raise HTTPException(status_code=404, detail="Meldung nicht gefunden")
+    return result
+
+
+@api_router.delete("/messages/{message_id}", status_code=204)
+async def delete_message(message_id: str):
+    r = await db.messages.delete_one({"id": message_id})
+    if r.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="Meldung nicht gefunden")
+    return None
+
+
+# ---------------------------------------------------------------------------
+# Konflikte (Auto-Detection, nicht persistiert)
+# ---------------------------------------------------------------------------
+
+
+@api_router.get("/incidents/{incident_id}/konflikte", response_model=List[dict])
+async def detect_konflikte(incident_id: str):
+    inc = await db.incidents.find_one({"id": incident_id}, {"_id": 0})
+    if not inc:
+        raise HTTPException(status_code=404, detail="Incident nicht gefunden")
+
+    now = now_utc()
+    konflikte: list[dict] = []
+
+    # Regel 1: Patient S1 wartend > 5 Min
+    patients = await db.patients.find(
+        {"incident_id": incident_id, "status": "wartend", "sichtung": "S1"},
+        {"_id": 0},
+    ).to_list(500)
+    for p in patients:
+        created = parse_iso(p.get("created_at"))
+        if created and (now - created).total_seconds() > 300:
+            konflikte.append({
+                "id": f"p-wartend-{p['id']}",
+                "typ": "patient_kritisch_wartet",
+                "schwere": "rot",
+                "titel": f"S1-Patient wartet ({p['kennung']})",
+                "beschreibung": f"S1-Patient {p['kennung']} ist seit {int((now - created).total_seconds() // 60)} Min. im Status 'wartend'.",
+                "bezug_typ": "patient",
+                "bezug_id": p["id"],
+                "bezug_label": p["kennung"],
+                "seit": iso(created),
+            })
+
+    # Regel 2: Transport offen ohne Ressource > 10 Min
+    tnow = await db.transports.find(
+        {"incident_id": incident_id, "status": "offen", "ressource": None},
+        {"_id": 0},
+    ).to_list(500)
+    for t in tnow:
+        created = parse_iso(t.get("created_at"))
+        if created and (now - created).total_seconds() > 600:
+            konflikte.append({
+                "id": f"t-offen-{t['id']}",
+                "typ": "transport_ohne_ressource",
+                "schwere": "gelb",
+                "titel": "Transport ohne Ressource",
+                "beschreibung": f"Transport {t.get('patient_kennung') or 'ohne Patient'} wartet seit {int((now - created).total_seconds() // 60)} Min. auf eine Ressource.",
+                "bezug_typ": "transport",
+                "bezug_id": t["id"],
+                "bezug_label": t.get("patient_kennung") or "Transport",
+                "seit": iso(created),
+            })
+
+    # Regel 3: Transport unterwegs > 60 Min
+    tunterwegs = await db.transports.find(
+        {"incident_id": incident_id, "status": "unterwegs"},
+        {"_id": 0},
+    ).to_list(500)
+    for t in tunterwegs:
+        start = parse_iso(t.get("gestartet_at"))
+        if start and (now - start).total_seconds() > 3600:
+            konflikte.append({
+                "id": f"t-lang-{t['id']}",
+                "typ": "transport_lang_unterwegs",
+                "schwere": "gelb",
+                "titel": "Transport lange unterwegs",
+                "beschreibung": f"Transport {t.get('patient_kennung') or ''} ({t.get('ressource') or 'unbekannt'}) bereits {int((now - start).total_seconds() // 60)} Min. unterwegs.",
+                "bezug_typ": "transport",
+                "bezug_id": t["id"],
+                "bezug_label": t.get("patient_kennung") or "Transport",
+                "seit": iso(start),
+            })
+
+    # Regel 4: Kritische Meldungen unquittiert
+    mhigh = await db.messages.find(
+        {
+            "incident_id": incident_id,
+            "prioritaet": "kritisch",
+            "quittiert_at": None,
+        },
+        {"_id": 0},
+    ).to_list(200)
+    for m in mhigh:
+        konflikte.append({
+            "id": f"m-unack-{m['id']}",
+            "typ": "kritische_meldung_offen",
+            "schwere": "rot",
+            "titel": "Kritische Meldung unquittiert",
+            "beschreibung": m["text"][:160],
+            "bezug_typ": "message",
+            "bezug_id": m["id"],
+            "bezug_label": m.get("von") or "System",
+            "seit": m.get("created_at"),
+        })
+
+    # Sortiert: rot > gelb > info
+    order = {"rot": 0, "gelb": 1, "info": 2}
+    konflikte.sort(key=lambda k: order.get(k["schwere"], 9))
+    return konflikte
 
 
 # ---------------------------------------------------------------------------

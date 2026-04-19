@@ -98,3 +98,49 @@ export async function updateTransport(id, payload) {
 export async function deleteTransport(id) {
     await api.delete(`/transports/${id}`);
 }
+
+/* =====================================================================
+   Resources
+   ===================================================================== */
+export async function listResources(incidentId, params = {}) {
+    const { data } = await api.get(`/incidents/${incidentId}/resources`, { params });
+    return data;
+}
+export async function createResource(incidentId, payload) {
+    const { data } = await api.post(`/incidents/${incidentId}/resources`, payload);
+    return data;
+}
+export async function updateResource(id, payload) {
+    const { data } = await api.patch(`/resources/${id}`, payload);
+    return data;
+}
+export async function deleteResource(id) {
+    await api.delete(`/resources/${id}`);
+}
+
+/* =====================================================================
+   Messages
+   ===================================================================== */
+export async function listMessages(incidentId, params = {}) {
+    const { data } = await api.get(`/incidents/${incidentId}/messages`, { params });
+    return data;
+}
+export async function createMessage(incidentId, payload) {
+    const { data } = await api.post(`/incidents/${incidentId}/messages`, payload);
+    return data;
+}
+export async function ackMessage(id, by) {
+    const { data } = await api.post(`/messages/${id}/ack`, null, { params: { by } });
+    return data;
+}
+export async function deleteMessage(id) {
+    await api.delete(`/messages/${id}`);
+}
+
+/* =====================================================================
+   Konflikte (Auto-Detection)
+   ===================================================================== */
+export async function listKonflikte(incidentId) {
+    const { data } = await api.get(`/incidents/${incidentId}/konflikte`);
+    return data;
+}
