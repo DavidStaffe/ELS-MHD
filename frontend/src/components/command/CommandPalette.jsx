@@ -128,7 +128,7 @@ export function CommandPaletteProvider({
         () => [
             { id: "nav-einstieg", icon: LayoutDashboard, label: "Einstieg (Incidents)", path: "/", available: true, shortcut: "G E" },
             { id: "nav-lage", icon: ICON_MAP.patienten, label: "Lage (aktiver Incident)", path: "/lage", available: true, shortcut: "G L" },
-            { id: "nav-patienten", icon: ICON_MAP.patienten, label: "Patienten", path: "/patienten", available: false, step: "03" },
+            { id: "nav-patienten", icon: ICON_MAP.patienten, label: "Patienten", path: "/patienten", available: true, shortcut: "G P" },
             { id: "nav-transport", icon: ICON_MAP.transport, label: "Transport", path: "/transport", available: false, step: "05" },
             { id: "nav-ressourcen", icon: ICON_MAP.ressourcen, label: "Ressourcen", path: "/ressourcen", available: false, step: "06" },
             { id: "nav-kommunikation", icon: ICON_MAP.kommunikation, label: "Kommunikation", path: "/kommunikation", available: false, step: "06" },

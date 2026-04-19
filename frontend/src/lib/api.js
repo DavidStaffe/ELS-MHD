@@ -40,3 +40,32 @@ export async function updateIncident(id, payload) {
 export async function deleteIncident(id) {
     await api.delete(`/incidents/${id}`);
 }
+
+/* =====================================================================
+   Patients
+   ===================================================================== */
+export async function listPatients(incidentId, params = {}) {
+    const { data } = await api.get(`/incidents/${incidentId}/patients`, {
+        params
+    });
+    return data;
+}
+
+export async function createPatient(incidentId, payload) {
+    const { data } = await api.post(`/incidents/${incidentId}/patients`, payload);
+    return data;
+}
+
+export async function getPatient(id) {
+    const { data } = await api.get(`/patients/${id}`);
+    return data;
+}
+
+export async function updatePatient(id, payload) {
+    const { data } = await api.patch(`/patients/${id}`, payload);
+    return data;
+}
+
+export async function deletePatient(id) {
+    await api.delete(`/patients/${id}`);
+}

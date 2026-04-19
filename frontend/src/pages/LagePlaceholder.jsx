@@ -2,7 +2,8 @@ import * as React from "react";
 import { useNavigate } from "react-router-dom";
 import { useIncidents } from "@/context/IncidentContext";
 import { Button } from "@/components/ui/button";
-import { SectionCard, StatusBadge } from "@/components/primitives";
+import { StatusBadge } from "@/components/primitives";
+import { cn } from "@/lib/utils";
 import { ArrowLeft, Users, Truck, Boxes, Radio, AlertOctagon, FileCheck2 } from "lucide-react";
 
 /**
@@ -36,7 +37,7 @@ export default function LagePlaceholder() {
     }
 
     const modules = [
-        { step: "03", label: "Patienten", icon: Users, description: "Erfassung, Sichtung, Status, Verbleib" },
+        { step: "03", label: "Patienten", icon: Users, description: "Erfassung, Sichtung, Status, Verbleib", to: "/patienten" },
         { step: "05", label: "Transport", icon: Truck, description: "Intern / extern, Zuteilung, Zeitstempel" },
         { step: "06", label: "Ressourcen", icon: Boxes, description: "Fahrzeuge, Personal, Material" },
         { step: "06", label: "Kommunikation", icon: Radio, description: "Meldungen, Quittierung" },
@@ -72,27 +73,45 @@ export default function LagePlaceholder() {
             <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
                 {modules.map((m) => {
                     const Icon = m.icon;
+                    const available = Boolean(m.to);
+                    const Wrapper = available ? "button" : "div";
                     return (
-                        <SectionCard
+                        <Wrapper
                             key={`${m.step}-${m.label}`}
-                            title={
-                                <span className="flex items-center gap-2">
-                                    <Icon className="h-4 w-4 text-primary" />
-                                    {m.label}
-                                </span>
-                            }
-                            subtitle={m.description}
-                            action={
-                                <StatusBadge tone="gray" size="sm">
-                                    Schritt {m.step}
-                                </StatusBadge>
-                            }
+                            type={available ? "button" : undefined}
+                            onClick={available ? () => navigate(m.to) : undefined}
+                            data-testid={`lage-module-${m.label.toLowerCase().replace(/[^a-z]/g, "")}`}
+                            className={cn(
+                                "els-surface text-left flex flex-col p-0 transition-all",
+                                available
+                                    ? "hover:border-primary/60 hover:bg-surface-raised els-focus-ring cursor-pointer"
+                                    : "opacity-80"
+                            )}
                         >
-                            <p className="text-caption text-muted-foreground">
-                                Das Modul folgt in einem der naechsten
-                                Implementierungsschritte.
-                            </p>
-                        </SectionCard>
+                            <div className="flex items-start justify-between gap-3 border-b border-border px-4 py-3">
+                                <div className="min-w-0">
+                                    <div className="flex items-center gap-2 text-heading">
+                                        <Icon className="h-4 w-4 text-primary" />
+                                        {m.label}
+                                    </div>
+                                    <p className="mt-0.5 text-caption text-muted-foreground">
+                                        {m.description}
+                                    </p>
+                                </div>
+                                <StatusBadge
+                                    tone={available ? "info" : "gray"}
+                                    size="sm"
+                                    variant="soft"
+                                >
+                                    {available ? "verfuegbar" : `Schritt ${m.step}`}
+                                </StatusBadge>
+                            </div>
+                            <div className="p-4 text-caption text-muted-foreground">
+                                {available
+                                    ? "Klicken zum Oeffnen."
+                                    : "Das Modul folgt in einem der naechsten Implementierungsschritte."}
+                            </div>
+                        </Wrapper>
                     );
                 })}
             </div>

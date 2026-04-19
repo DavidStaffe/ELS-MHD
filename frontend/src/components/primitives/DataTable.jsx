@@ -12,6 +12,7 @@ export function DataTable({
     rows = [],
     onRowClick,
     rowKey = "id",
+    rowTestId,
     empty = "Keine Eintraege.",
     dense = false,
     className,
@@ -65,7 +66,11 @@ export function DataTable({
                                 onClick={
                                     onRowClick ? () => onRowClick(r) : undefined
                                 }
-                                data-testid="data-table-row"
+                                data-testid={
+                                    rowTestId
+                                        ? rowTestId(r)
+                                        : "data-table-row"
+                                }
                                 className={cn(
                                     "border-b border-border last:border-0 transition-colors",
                                     onRowClick &&
