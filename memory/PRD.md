@@ -105,6 +105,43 @@ Abschlussbericht mit PDF-Export.
 - Backend-Tests (22/22 passed), Frontend-E2E (100%)
 
 ### ✅ Schritt 04 – Patientendetail + Smart Enhancement (2026-04)
+- **GLOBALE Umbenennung S4 → S0** (rueckwirkend): Backend Literal, idempotente DB-Migration on startup,
+  Frontend-Konstanten, KPIs, Filter, QuickEntryBar-Shortcut `0`, Grid-Reihenfolge S1/S2/S3/S0
+- Backend: Felder `transport_typ` + `fallabschluss_typ`, PATCH mit automatischer Status-Progression
+  und Default-Verbleib
+- Frontend `/patienten/:id`: Kopf (Kennung, SichtungBadge, Status, DEMO), 3 Prozesszeiten-KPIs,
+  Sichtungs-Grid, Notiz mit debounced Auto-Save, Transport-Panel + Dialog, Fallabschluss-Panel +
+  Dialog, Verbleib-Dropdown, vertikale Timeline mit 5 Events und Dauer-Deltas, Deep-Link-Support
+- **Smart Enhancement Ein-Klick-Progression**: Dynamischer Next-Step-Button passt sich an Status an,
+  oeffnet bei Bedarf Transport-/Fallabschluss-Dialog
+- Backend-Tests (18/18 passed), Frontend-E2E (100%)
+
+### ✅ Schritt 05 – Transportuebersicht + Drag & Drop (2026-04)
+- **Fix QuickEntryBar**: Sichtungs-Buttons zentriert (flex-1 justify-center), rechter Spacer w-44
+  reserviert Platz fuer "Made with Emergent"-Badge (S0-Button >180px vom rechten Rand)
+- Backend: `Transport`-Modell (typ, ziel, ressource, status, 4 Zeitstempel), CRUD-Endpoints
+  `/api/incidents/{id}/transports` + `/api/transports/{id}`, Filter `?typ=` `?status=`
+- **Auto-Create**: Setzen von `patient.transport_typ` legt automatisch Transport-Eintrag
+  (status=offen, ziel=uhs bei intern / rd bei extern, patient_kennung+sichtung kopiert) an
+- **Auto-Complete**: Patient-Status-Wechsel auf entlassen/uebergeben schliesst zugehoerige
+  Transporte automatisch ab
+- Cascade-Delete: Incident loeschen entfernt Patienten UND Transporte
+- Automatische Zeitstempel: `zugewiesen_at` (bei Ressource), `gestartet_at` (status=unterwegs),
+  `abgeschlossen_at` (status=abgeschlossen)
+- Frontend: `TransportContext` scoped auf activeIncident, 6 KPIs
+- `/transport` 2-Spalten-Layout (Intern UHS / Extern RD+KH), je 4 Status-Buckets
+- `TransportCard`: Sichtung, Kennung (Link zu Patient), Ziel, Ressource (rot wenn fehlt),
+  Live-Dauer, Draggable, Action-Buttons (Abfahrt, Abschliessen, Ressource...)
+- **Smart Enhancement – Drag & Drop Ressourcen-Zuweisung**: `ResourceBar` sticky bottom mit
+  9 Drop-Targets (4 UHS-Teams + 5 Rettungsmittel), Drag einer Karte weist Ressource zu +
+  setzt status=zugewiesen. Typ-Mismatch (intern/extern) verhindert Drop. Alternative:
+  Click auf "Ressource..." oeffnet `ResourceAssignDialog` mit Grid-Auswahl
+- `NewTransportDialog` fuer manuelle Anlage (ohne Patient, z.B. Materialfahrten)
+- Spalten-Kopf zeigt "N ohne Ressource"-Warnung fuer fehlende Zuweisungen
+- Bucket Dropping: Transport kann zurueck in "Offen"-Bucket gedroppt werden → entfernt Ressource
+- Sidebar: Transport-Modul aktiv bei Incident
+- Command-Palette: Transport-Navigation ueber "G T"
+- Backend-Tests (19/19 passed inkl. Auto-Create + Auto-Complete + Cascade), Frontend-E2E (100%, null Issues)
 - **GLOBALE Umbenennung S4 → S0** (rueckwirkend): Backend Literal, DB-Migration (idempotent on startup,
   alle S4-Eintraege -> S0), Frontend-Konstanten, KPIs, Filter, QuickEntryBar-Shortcuts (0 = S0),
   SichtungsGrid-Reihenfolge S1/S2/S3/S0
@@ -157,8 +194,7 @@ Abschlussbericht mit PDF-Export.
 - LagePlaceholder (`/lage`): Uebersicht mit Modulen, Hinweis auf Folge-Schritte
 - Backend-Test (13/13 passed), Frontend-E2E (95%+, nur 2 LOW Issues gefunden und gefixt)
 
-### 🔜 Backlog (Schritte 05–09)
-- **Schritt 05 (P0)**: Transportuebersicht (intern/extern, Ressource, Ziel, Status)
+### 🔜 Backlog (Schritte 06–09)
 - **Schritt 06 (P1)**: Ressourcen + Kommunikation + Konflikte
 - **Schritt 07 (P1)**: Produktreife – Leer-/Fehler-/Loading-States, Navigation
 - **Schritt 08 (P2)**: Demo-Integration – realistische Vordaten (Patienten, Transporte etc.)
