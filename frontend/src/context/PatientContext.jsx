@@ -3,11 +3,15 @@ import {
     listPatients as apiList,
     createPatient as apiCreate,
     updatePatient as apiUpdate,
-    deletePatient as apiDelete
+    deletePatient as apiDelete,
+    reopenPatient as apiReopen
 } from "@/lib/api";
 import { useIncidents } from "@/context/IncidentContext";
 
 const PatientContext = React.createContext(null);
+
+const CLOSED_STATES = new Set(["uebergeben", "entlassen"]);
+export const isPatientClosed = (p) => CLOSED_STATES.has(p?.status);
 
 export function usePatients() {
     const ctx = React.useContext(PatientContext);
@@ -74,17 +78,38 @@ export function PatientProvider({ children }) {
         setPatients((prev) => prev.filter((p) => p.id !== id));
     }, []);
 
-    // Abgeleitete KPIs
+    const reopen = React.useCallback(async (id) => {
+        const updated = await apiReopen(id);
+        setPatients((prev) =>
+            prev.map((p) => (p.id === id ? updated : p))
+        );
+        return updated;
+    }, []);
+
+    // Abgeleitete KPIs: zwei Modi
+    //  - alle: alle Patienten (inkl. abgeschlossen)
+    //  - offen: nur nicht abgeschlossene Patienten (status !in {uebergeben, entlassen})
     const kpis = React.useMemo(() => {
-        const buckets = { total: patients.length, S1: 0, S2: 0, S3: 0, S0: 0, wartend: 0, behandlung: 0, transport: 0, abgeschlossen: 0 };
+        const mkBuckets = () => ({
+            total: 0, S1: 0, S2: 0, S3: 0, S0: 0,
+            wartend: 0, behandlung: 0, transport: 0, abgeschlossen: 0
+        });
+        const alle = mkBuckets();
+        const offen = mkBuckets();
+        const addTo = (b, p) => {
+            b.total++;
+            if (p.sichtung && b[p.sichtung] !== undefined) b[p.sichtung]++;
+            if (p.status === "wartend") b.wartend++;
+            else if (p.status === "in_behandlung") b.behandlung++;
+            else if (p.status === "transportbereit") b.transport++;
+            else if (p.status === "uebergeben" || p.status === "entlassen") b.abgeschlossen++;
+        };
         for (const p of patients) {
-            if (p.sichtung && buckets[p.sichtung] !== undefined) buckets[p.sichtung]++;
-            if (p.status === "wartend") buckets.wartend++;
-            else if (p.status === "in_behandlung") buckets.behandlung++;
-            else if (p.status === "transportbereit") buckets.transport++;
-            else if (p.status === "uebergeben" || p.status === "entlassen") buckets.abgeschlossen++;
+            addTo(alle, p);
+            if (!isPatientClosed(p)) addTo(offen, p);
         }
-        return buckets;
+        // Legacy-Flach-Interface (Offene als Default) – rueckwaerts-kompatibel
+        return { ...offen, alle, offen };
     }, [patients]);
 
     const value = React.useMemo(
@@ -97,9 +122,10 @@ export function PatientProvider({ children }) {
             create,
             update,
             remove,
+            reopen,
             kpis
         }),
-        [patients, loading, error, incidentId, refresh, create, update, remove, kpis]
+        [patients, loading, error, incidentId, refresh, create, update, remove, reopen, kpis]
     );
 
     return (

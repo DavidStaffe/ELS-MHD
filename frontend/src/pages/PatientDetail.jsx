@@ -37,7 +37,8 @@ import {
     Truck,
     FileCheck2,
     Bed,
-    UserMinus
+    UserMinus,
+    RotateCcw
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { formatDuration } from "@/lib/time";
@@ -157,7 +158,9 @@ export default function PatientDetail() {
     const { patientId } = useParams();
     const navigate = useNavigate();
     const { activeIncident, setActive } = useIncidents();
-    const { patients, update, remove, refresh } = usePatients();
+    const { patients, update, remove, refresh, reopen } = usePatients();
+
+    const [reopenOpen, setReopenOpen] = React.useState(false);
 
     const [patient, setPatient] = React.useState(() =>
         patients.find((p) => p.id === patientId) || null
@@ -330,6 +333,26 @@ export default function PatientDetail() {
 
     const handleTransport = (typ) => applyPatch({ transport_typ: typ });
     const handleAbschluss = (typ) => applyPatch({ fallabschluss_typ: typ });
+
+    const handleReopen = async () => {
+        if (!patient) return;
+        setBusy(true);
+        setError(null);
+        try {
+            const updated = await reopen(patient.id);
+            setPatient(updated);
+            setVerbleib(updated.verbleib || "unbekannt");
+        } catch (e) {
+            setError(
+                e?.response?.data?.detail ||
+                e?.message ||
+                "Wiedereroeffnung fehlgeschlagen"
+            );
+        } finally {
+            setBusy(false);
+            setReopenOpen(false);
+        }
+    };
 
     const next = patient ? nextProgression(patient) : null;
 
@@ -663,18 +686,48 @@ export default function PatientDetail() {
                                 </StatusBadge>
                             </div>
                         ) : (
-                            <div className="flex items-center justify-between gap-3">
+                            <div className="space-y-3">
+                                <div className="flex items-center justify-between gap-3">
+                                    <div className="text-caption text-muted-foreground">
+                                        {(patient.wiedereroeffnet_at || []).length > 0
+                                            ? `Wiedereroeffnet · aktuell offen (${(patient.wiedereroeffnet_at || []).length}× erneut aufgenommen)`
+                                            : "Noch nicht abgeschlossen."}
+                                    </div>
+                                    <Button
+                                        variant="outline"
+                                        onClick={() => setAbschlussOpen(true)}
+                                        disabled={busy}
+                                        data-testid="pd-abschluss-open"
+                                    >
+                                        <FileCheck2 className="h-4 w-4" />
+                                        Fall abschliessen
+                                    </Button>
+                                </div>
+                            </div>
+                        )}
+                        {/* Wiedereroeffnen-Option fuer abgeschlossene Patienten */}
+                        {(patient.status === "uebergeben" ||
+                            patient.status === "entlassen") && (
+                            <div className="mt-3 flex items-center justify-between gap-3 rounded-md border border-border bg-surface-sunken px-3 py-2">
                                 <div className="text-caption text-muted-foreground">
-                                    Noch nicht abgeschlossen.
+                                    Patient kehrt zurueck? Wiedereroeffnung setzt
+                                    den Fall auf "In Behandlung" zurueck und
+                                    protokolliert den Zeitstempel.
                                 </div>
                                 <Button
                                     variant="outline"
-                                    onClick={() => setAbschlussOpen(true)}
-                                    disabled={busy}
-                                    data-testid="pd-abschluss-open"
+                                    size="sm"
+                                    disabled={busy || !can("patient.reopen")}
+                                    onClick={() => setReopenOpen(true)}
+                                    data-testid="pd-reopen-btn"
+                                    title={
+                                        can("patient.reopen")
+                                            ? "Fall wiedereroeffnen"
+                                            : "Keine Berechtigung"
+                                    }
                                 >
-                                    <FileCheck2 className="h-4 w-4" />
-                                    Fall abschliessen
+                                    <RotateCcw className="h-4 w-4" />
+                                    Wiedereroeffnen
                                 </Button>
                             </div>
                         )}
@@ -748,6 +801,15 @@ export default function PatientDetail() {
                 confirmLabel="Loeschen"
                 tone="destructive"
                 onConfirm={handleDelete}
+            />
+            <ConfirmModal
+                open={reopenOpen}
+                onOpenChange={setReopenOpen}
+                title={`Patient ${patient.kennung} wiedereroeffnen?`}
+                description="Der Fall wird auf 'In Behandlung' gesetzt, Fallabschluss zurueckgesetzt und der Zeitstempel protokolliert. Diese Aktion ist fuer Patienten gedacht, die nach Entlassung/Uebergabe erneut versorgt werden muessen."
+                confirmLabel="Wiedereroeffnen"
+                onConfirm={handleReopen}
+                testId="pd-reopen-confirm"
             />
 
             {/* Bett-Zuweisungs-Dialog */}

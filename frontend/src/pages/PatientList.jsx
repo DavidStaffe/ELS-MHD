@@ -10,7 +10,7 @@ import {
     DataTable,
     ConfirmModal
 } from "@/components/primitives";
-import { usePatients } from "@/context/PatientContext";
+import { usePatients, isPatientClosed } from "@/context/PatientContext";
 import { useIncidents } from "@/context/IncidentContext";
 import { useCommandPalette } from "@/components/command/CommandPalette";
 import { QuickEntryBar } from "@/components/patients/QuickEntryBar";
@@ -23,7 +23,9 @@ import {
     ChevronRight,
     ArrowLeft,
     Inbox,
-    Activity
+    Activity,
+    Eye,
+    EyeOff
 } from "lucide-react";
 import {
     SICHTUNG,
@@ -108,11 +110,17 @@ export default function PatientList() {
     const [dialogOpen, setDialogOpen] = React.useState(false);
     const [editPatient, setEditPatient] = React.useState(null);
     const [deleteCandidate, setDeleteCandidate] = React.useState(null);
+    // Abgeschlossene Patienten per Default ausblenden
+    const [showClosed, setShowClosed] = React.useState(false);
+    // KPI-Modus: "offen" (Default) oder "alle" – Umschaltung am oberen Rand
+    const [kpiMode, setKpiMode] = React.useState("offen");
 
     // Liste filtern
     const filtered = React.useMemo(() => {
         const q = query.trim().toLowerCase();
         return patients.filter((p) => {
+            // Abgeschlossene standardmaessig ausblenden
+            if (!showClosed && isPatientClosed(p)) return false;
             // Sichtung
             if (p.sichtung) {
                 if (!sichtungFilter[p.sichtung]) return false;
@@ -129,7 +137,7 @@ export default function PatientList() {
             }
             return true;
         });
-    }, [patients, sichtungFilter, statusFilter, query]);
+    }, [patients, sichtungFilter, statusFilter, query, showClosed]);
 
     const toggleSichtung = (k) =>
         setSichtungFilter((s) => ({ ...s, [k]: !s[k] }));
@@ -346,57 +354,102 @@ export default function PatientList() {
                         </div>
                     </div>
 
-                    {/* KPI-Leiste */}
-                    <div className="mb-4 grid grid-cols-2 gap-2 md:grid-cols-4 xl:grid-cols-8">
-                        <KpiTile
-                            label="Total"
-                            value={kpis.total}
-                            tone="default"
-                            testId="kpi-total"
-                        />
-                        <KpiTile
-                            label="S1"
-                            value={kpis.S1}
-                            tone="red"
-                            testId="kpi-s1"
-                        />
-                        <KpiTile
-                            label="S2"
-                            value={kpis.S2}
-                            tone="yellow"
-                            testId="kpi-s2"
-                        />
-                        <KpiTile
-                            label="S3"
-                            value={kpis.S3}
-                            tone="green"
-                            testId="kpi-s3"
-                        />
-                        <KpiTile
-                            label="S0"
-                            value={kpis.S0}
-                            tone="gray"
-                            testId="kpi-s0"
-                        />
-                        <KpiTile
-                            label="Wartend"
-                            value={kpis.wartend}
-                            tone="yellow"
-                            testId="kpi-wartend"
-                        />
-                        <KpiTile
-                            label="In Beh."
-                            value={kpis.behandlung}
-                            tone="default"
-                            testId="kpi-beh"
-                        />
-                        <KpiTile
-                            label="Transport"
-                            value={kpis.transport}
-                            tone="green"
-                            testId="kpi-transport"
-                        />
-                    </div>
+                    {/* KPI-Leiste mit Umschalter Offene / Gesamt */}
+                    {(() => {
+                        const kpiSet = kpiMode === "alle" ? kpis.alle : kpis.offen;
+                        const totalLabel = kpiMode === "alle" ? "Gesamt" : "Offene";
+                        return (
+                            <div className="mb-4 space-y-2" data-testid="kpi-section">
+                                <div
+                                    className="inline-flex rounded-md border border-border bg-surface-sunken p-0.5"
+                                    role="tablist"
+                                    aria-label="KPI-Umschalter"
+                                >
+                                    <button
+                                        type="button"
+                                        role="tab"
+                                        aria-selected={kpiMode === "offen"}
+                                        onClick={() => setKpiMode("offen")}
+                                        data-testid="kpi-mode-offen"
+                                        className={
+                                            "px-3 py-1 text-caption rounded transition-colors " +
+                                            (kpiMode === "offen"
+                                                ? "bg-primary/15 text-primary"
+                                                : "text-muted-foreground hover:text-foreground")
+                                        }
+                                    >
+                                        Offene ({kpis.offen.total})
+                                    </button>
+                                    <button
+                                        type="button"
+                                        role="tab"
+                                        aria-selected={kpiMode === "alle"}
+                                        onClick={() => setKpiMode("alle")}
+                                        data-testid="kpi-mode-alle"
+                                        className={
+                                            "px-3 py-1 text-caption rounded transition-colors " +
+                                            (kpiMode === "alle"
+                                                ? "bg-primary/15 text-primary"
+                                                : "text-muted-foreground hover:text-foreground")
+                                        }
+                                    >
+                                        Gesamt ({kpis.alle.total})
+                                    </button>
+                                </div>
+                                <div className="grid grid-cols-2 gap-2 md:grid-cols-4 xl:grid-cols-8">
+                                    <KpiTile
+                                        label={totalLabel}
+                                        value={kpiSet.total}
+                                        tone="default"
+                                        testId="kpi-total"
+                                        hint={kpiMode === "alle" ? `${kpiSet.abgeschlossen} abgeschlossen` : null}
+                                    />
+                                    <KpiTile
+                                        label="S1"
+                                        value={kpiSet.S1}
+                                        tone="red"
+                                        testId="kpi-s1"
+                                    />
+                                    <KpiTile
+                                        label="S2"
+                                        value={kpiSet.S2}
+                                        tone="yellow"
+                                        testId="kpi-s2"
+                                    />
+                                    <KpiTile
+                                        label="S3"
+                                        value={kpiSet.S3}
+                                        tone="green"
+                                        testId="kpi-s3"
+                                    />
+                                    <KpiTile
+                                        label="S0"
+                                        value={kpiSet.S0}
+                                        tone="gray"
+                                        testId="kpi-s0"
+                                    />
+                                    <KpiTile
+                                        label="Wartend"
+                                        value={kpiSet.wartend}
+                                        tone="yellow"
+                                        testId="kpi-wartend"
+                                    />
+                                    <KpiTile
+                                        label="In Beh."
+                                        value={kpiSet.behandlung}
+                                        tone="default"
+                                        testId="kpi-beh"
+                                    />
+                                    <KpiTile
+                                        label="Transport"
+                                        value={kpiSet.transport}
+                                        tone="green"
+                                        testId="kpi-transport"
+                                    />
+                                </div>
+                            </div>
+                        );
+                    })()}
 
                     {/* Filter- und Suchleiste */}
                     <div className="mb-3 flex flex-wrap items-center gap-3 rounded-md border border-border bg-surface-sunken px-3 py-2.5">
@@ -444,16 +497,31 @@ export default function PatientList() {
                                 );
                             })}
                         </div>
-                        <div className="ml-auto relative">
-                            <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
-                            <Input
-                                type="search"
-                                value={query}
-                                onChange={(e) => setQuery(e.target.value)}
-                                placeholder="Kennung, Notiz, Verbleib…"
-                                className="h-8 w-64 bg-background pl-8"
-                                data-testid="patient-search"
-                            />
+                        <div className="ml-auto flex items-center gap-2">
+                            <FilterChip
+                                active={showClosed}
+                                tone={showClosed ? "info" : "neutral"}
+                                onToggle={() => setShowClosed((v) => !v)}
+                                count={kpis.alle.abgeschlossen}
+                                data-testid="filter-show-closed"
+                            >
+                                {showClosed ? (
+                                    <><Eye className="h-3 w-3 mr-1" />Abgeschlossene sichtbar</>
+                                ) : (
+                                    <><EyeOff className="h-3 w-3 mr-1" />Abgeschlossene einblenden</>
+                                )}
+                            </FilterChip>
+                            <div className="relative">
+                                <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
+                                <Input
+                                    type="search"
+                                    value={query}
+                                    onChange={(e) => setQuery(e.target.value)}
+                                    placeholder="Kennung, Notiz, Verbleib…"
+                                    className="h-8 w-64 bg-background pl-8"
+                                    data-testid="patient-search"
+                                />
+                            </div>
                         </div>
                     </div>
 
@@ -470,7 +538,8 @@ export default function PatientList() {
                             hasFilter={
                                 query !== "" ||
                                 statusFilter !== "alle" ||
-                                !Object.values(sichtungFilter).every(Boolean)
+                                !Object.values(sichtungFilter).every(Boolean) ||
+                                !showClosed
                             }
                             onQuickS2={() => handleQuickCreate({ sichtung: "S2" })}
                         />

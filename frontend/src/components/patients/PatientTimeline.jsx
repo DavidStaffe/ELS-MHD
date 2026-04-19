@@ -109,6 +109,29 @@ export function PatientTimeline({ patient, events = DEFAULT_EVENTS }) {
                 );
             })}
 
+            {/* Wiedereroeffnungs-Historie */}
+            {(patient.wiedereroeffnet_at || []).map((ts, idx) => (
+                <li
+                    key={`reopen-${idx}`}
+                    data-testid={`timeline-reopen-${idx}`}
+                    className="flex items-start gap-3"
+                >
+                    <div className="relative flex h-5 w-5 shrink-0 items-center justify-center">
+                        <span className="block h-2.5 w-2.5 rounded-full bg-status-yellow" />
+                    </div>
+                    <div className="flex-1 text-body">
+                        <div className="flex items-center justify-between gap-2">
+                            <span className="font-medium text-status-yellow">
+                                Wiedereroeffnet #{idx + 1}
+                            </span>
+                        </div>
+                        <div className="text-caption text-muted-foreground">
+                            <span className="font-mono">{formatDateTime(ts)}</span>
+                        </div>
+                    </div>
+                </li>
+            ))}
+
             {/* Live-Dauer seit letztem Event (wenn nicht abgeschlossen) */}
             {patient.status !== "uebergeben" &&
                 patient.status !== "entlassen" &&

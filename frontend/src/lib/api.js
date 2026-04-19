@@ -70,6 +70,11 @@ export async function deletePatient(id) {
     await api.delete(`/patients/${id}`);
 }
 
+export async function reopenPatient(id) {
+    const { data } = await api.post(`/patients/${id}/reopen`);
+    return data;
+}
+
 /* =====================================================================
    Transports
    ===================================================================== */

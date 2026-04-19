@@ -1,6 +1,6 @@
 """All Pydantic models for the ELS-MHD API."""
 from datetime import datetime
-from typing import Optional
+from typing import List, Optional
 import uuid
 
 from pydantic import BaseModel, Field, ConfigDict
@@ -108,6 +108,7 @@ class Patient(PatientBase):
     behandlung_start_at: Optional[datetime] = None
     transport_angefordert_at: Optional[datetime] = None
     fallabschluss_at: Optional[datetime] = None
+    wiedereroeffnet_at: List[datetime] = Field(default_factory=list)
 
 
 # --- Transports -------------------------------------------------------------

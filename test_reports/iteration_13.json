@@ -1,0 +1,36 @@
+{
+  "summary": "Tested patient reopen/wiedereroeffnen feature end-to-end. Backend: 5 new pytest cases all pass (404 non-existent, 409 non-closed, successful reopen, multi-reopen history growth 1->2, system funk entry logged, wiedereroeffnet_at default list). Full suite 148/153 pass – same 5 pre-existing version/S4 failures as iteration 12 baseline, no new regressions. Frontend: verified KPI toggle Offene/Gesamt with correct counts (4 open / 7 total, '3 abgeschlossen' hint), show-closed FilterChip hides 3 closed patients by default and reveals all 7 when toggled, EL reopen button enabled + confirm modal contains 'In Behandlung' and 'Zeitstempel', reopen API call transitions patient to 'In Behandlung' with timeline-reopen-0 entry and 'Wiedereroeffnet · aktuell offen (1x erneut aufgenommen)' text, reopened patient re-appears in default Offene list, role gating correct (helfer + einsatzleiter enabled; dokumentar, fuehrungsassistenz, abschnittleitung show button but disabled).",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "/api/meta & tests/test_step04-06/incidents/patients", "issue": "Pre-existing 5 failures (hardcoded version asserts 0.2.0/0.4.0/0.5.0/0.6.0 vs current 1.0.0, and S4 sichtung not in Literal). Unrelated to reopen feature."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_patient_reopen.py",
+    "/app/test_reports/pytest/pytest_iter13.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "routes/patients.py reopen_patient: clean implementation – guards 404/409, appends to wiedereroeffnet_at list, nulls fallabschluss_typ/at, resets verbleib to 'unbekannt', logs system funk entry. Uses find_one_and_update with projection excluding _id. Good.",
+    "models.py: Patient.wiedereroeffnet_at: List[datetime] with default_factory=list – backward compatible, serializes cleanly.",
+    "PatientList.jsx kpi section: proper dual-mode (kpiMode offen|alle), hint '{abgeschlossen} abgeschlossen' only in alle mode. FilterChip show-closed uses kpis.alle.abgeschlossen as count – matches backend closed count.",
+    "PatientDetail.jsx handleReopen: uses PatientContext reopen(), refreshes local state, clears verbleib cache, closes modal. Role gating via can('patient.reopen') – button stays visible but disabled for non-privileged roles (good for discoverability).",
+    "EmptyState hasFilter heuristic includes '!showClosed' – correctly shows 'Keine Treffer' prompt when closed patients are hidden and would otherwise be displayed."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_patient_reopen.py (new regression tests, 5 cases)"
+  ],
+  "success_rate": {"backend": "96.7% (148/153, 5 pre-existing unrelated)", "frontend": "100% (all reopen + KPI toggle + show-closed assertions pass)"},
+  "test_credentials": "N/A – role-based local-only auth, set via localStorage els-role",
+  "seed_data_creation": "Created 2 demo incidents via POST /api/incidents/demo during UI run (7 patients each, 3 closed). One patient reopened from entlassen/uebergeben -> in_behandlung as part of flow verification.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Reopen feature is fully green end-to-end. Active incident localStorage key is 'els-active-incident' (NOT 'els-active-incident-id'). Role localStorage key is 'els-role'. Dokumentar/FA/Abschnittleitung render the reopen button with HTML 'disabled' attribute (empty string) – correct. Helfer + Einsatzleiter see enabled button. Reopened patient correctly disappears from 'alle abgeschlossen' count and reappears in default Offene list. Timeline marker for reopen is data-testid='timeline-reopen-0' (idx-based). Multiple reopens append to wiedereroeffnet_at list – verified len 1 -> 2 via PATCH re-close then second POST /reopen.",
+  "rca of the issue": "Not applicable – feature verification, no bugs found."
+}

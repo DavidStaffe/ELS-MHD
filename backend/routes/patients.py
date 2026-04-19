@@ -144,6 +144,47 @@ async def update_patient(patient_id: str, payload: PatientUpdate):
     return result
 
 
+@router.post("/patients/{patient_id}/reopen", response_model=dict)
+async def reopen_patient(patient_id: str):
+    """Wiedereroeffnung eines abgeschlossenen Patienten.
+
+    Nutzung: Patient wurde entlassen/uebergeben, kehrt aber zurueck und muss
+    erneut versorgt werden. Setzt Status auf 'in_behandlung' zurueck, hebt
+    Fallabschluss auf und haengt den Zeitstempel an `wiedereroeffnet_at`.
+    """
+    existing = await db.patients.find_one({"id": patient_id}, {"_id": 0})
+    if not existing:
+        raise HTTPException(status_code=404, detail="Patient nicht gefunden")
+    if existing.get("status") not in ("uebergeben", "entlassen"):
+        raise HTTPException(
+            status_code=409,
+            detail="Patient ist nicht abgeschlossen und kann nicht wiedereroeffnet werden",
+        )
+    now = now_utc()
+    ts = iso(now)
+    history = list(existing.get("wiedereroeffnet_at") or [])
+    history.append(ts)
+    update = {
+        "status": "in_behandlung",
+        "fallabschluss_typ": None,
+        "fallabschluss_at": None,
+        "verbleib": "unbekannt",
+        "wiedereroeffnet_at": history,
+        "updated_at": ts,
+    }
+    result = await db.patients.find_one_and_update(
+        {"id": patient_id}, {"$set": update},
+        return_document=True, projection={"_id": 0},
+    )
+    await log_system_entry(
+        incident_id=result["incident_id"],
+        text=f"Patient {result.get('kennung')} wiedereroeffnet",
+        funk_typ="system",
+        patient_id=patient_id,
+    )
+    return result
+
+
 @router.delete("/patients/{patient_id}", status_code=204)
 async def delete_patient(patient_id: str):
     result = await db.patients.delete_one({"id": patient_id})

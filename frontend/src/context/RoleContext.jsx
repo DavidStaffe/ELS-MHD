@@ -63,6 +63,7 @@ const PERMS = {
     "patient.update": ["einsatzleiter", "helfer"],
     "patient.delete": ["einsatzleiter"],
     "patient.progress": ["einsatzleiter", "helfer"],
+    "patient.reopen": ["einsatzleiter", "helfer"],
 
     // Transport
     "transport.create": ["einsatzleiter"],
