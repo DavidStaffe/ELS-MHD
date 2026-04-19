@@ -93,6 +93,42 @@ Abschlussbericht mit PDF-Export.
 - Automatische Zeitstempel: sichtung_at, behandlung_start_at (bei Sichtung gesetzt),
   transport_angefordert_at (bei status=transportbereit), fallabschluss_at (bei entlassen/uebergeben)
 - Cascade-Delete: Incident loeschen entfernt alle Patienten
+- Frontend: `PatientContext` scoped auf activeIncident, KPI-Ableitung (total, S1-S3+S0, wartend/beh/transport)
+- `PatientList`: DataTable mit Kennung (mono), SichtungBadge, Status-Badge, Verbleib, Live-Dauer,
+  Notiz-Preview, Delete-Action, Row-Klick navigiert zu Detail
+- Filter-Chips: Sichtung (multi, S1-S3+S0 mit counts) + Status (single select)
+- KPI-Leiste: 8 Kacheln (Total, S1-S3+S0, Wartend, In Beh., Transport)
+- `QuickEntryBar` (Smart Enhancement): Sticky bottom, 4 Sichtungs-Buttons mit Shortcuts 1/2/3/0
+- `PatientDialog`: Sichtung-Grid-Auswahl, Status-/Verbleib-Select, Notiz
+- Command-Palette: dynamische Gruppe "Patienten" mit Navigation zu Detail
+- Sidebar: Patienten-Modul aktiv wenn Incident gesetzt
+- Backend-Tests (22/22 passed), Frontend-E2E (100%)
+
+### ✅ Schritt 04 – Patientendetail + Smart Enhancement (2026-04)
+- **GLOBALE Umbenennung S4 → S0** (rueckwirkend): Backend Literal, DB-Migration (idempotent on startup,
+  alle S4-Eintraege -> S0), Frontend-Konstanten, KPIs, Filter, QuickEntryBar-Shortcuts (0 = S0),
+  SichtungsGrid-Reihenfolge S1/S2/S3/S0
+- Backend: Neue Felder `transport_typ` (intern/extern), `fallabschluss_typ` (rd_uebergabe/entlassung/manuell),
+  PATCH-Logik mit automatischer Status-Progression + Default-Verbleib (rd bei RD-Uebergabe, event bei Entlassung)
+- Frontend `/patienten/:id`:
+  - Kopf: Kennung (mono, display), SichtungBadge, Status, DEMO, Incident-Name
+  - 3 Prozesszeiten-KPIs (Seit Sichtung, Behandlungsdauer, Seit Transport-Anforderung) mit Live-Timer
+  - **Smart Enhancement Ein-Klick-Progression** (pd-next-step): Passt sich dynamisch an Status an,
+    oeffnet bei Bedarf Transport-Dialog oder Fallabschluss-Dialog
+  - Sichtungs-Grid (S1/S2/S3/S0, farbkodiert)
+  - Notiz mit debounced Auto-Save (800ms)
+  - Transport-Panel + Dialog (intern/extern)
+  - Fallabschluss-Panel + Dialog (rd_uebergabe/entlassung/manuell)
+  - Verbleib-Dropdown mit Sofort-Save
+  - Vertikale Timeline mit 5 Events + Dauer-Deltas zwischen Ereignissen + Live-Dauer seit letztem Event
+  - Deep-Link-Support: Direkt via URL ladbar, setzt activeIncident automatisch
+- Command-Palette: Patient-Sprungziel navigiert nun zu Detail-Screen
+- Backend-Tests (18/18 passed), Frontend-E2E (100%, null Issues)
+- Backend: Patient-CRUD pro Incident (GET/POST `/api/incidents/{id}/patients`, GET/PATCH/DELETE `/api/patients/{id}`)
+- Auto-Kennung sequenziell pro Incident (atomic counter in Incident-Doc): P-0001, P-0002, ...
+- Automatische Zeitstempel: sichtung_at, behandlung_start_at (bei Sichtung gesetzt),
+  transport_angefordert_at (bei status=transportbereit), fallabschluss_at (bei entlassen/uebergeben)
+- Cascade-Delete: Incident loeschen entfernt alle Patienten
 - Frontend: `PatientContext` scoped auf activeIncident, KPI-Ableitung (total, S1-S4, wartend/beh/transport)
 - `PatientList`: DataTable mit Kennung (mono), SichtungBadge, Status-Badge, Verbleib, Live-Dauer,
   Notiz-Preview, Delete-Action
@@ -121,8 +157,7 @@ Abschlussbericht mit PDF-Export.
 - LagePlaceholder (`/lage`): Uebersicht mit Modulen, Hinweis auf Folge-Schritte
 - Backend-Test (13/13 passed), Frontend-E2E (95%+, nur 2 LOW Issues gefunden und gefixt)
 
-### 🔜 Backlog (Schritte 04–09)
-- **Schritt 04 (P0)**: Patientendetail (Zeitstempel, Behandlungsstart, Fallabschluss)
+### 🔜 Backlog (Schritte 05–09)
 - **Schritt 05 (P0)**: Transportuebersicht (intern/extern, Ressource, Ziel, Status)
 - **Schritt 06 (P1)**: Ressourcen + Kommunikation + Konflikte
 - **Schritt 07 (P1)**: Produktreife – Leer-/Fehler-/Loading-States, Navigation
