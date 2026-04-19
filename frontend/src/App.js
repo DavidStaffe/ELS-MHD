@@ -14,6 +14,7 @@ import PatientDetail from "@/pages/PatientDetail";
 import TransportList from "@/pages/TransportList";
 import ResourceList from "@/pages/ResourceList";
 import MessageList from "@/pages/MessageList";
+import Funktagebuch from "@/pages/Funktagebuch";
 import KonfliktList from "@/pages/KonfliktList";
 import AbschlussPage from "@/pages/AbschlussPage";
 import AbschnittList from "@/pages/AbschnittList";
@@ -37,7 +38,9 @@ function App() {
                                         <Route path="/ressourcen" element={<ResourceList />} />
                                         <Route path="/abschnitte" element={<AbschnittList />} />
                                         <Route path="/betten" element={<BettenPage />} />
-                                        <Route path="/kommunikation" element={<MessageList />} />
+                                        <Route path="/kommunikation" element={<Funktagebuch />} />
+                                        <Route path="/funktagebuch" element={<Funktagebuch />} />
+                                        <Route path="/kommunikation-legacy" element={<MessageList />} />
                                         <Route path="/konflikte" element={<KonfliktList />} />
                                         <Route path="/abschluss" element={<AbschlussPage />} />
                                         <Route path="*" element={<Navigate to="/" replace />} />

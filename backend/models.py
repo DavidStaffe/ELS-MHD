@@ -20,6 +20,8 @@ from core.types import (
     ResourceStatus,
     MessagePrio,
     MessageKat,
+    FunkTyp,
+    FunkQuelle,
     BettTyp,
     BettStatus,
 )
@@ -171,7 +173,7 @@ class ResourceUpdate(BaseModel):
     abschnitt_id: Optional[str] = None
 
 
-# --- Messages ---------------------------------------------------------------
+# --- Messages / Funktagebuch ------------------------------------------------
 
 class MessageBase(BaseModel):
     model_config = ConfigDict(extra="ignore")
@@ -179,15 +181,44 @@ class MessageBase(BaseModel):
     prioritaet: MessagePrio = "normal"
     kategorie: MessageKat = "info"
     von: str = Field(default="", max_length=80)
+    # Funktagebuch-Zusatzfelder (Schritt 13)
+    funk_typ: FunkTyp = "lage"
+    absender: str = Field(default="", max_length=120)
+    empfaenger: str = Field(default="", max_length=120)
+    abschnitt_id: Optional[str] = None
+    transport_id: Optional[str] = None
+    ressource_id: Optional[str] = None
+    patient_id: Optional[str] = None
+    erfasst_von: str = Field(default="", max_length=80)
+    erfasst_rolle: str = Field(default="", max_length=40)
 
 
 class MessageCreate(MessageBase):
     pass
 
 
+class MessageUpdate(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    text: Optional[str] = None
+    prioritaet: Optional[MessagePrio] = None
+    kategorie: Optional[MessageKat] = None
+    funk_typ: Optional[FunkTyp] = None
+    absender: Optional[str] = None
+    empfaenger: Optional[str] = None
+    abschnitt_id: Optional[str] = None
+    transport_id: Optional[str] = None
+    ressource_id: Optional[str] = None
+    patient_id: Optional[str] = None
+
+
 class MessageAck(BaseModel):
     model_config = ConfigDict(extra="ignore")
     quittiert_von: Optional[str] = Field(default=None, max_length=80)
+
+
+class MessageConfirm(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    bestaetigt_von: Optional[str] = Field(default=None, max_length=80)
 
 
 # --- Abschnitte (Schritt 10) ------------------------------------------------

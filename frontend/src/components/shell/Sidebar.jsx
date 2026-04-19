@@ -89,7 +89,7 @@ const NAV_GROUPS = (hasIncident) => [
             {
                 to: "/kommunikation",
                 icon: Radio,
-                label: "Kommunikation",
+                label: "Funktagebuch",
                 testId: "nav-kommunikation",
                 disabled: !hasIncident,
                 hint: hasIncident ? null : "inaktiv"

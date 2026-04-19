@@ -15,6 +15,20 @@ export const ROLES = {
         tone: "info",
         beschreibung: "Vollzugriff auf alle Module. Freigabe des Abschlussberichts."
     },
+    fuehrungsassistenz: {
+        key: "fuehrungsassistenz",
+        label: "Fuehrungsassistenz Funk/Doku",
+        kurz: "FA",
+        tone: "blue",
+        beschreibung: "Volle Schreib- und Dokumentationsrechte im Funktagebuch."
+    },
+    abschnittleitung: {
+        key: "abschnittleitung",
+        label: "Abschnittleitung",
+        kurz: "AL",
+        tone: "purple",
+        beschreibung: "Abschnittsbezogene Meldungen erfassen und rueckmelden (UHS/BHP etc.)."
+    },
     helfer: {
         key: "helfer",
         label: "Sanitaeter / Helfer",
@@ -42,7 +56,7 @@ const PERMS = {
     "incident.create": ["einsatzleiter"],
     "incident.delete": ["einsatzleiter"],
     "incident.close": ["einsatzleiter"],
-    "incident.demo_start": ["einsatzleiter", "helfer", "dokumentar"],
+    "incident.demo_start": ["einsatzleiter", "fuehrungsassistenz", "abschnittleitung", "helfer", "dokumentar"],
 
     // Patienten
     "patient.create": ["einsatzleiter", "helfer"],
@@ -57,14 +71,19 @@ const PERMS = {
     "transport.delete": ["einsatzleiter"],
 
     // Ressourcen
-    "resource.update": ["einsatzleiter"],
+    "resource.view": ["einsatzleiter", "fuehrungsassistenz", "abschnittleitung", "helfer", "dokumentar"],
+    "resource.update": ["einsatzleiter", "helfer"],
     "resource.create": ["einsatzleiter"],
     "resource.delete": ["einsatzleiter"],
 
-    // Kommunikation
-    "message.create": ["einsatzleiter", "helfer"],
-    "message.ack": ["einsatzleiter", "helfer"],
-    "message.delete": ["einsatzleiter"],
+    // Kommunikation / Funktagebuch
+    "message.view": ["einsatzleiter", "fuehrungsassistenz", "abschnittleitung", "helfer", "dokumentar"],
+    "message.create": ["einsatzleiter", "fuehrungsassistenz", "abschnittleitung", "helfer"],
+    "message.update": ["einsatzleiter", "fuehrungsassistenz"],
+    "message.ack": ["einsatzleiter", "fuehrungsassistenz", "helfer"],
+    "message.confirm": ["einsatzleiter"],
+    "message.finalize": ["einsatzleiter", "fuehrungsassistenz"],
+    "message.delete": ["einsatzleiter", "fuehrungsassistenz"],
 
     // Konflikte
     "konflikt.resolve": ["einsatzleiter", "helfer"],

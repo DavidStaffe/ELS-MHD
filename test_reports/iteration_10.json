@@ -1,0 +1,45 @@
+{
+  "summary": "Schritt 13 (Funktagebuch + Ressourcen-CRUD + 2 neue Rollen) vollstaendig verifiziert. Backend: 9/9 neue Tests in test_step13_funktagebuch.py gruen (Message-Create mit funk_typ/absender/empfaenger/erfasst_von/erfasst_rolle, Filter funk_typ/prioritaet/quelle/q, confirm/finalize, PATCH+DELETE 409 bei finalisiert/system, Patient-Create -> System-Eintrag mit Kennung+Sichtung, Fallabschluss-System-Eintrag, Transport-Status-System-Eintrag mit funk_typ=system, Demo-Seed hat >=4 manuelle Eintraege mit funk_ein/lage/auftrag/rueckmeldung, Resource CRUD POST/PATCH/DELETE). Gesamter Backend-Suite: 139/144 Tests pass (96.5%), die 5 Fails sind pre-existing Version-String-Assertions aus iter 9 - unveraendert. Frontend: /kommunikation rendert Funktagebuch (funk-title='Funktagebuch', Sidebar-Label 'Funktagebuch'), alle 5 KPIs (kpi-funk-total/offen/krit/sys/final), alle Filter-Chips (Typ, Prio, Quelle, Abschnitt), Suchfeld, funk-new-btn, funk-print, funk-refresh. Eintrag-Dialog mit allen Pflichtfeldern entry-typ/entry-prio/entry-absender/entry-empfaenger/entry-abschnitt/entry-text -> POST /messages erfolgreich, neuer entry-card-{id} erscheint mit korrekter erfasst_rolle. Rollen-Gates funktionieren korrekt: EL (ack+confirm+finalize+delete), FA (finalize sichtbar), Helfer (nur ack, kein confirm/finalize), Dokumentar (kein funk-new-btn, kein ack/confirm). Alle 5 Rollen im RoleSelector vorhanden inkl. role-opt-fuehrungsassistenz und role-opt-abschnittleitung. Ressourcen-CRUD /ressourcen: resource-new-btn (EL), resource-edit-{id} (10x, EL+Helfer), resource-delete-{id} (EL=10, Helfer=0). resource-dialog mit allen Feldern oeffnet, Anlegen via POST funktioniert. Print-Area ist im DOM bei /kommunikation. Regression aller 10 Hauptrouten (/, /lage, /patienten, /transporte, /ressourcen, /abschnitte, /betten, /konflikte, /auswertung, /kommunikation) -> 200, 0 console pageerrors, 0 error boundaries.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "tests/test_incidents_api.py, test_step04/05/06_api.py", "issue": "5 pre-existing Version-String-Asserts (0.2/0.4/0.5/0.6 statt 1.0.0). Refactor-unabhaengig, seit iter 9 bekannt."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "/ressourcen ResourceDialog", "issues": ["Die Form-Feld-Testids heissen resource-name-input / resource-typ-select / resource-kat-select / resource-status-select / resource-abschnitt-dialog statt der im Spec erwartete name resource-name/typ/kategorie/status/abschnitt. Funktional einwandfrei, nur Nomenklatur-Unterschied. Optional: Aliase hinzufuegen oder Spec aktualisieren."]}
+    ]
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_step13_funktagebuch.py",
+    "/app/test_reports/pytest/iteration_10_step13.xml",
+    "/app/test_reports/pytest/iteration_10_full.xml"
+  ],
+  "action_items": [
+    "Keine kritischen Fixes noetig. Optional (kosmetisch): Die 5 pre-existing hardcoded Version-Asserts in test_incidents_api.py / test_step04_api.py / test_step05_transport_api.py / test_step06_resources_messages_konflikte.py auf dynamisch updaten (unveraendert seit iter 9).",
+    "Optional: ResourceDialog-Feld-Testids ggf. auf kurze Namen umbenennen (resource-name statt resource-name-input) fuer Spec-Konformitaet, ansonsten Spec anpassen."
+  ],
+  "critical_code_review_comments": [
+    "routes/messages.py sauber: Filter unterstuetzen kommaseparierte Typ-/Prio-/Quelle-Listen via $in, since/until via created_at-Range. Finalize/Delete/Patch-Gates (409 bei finalisiert ODER quelle=system) konsistent.",
+    "services/funk.py log_system_entry setzt konsequent funk_typ='system', quelle='system', finalisiert=True mit Timestamps - Unveraenderlichkeit gewaehrleistet auf Data-Ebene.",
+    "models.py MessageBase hat alle Schritt-13-Felder als typisierte Literals (FunkTyp, FunkQuelle). MessageUpdate enthaelt NICHT quelle/finalisiert/erfasst_von - korrekter Gate gegen Client-seitige Manipulation.",
+    "Frontend Funktagebuch.jsx (>700 LOC) koennte modular aufgeteilt werden (EntryCard, EntryDialog, DetailDialog, FilterBar separate Komponenten), aber aktuell wartbar und gut mit data-testids versehen.",
+    "RoleContext erweiterte PERMS fuer fuehrungsassistenz/abschnittleitung korrekt in UI abgebildet (Gate-Test bestaetigt)."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_step13_funktagebuch.py (NEU - 9 pytest-Tests)"
+  ],
+  "success_rate": {
+    "backend": "100% auf neuen Step13-Tests (9/9). Gesamt 139/144 (96.5%); 5 Fails sind pre-existing Version-Strings aus iter 9.",
+    "frontend": "100% (alle Feature-Tests gruen: Funktagebuch render+CRUD, Filter, KPIs, 4 Rollen-Gates, Ressourcen-CRUD, Sidebar-Label, Print-Area, 10/10 Routen-Regression ohne Errors)."
+  },
+  "test_credentials": "Keine Auth. localStorage['els-role'] in {einsatzleiter|fuehrungsassistenz|abschnittleitung|helfer|dokumentar}, localStorage['els-active-incident']=283bc8ba-e275-4c57-910d-20b131a9ef16 (Grossveranstaltung Messe, Demo).",
+  "seed_data_creation": "Nur 4 Demo-Incidents bleiben uebrig (Grossveranstaltung Messe, Marathon Muenchen, Stadtfest 2026, Open-Air Festival - alle demo=true). Alle TEST_-Incidents/Resources/Messages vom Testlauf wieder geloescht.",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Step13 validiert. Demo-Incident 283bc8ba-e275-4c57-910d-20b131a9ef16 hat 4 manuelle Funk-Eintraege (funk_ein/lage/auftrag/rueckmeldung) + System-Eintraege fuer Patienten/Transporte. pytest-Kommando: `cd /app/backend && REACT_APP_BACKEND_URL=https://medical-ops-control.preview.emergentagent.com python -m pytest tests/test_step13_funktagebuch.py -v`. Frontend-Testids fuer Funktagebuch: funk-title, funk-new-btn, funk-print, kpi-funk-{total|offen|krit|sys|final}, f-typ-{alle|funk_ein|lage|auftrag|rueckmeldung|funk_aus|vorkommnis|system}, f-prio-{alle|kritisch|dringend|normal}, f-quelle-{alle|manuell|system}, f-ab-{alle|ohne|<id>}, funk-search, entry-card-{id}, entry-{ack|confirm|finalize|delete}-{id}, entry-{typ|prio|absender|empfaenger|abschnitt|text|save}, detail-dialog. ResourceDialog hat resource-name-input/resource-typ-select/resource-kat-select/resource-status-select/resource-abschnitt-dialog/resource-save (nicht die in Spec erwaehnten Kurznamen).",
+  "rca_of_the_issue": "Kein Bug gefunden. Schritt 13 komplett und konsistent umgesetzt: Backend erweiterte Message-Domain mit FunkTyp-Literals, System-Eintragsmechanismus via services/funk.py, Auto-Hooks in patients/transports/demo-Routen, Validierungs-Gates gegen Modifikation finalisierter/System-Eintraege. Frontend liefert vollstaendige Funktagebuch-UI mit Rollen-Gating, dedizierten KPIs, Multi-Filter, Print-View und 2 neuen Rollen-Icons. Ressourcen-CRUD funktional komplett inkl. EL-only Delete/Create und Helfer-Edit. Nur kosmetische Anmerkung: ResourceDialog-Testid-Nomenklatur weicht vom Spec-Wording ab (Funktion identisch)."
+}

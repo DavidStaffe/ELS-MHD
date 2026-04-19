@@ -1,12 +1,17 @@
 import * as React from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import {
     Select, SelectContent, SelectItem, SelectTrigger, SelectValue
 } from "@/components/ui/select";
-import { StatusBadge, SectionCard, KpiTile } from "@/components/primitives";
+import {
+    Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle
+} from "@/components/ui/dialog";
+import { StatusBadge, SectionCard, KpiTile, ConfirmModal } from "@/components/primitives";
 import { useOps } from "@/context/OpsContext";
 import { useIncidents } from "@/context/IncidentContext";
+import { useRole } from "@/context/RoleContext";
 import { listAbschnitte, updateResource as apiUpdateResource } from "@/lib/api";
 import { getFarbe } from "@/lib/abschnitt-meta";
 import {
@@ -16,8 +21,9 @@ import {
 import { cn } from "@/lib/utils";
 import {
     ArrowLeft, Boxes, RefreshCw, Truck, Stethoscope, Bike,
-    AlertTriangle, Circle, Layers
+    AlertTriangle, Circle, Plus, Edit3, Trash2
 } from "lucide-react";
+import { toast } from "sonner";
 
 const KAT_ICON = {
     uhs: Stethoscope,
@@ -52,7 +58,7 @@ function AbschnittChip({ abschnitt }) {
     );
 }
 
-function ResourceRow({ resource, abschnitt, abschnitte, onChangeStatus, onChangeAbschnitt }) {
+function ResourceRow({ resource, abschnitt, abschnitte, onChangeStatus, onChangeAbschnitt, onEdit, onDelete, canEdit, canDelete }) {
     const meta = RESOURCE_STATUS[resource.status] || { label: resource.status, tone: "neutral" };
     const KatIcon = KAT_ICON[resource.kategorie] || Boxes;
     return (
@@ -111,7 +117,149 @@ function ResourceRow({ resource, abschnitt, abschnitte, onChangeStatus, onChange
                     ))}
                 </SelectContent>
             </Select>
+            {canEdit && (
+                <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-7 w-7"
+                    onClick={() => onEdit(resource)}
+                    data-testid={`resource-edit-${resource.id}`}
+                    title="Bearbeiten"
+                >
+                    <Edit3 className="h-3.5 w-3.5" />
+                </Button>
+            )}
+            {canDelete && (
+                <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-7 w-7 text-status-red"
+                    onClick={() => onDelete(resource)}
+                    data-testid={`resource-delete-${resource.id}`}
+                    title="Loeschen"
+                >
+                    <Trash2 className="h-3.5 w-3.5" />
+                </Button>
+            )}
         </div>
+    );
+}
+
+function ResourceDialog({ open, onOpenChange, initial, abschnitte, onSave }) {
+    const [form, setForm] = React.useState({
+        name: "", typ: "intern", kategorie: "sonstiges",
+        status: "verfuegbar", abschnitt_id: null, notiz: ""
+    });
+    React.useEffect(() => {
+        setForm(initial || {
+            name: "", typ: "intern", kategorie: "sonstiges",
+            status: "verfuegbar", abschnitt_id: null, notiz: ""
+        });
+    }, [initial, open]);
+    const isEdit = Boolean(initial?.id);
+
+    return (
+        <Dialog open={open} onOpenChange={onOpenChange}>
+            <DialogContent className="sm:max-w-md" data-testid="resource-dialog">
+                <DialogHeader>
+                    <DialogTitle>{isEdit ? "Ressource bearbeiten" : "Neue Ressource"}</DialogTitle>
+                    <DialogDescription>
+                        Ressource fuer diesen Incident anlegen oder aendern.
+                    </DialogDescription>
+                </DialogHeader>
+                <div className="space-y-3">
+                    <div>
+                        <label className="text-caption text-muted-foreground">Name</label>
+                        <Input
+                            value={form.name}
+                            onChange={(e) => setForm({ ...form, name: e.target.value })}
+                            placeholder="z.B. RTW 3, UHS Team 4"
+                            data-testid="resource-name-input"
+                        />
+                    </div>
+                    <div className="grid grid-cols-2 gap-2">
+                        <div>
+                            <label className="text-caption text-muted-foreground">Typ</label>
+                            <Select value={form.typ} onValueChange={(v) => setForm({ ...form, typ: v })}>
+                                <SelectTrigger data-testid="resource-typ-select">
+                                    <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="intern">Intern</SelectItem>
+                                    <SelectItem value="extern">Extern</SelectItem>
+                                </SelectContent>
+                            </Select>
+                        </div>
+                        <div>
+                            <label className="text-caption text-muted-foreground">Kategorie</label>
+                            <Select value={form.kategorie} onValueChange={(v) => setForm({ ...form, kategorie: v })}>
+                                <SelectTrigger data-testid="resource-kat-select">
+                                    <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    {RESOURCE_KAT_KEYS.map((k) => (
+                                        <SelectItem key={k} value={k}>
+                                            {RESOURCE_KATEGORIE[k].label}
+                                        </SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
+                        </div>
+                    </div>
+                    <div className="grid grid-cols-2 gap-2">
+                        <div>
+                            <label className="text-caption text-muted-foreground">Status</label>
+                            <Select value={form.status} onValueChange={(v) => setForm({ ...form, status: v })}>
+                                <SelectTrigger data-testid="resource-status-select">
+                                    <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    {RESOURCE_STATUS_KEYS.map((k) => (
+                                        <SelectItem key={k} value={k}>
+                                            {RESOURCE_STATUS[k].label}
+                                        </SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
+                        </div>
+                        <div>
+                            <label className="text-caption text-muted-foreground">Abschnitt</label>
+                            <Select
+                                value={form.abschnitt_id || "none"}
+                                onValueChange={(v) => setForm({ ...form, abschnitt_id: v === "none" ? null : v })}
+                            >
+                                <SelectTrigger data-testid="resource-abschnitt-dialog">
+                                    <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="none">(keiner)</SelectItem>
+                                    {abschnitte.map((a) => (
+                                        <SelectItem key={a.id} value={a.id}>
+                                            {a.name}
+                                        </SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
+                        </div>
+                    </div>
+                </div>
+                <DialogFooter>
+                    <Button variant="outline" onClick={() => onOpenChange(false)}>Abbrechen</Button>
+                    <Button
+                        onClick={() => {
+                            if (!form.name.trim()) {
+                                toast.error("Name erforderlich");
+                                return;
+                            }
+                            onSave(form);
+                        }}
+                        data-testid="resource-save"
+                    >
+                        {isEdit ? "Speichern" : "Anlegen"}
+                    </Button>
+                </DialogFooter>
+            </DialogContent>
+        </Dialog>
     );
 }
 
@@ -227,8 +375,11 @@ function StatusMatrix({ resources }) {
 export default function ResourceList() {
     const navigate = useNavigate();
     const { activeIncident } = useIncidents();
-    const { resources, refreshResources, updResource } = useOps();
+    const { resources, refreshResources, updResource, addResource, rmResource } = useOps();
+    const { can } = useRole();
     const [abschnitte, setAbschnitte] = React.useState([]);
+    const [dialog, setDialog] = React.useState({ open: false, initial: null });
+    const [confirmDelete, setConfirmDelete] = React.useState(null);
 
     const loadAbschnitte = React.useCallback(async () => {
         if (!activeIncident?.id) return;
@@ -255,6 +406,33 @@ export default function ResourceList() {
             await refreshResources();
         } catch (e) {
             // ignore
+        }
+    };
+
+    const handleSave = async (form) => {
+        try {
+            if (dialog.initial?.id) {
+                await updResource(dialog.initial.id, form);
+                toast.success("Ressource aktualisiert");
+            } else {
+                await addResource(form);
+                toast.success("Ressource angelegt");
+            }
+            setDialog({ open: false, initial: null });
+        } catch (e) {
+            toast.error("Speichern fehlgeschlagen");
+        }
+    };
+
+    const handleDelete = async () => {
+        if (!confirmDelete) return;
+        try {
+            await rmResource(confirmDelete.id);
+            toast.success("Ressource geloescht");
+        } catch (e) {
+            toast.error("Loeschen fehlgeschlagen");
+        } finally {
+            setConfirmDelete(null);
         }
     };
 
@@ -298,15 +476,26 @@ export default function ResourceList() {
                         {activeIncident.name}
                     </p>
                 </div>
-                <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={refreshResources}
-                    data-testid="resources-refresh"
-                >
-                    <RefreshCw className="h-4 w-4" />
-                    Aktualisieren
-                </Button>
+                <div className="flex items-center gap-2">
+                    {can("resource.create") && (
+                        <Button
+                            onClick={() => setDialog({ open: true, initial: null })}
+                            data-testid="resource-new-btn"
+                        >
+                            <Plus className="h-4 w-4" />
+                            Ressource anlegen
+                        </Button>
+                    )}
+                    <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={refreshResources}
+                        data-testid="resources-refresh"
+                    >
+                        <RefreshCw className="h-4 w-4" />
+                        Aktualisieren
+                    </Button>
+                </div>
             </div>
 
             <div className="mb-4 grid grid-cols-2 gap-2 md:grid-cols-5">
@@ -342,6 +531,10 @@ export default function ResourceList() {
                                 abschnitte={abschnitte}
                                 onChangeStatus={(id, status) => updResource(id, { status })}
                                 onChangeAbschnitt={handleChangeAbschnitt}
+                                onEdit={(x) => setDialog({ open: true, initial: x })}
+                                onDelete={(x) => setConfirmDelete(x)}
+                                canEdit={can("resource.update")}
+                                canDelete={can("resource.delete")}
                             />
                         ))}
                     </div>
@@ -361,11 +554,33 @@ export default function ResourceList() {
                                 abschnitte={abschnitte}
                                 onChangeStatus={(id, status) => updResource(id, { status })}
                                 onChangeAbschnitt={handleChangeAbschnitt}
+                                onEdit={(x) => setDialog({ open: true, initial: x })}
+                                onDelete={(x) => setConfirmDelete(x)}
+                                canEdit={can("resource.update")}
+                                canDelete={can("resource.delete")}
                             />
                         ))}
                     </div>
                 </SectionCard>
             </div>
+
+            <ResourceDialog
+                open={dialog.open}
+                onOpenChange={(v) => setDialog((d) => ({ ...d, open: v }))}
+                initial={dialog.initial}
+                abschnitte={abschnitte}
+                onSave={handleSave}
+            />
+
+            <ConfirmModal
+                open={!!confirmDelete}
+                onOpenChange={(v) => !v && setConfirmDelete(null)}
+                title="Ressource loeschen?"
+                description={confirmDelete ? `"${confirmDelete.name}" wird geloescht.` : ""}
+                confirmLabel="Loeschen"
+                tone="destructive"
+                onConfirm={handleDelete}
+            />
         </div>
     );
 }

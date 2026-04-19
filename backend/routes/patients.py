@@ -8,6 +8,7 @@ from core.db import db
 from core.time import iso, now_utc
 from models import Patient, PatientCreate, PatientUpdate
 from services.seeds import next_kennung, ensure_transport_for_patient, release_bett_for_patient
+from services.funk import log_system_entry
 
 router = APIRouter(prefix="/api", tags=["patients"])
 
@@ -60,6 +61,13 @@ async def create_patient(incident_id: str, payload: PatientCreate):
         if isinstance(doc.get(k), datetime):
             doc[k] = iso(doc[k])
     await db.patients.insert_one(doc)
+    await log_system_entry(
+        incident_id=incident_id,
+        text=f"Patient {kennung} angelegt" + (f" (Sichtung {patient.sichtung})" if patient.sichtung else ""),
+        funk_typ="system",
+        prioritaet="kritisch" if patient.sichtung == "S1" else "normal",
+        patient_id=patient.id,
+    )
     return {k: v for k, v in doc.items() if k != "_id"}
 
 
@@ -127,6 +135,12 @@ async def update_patient(patient_id: str, payload: PatientUpdate):
                       "abgeschlossen_at": iso(now), "updated_at": iso(now)}},
         )
         await release_bett_for_patient(patient_id)
+        await log_system_entry(
+            incident_id=result["incident_id"],
+            text=f"Fallabschluss {result.get('kennung')}: {update['status']}",
+            funk_typ="system",
+            patient_id=patient_id,
+        )
     return result
 
 

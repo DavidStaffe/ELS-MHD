@@ -35,5 +35,17 @@ ResourceStatus = Literal["verfuegbar", "im_einsatz", "wartung", "offline"]
 MessagePrio = Literal["kritisch", "dringend", "normal"]
 MessageKat = Literal["info", "lage", "anforderung", "warnung"]
 
+# Schritt 13: Funktagebuch-Eintragstypen
+FunkTyp = Literal[
+    "funk_ein",       # Funkmeldung eingehend
+    "funk_aus",       # Funkmeldung ausgehend
+    "lage",           # Lagemeldung
+    "auftrag",        # Auftrag / Weisung
+    "rueckmeldung",   # Rueckmeldung / Statusmeldung
+    "vorkommnis",     # Besonderes Vorkommnis
+    "system",         # Automatischer Systemeintrag
+]
+FunkQuelle = Literal["manuell", "system"]
+
 BettTyp = Literal["liegend", "sitzend", "schockraum", "beobachtung", "sonstiges"]
 BettStatus = Literal["frei", "belegt", "gesperrt"]

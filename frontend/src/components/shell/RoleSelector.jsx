@@ -10,10 +10,12 @@ import {
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { ROLES, ROLE_KEYS, useRole } from "@/context/RoleContext";
-import { ShieldCheck, Stethoscope, FileCheck2 } from "lucide-react";
+import { ShieldCheck, Stethoscope, FileCheck2, Radio, Layers } from "lucide-react";
 
 const ROLE_ICON = {
     einsatzleiter: ShieldCheck,
+    fuehrungsassistenz: Radio,
+    abschnittleitung: Layers,
     helfer: Stethoscope,
     dokumentar: FileCheck2
 };

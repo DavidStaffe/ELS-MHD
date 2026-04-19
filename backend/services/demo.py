@@ -151,26 +151,63 @@ async def _seed_demo_data(incident_id: str, incident_start: datetime):
             if ressource and t_status != "abgeschlossen":
                 await update_resource_status_by_name(incident_id, ressource, "im_einsatz")
 
-    # Meldungen
+    # Meldungen / Funktagebuch-Eintraege
     messages = [
-        ("kritisch", "anforderung", "SAN 1",
-         "Kollaps Haupteingang, zweiten Trupp alarmieren!", now - timedelta(minutes=9)),
-        ("dringend", "lage", "UHS",
-         "UHS Kapazitaet 80% erreicht", now - timedelta(minutes=15)),
-        ("normal", "info", "EL",
-         "Einsatz laeuft planmaessig", now - timedelta(minutes=30)),
+        {
+            "prio": "kritisch", "kat": "anforderung", "von": "SAN 1",
+            "absender": "SAN 1", "empfaenger": "EL",
+            "text": "Kollaps Haupteingang, zweiten Trupp alarmieren!",
+            "when": now - timedelta(minutes=9),
+            "funk_typ": "funk_ein",
+        },
+        {
+            "prio": "dringend", "kat": "lage", "von": "UHS",
+            "absender": "UHS", "empfaenger": "EL",
+            "text": "UHS Kapazitaet 80% erreicht",
+            "when": now - timedelta(minutes=15),
+            "funk_typ": "lage",
+        },
+        {
+            "prio": "normal", "kat": "info", "von": "EL",
+            "absender": "EL", "empfaenger": "Alle",
+            "text": "Einsatz laeuft planmaessig",
+            "when": now - timedelta(minutes=30),
+            "funk_typ": "auftrag",
+        },
+        {
+            "prio": "normal", "kat": "info", "von": "RTW 1",
+            "absender": "RTW 1", "empfaenger": "EL",
+            "text": "Auf Anfahrt zur UHS, 3 min",
+            "when": now - timedelta(minutes=7),
+            "funk_typ": "rueckmeldung",
+        },
     ]
-    for prio, kat, von, text, when in messages:
+    for m in messages:
         await db.messages.insert_one({
             "id": str(uuid.uuid4()),
             "incident_id": incident_id,
-            "text": text,
-            "prioritaet": prio,
-            "kategorie": kat,
-            "von": von,
-            "quittiert_at": iso(now - timedelta(minutes=2)) if prio == "normal" else None,
-            "quittiert_von": "Einsatzleiter" if prio == "normal" else None,
-            "created_at": iso(when),
+            "text": m["text"],
+            "prioritaet": m["prio"],
+            "kategorie": m["kat"],
+            "von": m["von"],
+            "funk_typ": m["funk_typ"],
+            "absender": m["absender"],
+            "empfaenger": m["empfaenger"],
+            "abschnitt_id": None,
+            "transport_id": None,
+            "ressource_id": None,
+            "patient_id": None,
+            "erfasst_von": "Demo",
+            "erfasst_rolle": "fuehrungsassistenz",
+            "quelle": "manuell",
+            "quittiert_at": iso(now - timedelta(minutes=2)) if m["prio"] == "normal" else None,
+            "quittiert_von": "Einsatzleiter" if m["prio"] == "normal" else None,
+            "bestaetigt_at": None,
+            "bestaetigt_von": None,
+            "finalisiert": False,
+            "finalisiert_at": None,
+            "finalisiert_von": None,
+            "created_at": iso(m["when"]),
         })
 
     # Schritt 10: Einsatzabschnitte

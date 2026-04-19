@@ -5,10 +5,12 @@ import { Button } from "@/components/ui/button";
 import { CommandPaletteTrigger } from "@/components/command/CommandPalette";
 import { formatDuration } from "@/lib/time";
 import { useRole, ROLES } from "@/context/RoleContext";
-import { Sun, Moon, ShieldCheck, Stethoscope, FileCheck2, Clock3, LayoutGrid, UserCog } from "lucide-react";
+import { Sun, Moon, ShieldCheck, Stethoscope, FileCheck2, Clock3, LayoutGrid, UserCog, Radio, Layers } from "lucide-react";
 
 const ROLE_ICON = {
     einsatzleiter: ShieldCheck,
+    fuehrungsassistenz: Radio,
+    abschnittleitung: Layers,
     helfer: Stethoscope,
     dokumentar: FileCheck2
 };

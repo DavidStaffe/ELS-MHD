@@ -12,6 +12,7 @@ from services.seeds import (
     update_resource_status_by_name,
     release_bett_for_patient,
 )
+from services.funk import log_system_entry
 
 router = APIRouter(prefix="/api", tags=["transports"])
 
@@ -137,6 +138,18 @@ async def update_transport(transport_id: str, payload: TransportUpdate):
 
     if new_status == "abgeschlossen" and result.get("patient_id"):
         await release_bett_for_patient(result["patient_id"])
+
+    # Funktagebuch-Systemeintrag bei Status-Aenderung
+    if "status" in update and update["status"] != existing.get("status"):
+        kennung = result.get("patient_kennung") or "?"
+        ress = result.get("ressource") or "-"
+        await log_system_entry(
+            incident_id=result["incident_id"],
+            text=f"Transport {kennung} -> {update['status']} ({ress})",
+            funk_typ="system",
+            transport_id=transport_id,
+            patient_id=result.get("patient_id"),
+        )
 
     return result
 

@@ -119,25 +119,6 @@ export async function deleteResource(id) {
 }
 
 /* =====================================================================
-   Messages
-   ===================================================================== */
-export async function listMessages(incidentId, params = {}) {
-    const { data } = await api.get(`/incidents/${incidentId}/messages`, { params });
-    return data;
-}
-export async function createMessage(incidentId, payload) {
-    const { data } = await api.post(`/incidents/${incidentId}/messages`, payload);
-    return data;
-}
-export async function ackMessage(id, by) {
-    const { data } = await api.post(`/messages/${id}/ack`, null, { params: { by } });
-    return data;
-}
-export async function deleteMessage(id) {
-    await api.delete(`/messages/${id}`);
-}
-
-/* =====================================================================
    Konflikte (Auto-Detection)
    ===================================================================== */
 export async function listKonflikte(incidentId) {
@@ -179,6 +160,41 @@ export async function createReportVersion(incidentId, payload = {}) {
 export async function patchIncidentMeta(incidentId, payload) {
     const { data } = await api.patch(`/incidents/${incidentId}/meta`, payload);
     return data;
+}
+
+/* =====================================================================
+   Messages / Funktagebuch  (Schritt 13)
+   ===================================================================== */
+export async function listMessages(incidentId, params = {}) {
+    const { data } = await api.get(`/incidents/${incidentId}/messages`, { params });
+    return data;
+}
+export async function createMessage(incidentId, payload) {
+    const { data } = await api.post(`/incidents/${incidentId}/messages`, payload);
+    return data;
+}
+export async function getMessage(id) {
+    const { data } = await api.get(`/messages/${id}`);
+    return data;
+}
+export async function updateMessage(id, payload) {
+    const { data } = await api.patch(`/messages/${id}`, payload);
+    return data;
+}
+export async function ackMessage(id, by) {
+    const { data } = await api.post(`/messages/${id}/ack`, null, { params: by ? { by } : {} });
+    return data;
+}
+export async function confirmMessage(id, payload = {}) {
+    const { data } = await api.post(`/messages/${id}/confirm`, payload);
+    return data;
+}
+export async function finalizeMessage(id, by) {
+    const { data } = await api.post(`/messages/${id}/finalize`, null, { params: by ? { by } : {} });
+    return data;
+}
+export async function deleteMessage(id) {
+    await api.delete(`/messages/${id}`);
 }
 
 /* =====================================================================
