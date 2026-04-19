@@ -84,13 +84,44 @@ Abschlussbericht mit PDF-Export.
 - `NewIncidentDialog` (Name, Typ, Ort, Startzeit, Beschreibung) mit Validierung, Fehleranzeige
 - GlobalHeader: klickbarer Incident-Context (navigiert zu `/`), Live-Dauer-Anzeige, DEMO-Badge
 - Sidebar: "Aktiver Incident"-Gruppe mit Lage aktiv nur bei gesetztem Incident
+- Command-Palette: dynamische "Incident wechseln"-Gruppe (ein Eintrag pro Incident)
+- Backend-Test (13/13 passed), Frontend-E2E (100% nach LOW-Issue-Fix)
+
+### ✅ Schritt 03 – Patientenliste + Schnellerfassung (2026-04)
+- Backend: Patient-CRUD pro Incident (GET/POST `/api/incidents/{id}/patients`, GET/PATCH/DELETE `/api/patients/{id}`)
+- Auto-Kennung sequenziell pro Incident (atomic counter in Incident-Doc): P-0001, P-0002, ...
+- Automatische Zeitstempel: sichtung_at, behandlung_start_at (bei Sichtung gesetzt),
+  transport_angefordert_at (bei status=transportbereit), fallabschluss_at (bei entlassen/uebergeben)
+- Cascade-Delete: Incident loeschen entfernt alle Patienten
+- Frontend: `PatientContext` scoped auf activeIncident, KPI-Ableitung (total, S1-S4, wartend/beh/transport)
+- `PatientList`: DataTable mit Kennung (mono), SichtungBadge, Status-Badge, Verbleib, Live-Dauer,
+  Notiz-Preview, Delete-Action
+- Filter-Chips: Sichtung (multi, S1-S4 mit counts) + Status (single select)
+- KPI-Leiste: 8 Kacheln (Total, S1-S4, Wartend, In Beh., Transport)
+- **`QuickEntryBar` (Smart Enhancement)**: Sticky bottom, 4 grosse farbkodierte Sichtungs-Buttons,
+  Tastaturkuerzel 1/2/3/4 (legt Patient sofort mit Sichtung+status=in_behandlung an),
+  N-Taste oeffnet Detail-Dialog. Shortcuts in Inputs/Textarea deaktiviert
+- `PatientDialog`: Sichtung-Grid-Auswahl, Status-/Verbleib-Select, Notiz-Feld. Fuer Neu + Edit
+- Command-Palette: dynamische Gruppe "Patienten" mit je einem Eintrag pro Patient (Scroll-Highlight)
+- Sidebar: Patienten-Modul aktiv wenn Incident gesetzt
+- Backend-Tests (22/22 passed), Frontend-E2E (100%)
+- Backend: Incident-Modell + CRUD (GET/POST/PATCH/DELETE /api/incidents, POST /api/incidents/demo),
+  Query-Filter (?status, ?demo), automatisches `end_at` bei Status-Wechsel auf abgeschlossen
+- Frontend: `IncidentContext` + Provider (listet, erstellt, aktiviert, schliesst, reaktiviert, loescht,
+  Demo-Start), aktive ID persistiert in localStorage (`els-active-incident`)
+- `IncidentList` Seite (`/`) mit Filter-Chips (alle/operativ/geplant/abgeschlossen/demo + Counts),
+  Suche (Name/Ort/Typ), Loading-Skeleton, Empty-State
+- `IncidentCard` mit Typ-Icon, DEMO-Badge, Status-Badge (operativ-Puls), Live-Dauer,
+  Aktionen: Aktivieren, Lage oeffnen, Abschliessen, Reaktivieren, Loeschen (nur DEMO)
+- `NewIncidentDialog` (Name, Typ, Ort, Startzeit, Beschreibung) mit Validierung, Fehleranzeige
+- GlobalHeader: klickbarer Incident-Context (navigiert zu `/`), Live-Dauer-Anzeige, DEMO-Badge
+- Sidebar: "Aktiver Incident"-Gruppe mit Lage aktiv nur bei gesetztem Incident
 - Command-Palette: dynamische "Incident wechseln"-Gruppe (ein Eintrag pro Incident),
   `handleStartDemo`/`handleNewIncident` realgeschaltet
 - LagePlaceholder (`/lage`): Uebersicht mit Modulen, Hinweis auf Folge-Schritte
 - Backend-Test (13/13 passed), Frontend-E2E (95%+, nur 2 LOW Issues gefunden und gefixt)
 
-### 🔜 Backlog (Schritte 03–09)
-- **Schritt 03 (P0)**: Patientenliste (Kennung, Sichtung S1–S4, Status, Verbleib, Filter)
+### 🔜 Backlog (Schritte 04–09)
 - **Schritt 04 (P0)**: Patientendetail (Zeitstempel, Behandlungsstart, Fallabschluss)
 - **Schritt 05 (P0)**: Transportuebersicht (intern/extern, Ressource, Ziel, Status)
 - **Schritt 06 (P1)**: Ressourcen + Kommunikation + Konflikte
