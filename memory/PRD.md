@@ -72,22 +72,30 @@ Abschlussbericht mit PDF-Export.
 - Backend: `/api/meta` Endpoint
 - data-testid auf allen interaktiven Elementen
 
-### ✅ Schritt 01 + Enhancement – Kommando-Palette ⌘K (2026-04)
-- `CommandPaletteProvider` mit globalem Keyboard-Shortcut (Ctrl+K / ⌘K)
-- Dynamische Command-Registrierung via `useCommandPalette().registerCommand()`
-  (spaetere Schritte koennen Patient-Kennungen, Aktionen etc. einhaengen)
-- Gruppen: Schnellzugriff (dynamisch), Navigation, Incident, Einstellungen
-- Trigger-Button im Header mit ⌘K/Ctrl+K Kbd-Hinweis
-- Theme-Toggle, Demo-Incident, Neuer Incident via Palette bedienbar
+### ✅ Schritt 02 – Einstieg & Incident-Auswahl (2026-04)
+- Backend: Incident-Modell + CRUD (GET/POST/PATCH/DELETE /api/incidents, POST /api/incidents/demo),
+  Query-Filter (?status, ?demo), automatisches `end_at` bei Status-Wechsel auf abgeschlossen
+- Frontend: `IncidentContext` + Provider (listet, erstellt, aktiviert, schliesst, reaktiviert, loescht,
+  Demo-Start), aktive ID persistiert in localStorage (`els-active-incident`)
+- `IncidentList` Seite (`/`) mit Filter-Chips (alle/operativ/geplant/abgeschlossen/demo + Counts),
+  Suche (Name/Ort/Typ), Loading-Skeleton, Empty-State
+- `IncidentCard` mit Typ-Icon, DEMO-Badge, Status-Badge (operativ-Puls), Live-Dauer,
+  Aktionen: Aktivieren, Lage oeffnen, Abschliessen, Reaktivieren, Loeschen (nur DEMO)
+- `NewIncidentDialog` (Name, Typ, Ort, Startzeit, Beschreibung) mit Validierung, Fehleranzeige
+- GlobalHeader: klickbarer Incident-Context (navigiert zu `/`), Live-Dauer-Anzeige, DEMO-Badge
+- Sidebar: "Aktiver Incident"-Gruppe mit Lage aktiv nur bei gesetztem Incident
+- Command-Palette: dynamische "Incident wechseln"-Gruppe (ein Eintrag pro Incident),
+  `handleStartDemo`/`handleNewIncident` realgeschaltet
+- LagePlaceholder (`/lage`): Uebersicht mit Modulen, Hinweis auf Folge-Schritte
+- Backend-Test (13/13 passed), Frontend-E2E (95%+, nur 2 LOW Issues gefunden und gefixt)
 
-### 🔜 Backlog (Schritte 02–09)
-- **Schritt 02 (P0)**: Einstieg & Incident-Auswahl (Incident-Liste, neuer Incident, Demo-Incident)
+### 🔜 Backlog (Schritte 03–09)
 - **Schritt 03 (P0)**: Patientenliste (Kennung, Sichtung S1–S4, Status, Verbleib, Filter)
 - **Schritt 04 (P0)**: Patientendetail (Zeitstempel, Behandlungsstart, Fallabschluss)
 - **Schritt 05 (P0)**: Transportuebersicht (intern/extern, Ressource, Ziel, Status)
 - **Schritt 06 (P1)**: Ressourcen + Kommunikation + Konflikte
 - **Schritt 07 (P1)**: Produktreife – Leer-/Fehler-/Loading-States, Navigation
-- **Schritt 08 (P2)**: Demo-Integration – realistische Vordaten
+- **Schritt 08 (P2)**: Demo-Integration – realistische Vordaten (Patienten, Transporte etc.)
 - **Schritt 09 (P1)**: Auswertung & Abschluss – 14-Kapitel-Bericht, PDF-Export, Blocker-Check
 
 ## Next Actions

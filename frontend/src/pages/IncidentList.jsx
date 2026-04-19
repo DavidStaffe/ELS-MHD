@@ -150,11 +150,15 @@ export default function IncidentList() {
         setDemoBusy(true);
         try {
             const created = await startDemo();
+            if (created?.id) {
+                setActive(created.id);
+                navigate("/lage");
+            }
             return created;
         } finally {
             setDemoBusy(false);
         }
-    }, [startDemo]);
+    }, [startDemo, setActive, navigate]);
 
     // Dynamische Commands: "Incident wechseln" fuer jeden Incident
     React.useEffect(() => {
@@ -316,7 +320,14 @@ export default function IncidentList() {
             <NewIncidentDialog
                 open={newOpen}
                 onOpenChange={setNewOpen}
-                onCreate={create}
+                onCreate={async (payload) => {
+                    const created = await create(payload);
+                    if (created?.id) {
+                        setActive(created.id);
+                        navigate("/lage");
+                    }
+                    return created;
+                }}
             />
 
             <ConfirmModal
