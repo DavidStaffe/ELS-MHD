@@ -72,6 +72,14 @@ Abschlussbericht mit PDF-Export.
 - Backend: `/api/meta` Endpoint
 - data-testid auf allen interaktiven Elementen
 
+### ✅ Schritt 01 + Enhancement – Kommando-Palette ⌘K (2026-04)
+- `CommandPaletteProvider` mit globalem Keyboard-Shortcut (Ctrl+K / ⌘K)
+- Dynamische Command-Registrierung via `useCommandPalette().registerCommand()`
+  (spaetere Schritte koennen Patient-Kennungen, Aktionen etc. einhaengen)
+- Gruppen: Schnellzugriff (dynamisch), Navigation, Incident, Einstellungen
+- Trigger-Button im Header mit ⌘K/Ctrl+K Kbd-Hinweis
+- Theme-Toggle, Demo-Incident, Neuer Incident via Palette bedienbar
+
 ### 🔜 Backlog (Schritte 02–09)
 - **Schritt 02 (P0)**: Einstieg & Incident-Auswahl (Incident-Liste, neuer Incident, Demo-Incident)
 - **Schritt 03 (P0)**: Patientenliste (Kennung, Sichtung S1–S4, Status, Verbleib, Filter)

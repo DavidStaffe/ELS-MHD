@@ -2,6 +2,7 @@ import * as React from "react";
 import { cn } from "@/lib/utils";
 import { StatusBadge } from "@/components/primitives/StatusBadge";
 import { Button } from "@/components/ui/button";
+import { CommandPaletteTrigger } from "@/components/command/CommandPalette";
 import { Sun, Moon, ShieldCheck, Clock3 } from "lucide-react";
 
 function useClock() {
@@ -103,6 +104,9 @@ export function GlobalHeader({
                     {role}
                 </span>
             </div>
+
+            {/* Command Palette Trigger */}
+            <CommandPaletteTrigger />
 
             {/* Uhrzeit */}
             <div

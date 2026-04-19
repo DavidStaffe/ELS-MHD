@@ -10,6 +10,7 @@ import {
     DataTable,
     ConfirmModal
 } from "@/components/primitives";
+import { useCommandPalette } from "@/components/command/CommandPalette";
 import {
     Users,
     Truck,
@@ -18,7 +19,8 @@ import {
     PlayCircle,
     Plus,
     FileCheck2,
-    Info
+    Info,
+    Command as CommandIcon
 } from "lucide-react";
 
 /**
@@ -66,9 +68,46 @@ const COLUMNS = [
     { key: "dauer", label: "Dauer", mono: true, align: "right", width: "12%" }
 ];
 
-export default function Home() {
+export default function Home({ demoOpen, setDemoOpen, newOpen, setNewOpen }) {
     const [filter, setFilter] = React.useState({ S1: true, S2: true, S3: false, S4: false, offen: true });
-    const [confirmOpen, setConfirmOpen] = React.useState(false);
+    // Fallback-State falls Home ohne App-Shell-Handler genutzt wird
+    const [localDemo, setLocalDemo] = React.useState(false);
+    const [localNew, setLocalNew] = React.useState(false);
+    const isDemoOpen = demoOpen ?? localDemo;
+    const setIsDemoOpen = setDemoOpen ?? setLocalDemo;
+    const isNewOpen = newOpen ?? localNew;
+    const setIsNewOpen = setNewOpen ?? setLocalNew;
+
+    const { registerCommand } = useCommandPalette();
+
+    // Demo-Registrierung dynamischer Commands (zeigt API-Muster fuer spaetere Schritte)
+    React.useEffect(() => {
+        const unregisters = [];
+        unregisters.push(
+            registerCommand({
+                id: "focus-patient-search",
+                label: "Patient nach Kennung suchen",
+                group: "Schnellzugriff",
+                icon: Users,
+                keywords: ["kennung", "pat", "p-"],
+                run: () => {
+                    const el = document.querySelector('[data-testid="patient-search"]');
+                    if (el) el.focus();
+                }
+            })
+        );
+        unregisters.push(
+            registerCommand({
+                id: "scroll-kpi",
+                label: "Kennzahlen anzeigen",
+                group: "Schnellzugriff",
+                icon: FileCheck2,
+                keywords: ["kpi", "zahlen", "lage"],
+                run: () => window.scrollTo({ top: 0, behavior: "smooth" })
+            })
+        );
+        return () => unregisters.forEach((u) => u && u());
+    }, [registerCommand]);
 
     return (
         <div className="mx-auto w-full max-w-[1600px] px-6 py-6">
@@ -91,12 +130,15 @@ export default function Home() {
                     <Button
                         variant="outline"
                         data-testid="btn-start-demo"
-                        onClick={() => setConfirmOpen(true)}
+                        onClick={() => setIsDemoOpen(true)}
                     >
                         <PlayCircle className="h-4 w-4" />
                         Demo-Incident starten
                     </Button>
-                    <Button data-testid="btn-new-incident">
+                    <Button
+                        data-testid="btn-new-incident"
+                        onClick={() => setIsNewOpen(true)}
+                    >
                         <Plus className="h-4 w-4" />
                         Neuen Incident anlegen
                     </Button>
@@ -343,7 +385,7 @@ export default function Home() {
             {/* Hinweisleiste */}
             <div className="mt-6 flex items-start gap-3 rounded-md border border-border bg-surface-sunken px-4 py-3 text-caption text-muted-foreground">
                 <Info className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
-                <div>
+                <div className="flex-1">
                     <span className="font-medium text-foreground">
                         Produktbasis aktiv.
                     </span>{" "}
@@ -354,15 +396,31 @@ export default function Home() {
                         /aktuell/els-figma-komponenten-briefing-v0.1.md
                     </span>
                 </div>
+                <div className="hidden md:flex shrink-0 items-center gap-1.5 rounded-md border border-border bg-background px-2 py-1 text-foreground">
+                    <CommandIcon className="h-3 w-3" />
+                    <span className="font-mono text-[0.7rem]">K</span>
+                    <span className="text-muted-foreground">Kommando-Palette</span>
+                </div>
             </div>
 
             <ConfirmModal
-                open={confirmOpen}
-                onOpenChange={setConfirmOpen}
+                open={isDemoOpen}
+                onOpenChange={setIsDemoOpen}
                 title="Demo-Incident starten?"
                 description="Es werden Vordaten (Patienten, Transporte, Ressourcen) geladen und ein DEMO-Badge im Header angezeigt. Produktivdaten bleiben unveraendert."
                 confirmLabel="Demo starten"
                 tone="warning"
+                testId="confirm-modal-demo"
+            />
+
+            <ConfirmModal
+                open={isNewOpen}
+                onOpenChange={setIsNewOpen}
+                title="Neuen Incident anlegen?"
+                description="Der Incident-Anlage-Dialog folgt in Schritt 02 (Name, Typ, Ort, Datum). Dies ist aktuell nur ein Platzhalter."
+                confirmLabel="Verstanden"
+                tone="default"
+                testId="confirm-modal-new"
             />
         </div>
     );

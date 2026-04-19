@@ -2,6 +2,7 @@ import * as React from "react";
 import { Sidebar } from "./Sidebar";
 import { GlobalHeader } from "./GlobalHeader";
 import { cn } from "@/lib/utils";
+import { CommandPaletteProvider } from "@/components/command/CommandPalette";
 
 const THEME_KEY = "els-theme";
 
@@ -11,7 +12,13 @@ function applyTheme(theme) {
     root.classList.add(theme);
 }
 
-export function AppShell({ children, incident, role = "Einsatzleiter" }) {
+export function AppShell({
+    children,
+    incident,
+    role = "Einsatzleiter",
+    onStartDemo,
+    onNewIncident
+}) {
     const [theme, setTheme] = React.useState(() => {
         if (typeof window === "undefined") return "dark";
         return localStorage.getItem(THEME_KEY) || "dark";
@@ -31,22 +38,29 @@ export function AppShell({ children, incident, role = "Einsatzleiter" }) {
     }, []);
 
     return (
-        <div className={cn("flex h-screen w-full bg-background text-foreground")}>
-            <Sidebar />
-            <div className="flex min-w-0 flex-1 flex-col">
-                <GlobalHeader
-                    incident={incident}
-                    role={role}
-                    theme={theme}
-                    onToggleTheme={toggleTheme}
-                />
-                <main
-                    data-testid="app-main"
-                    className="flex-1 overflow-y-auto"
-                >
-                    {children}
-                </main>
+        <CommandPaletteProvider
+            theme={theme}
+            onToggleTheme={toggleTheme}
+            onStartDemo={onStartDemo}
+            onNewIncident={onNewIncident}
+        >
+            <div className={cn("flex h-screen w-full bg-background text-foreground")}>
+                <Sidebar />
+                <div className="flex min-w-0 flex-1 flex-col">
+                    <GlobalHeader
+                        incident={incident}
+                        role={role}
+                        theme={theme}
+                        onToggleTheme={toggleTheme}
+                    />
+                    <main
+                        data-testid="app-main"
+                        className="flex-1 overflow-y-auto"
+                    >
+                        {children}
+                    </main>
+                </div>
             </div>
-        </div>
+        </CommandPaletteProvider>
     );
 }
