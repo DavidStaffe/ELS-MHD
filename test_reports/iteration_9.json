@@ -1,0 +1,40 @@
+{
+  "summary": "Post-Refactor-Regression gruen. server.py ist jetzt ein 70-Zeilen-Bootstrap; Domainlogik liegt in core/, models.py, routes/*, services/*. GET /api/meta liefert version=1.0.0 (step 01-12). POST /api/incidents/demo erzeugt kompletten Demo-Incident (2 Abschnitte, 6 Betten davon 4 belegt, 7 Patienten, 2+ Transporte, 3 Meldungen, 9 Ressourcen). Backend-Regression via pytest: 130/135 passed. Die 5 Fehler sind AUSSCHLIESSLICH pre-existing hardcoded Version-Assertions in alten Step02/04/05/06-Tests (erwarten 0.2/0.4/0.5/0.6, App ist bei 1.0.0) - NICHT durch den Refactor verursacht. Neue Suites test_step07_09_role_demo_abschluss.py (28/28) und test_step10_12_abschnitte_betten.py (36/36 inkl. alle Step07-12-Tests) laufen komplett gruen: demo-Incident, auswertung A-G, abschluss-check Blocker+Warnungen, report 14 Kapitel, report-versions inkl. freigabe-Metadata, patch meta besondere_vorkommnisse/nachbearbeitung, 404-Pfade, abschnitte-CRUD + 409 bei aktivem Incident, betten-CRUD inkl. bulk, assign/release, gesperrtes Bett 409, fallabschluss-gibt-Bett-frei, aktive_ohne_bett-blocker, report-Kapitel 2+8 mit Abschnitten/Betten. Frontend-Regression: alle 9 Hauptrouten (/, /patienten, /transporte, /ressourcen, /meldungen, /konflikte, /abschnitte, /betten, /abschluss) plus /patienten/{id} rendern fuer Rolle=einsatzleiter gegen den Demo-Incident HTTP 200, KEINE Error-Boundary, KEINE Console-Errors. PatientDetail zeigt korrekt Kennung, Sichtung-Badge, UEBERGEBEN/DEMO, Grossveranstaltung Messe, Zeitverlauf (Ankunft/Sichtung/Behandlung/Transport/Fallabschluss mit relativen Deltas), Bett-Zuweisung, Fallabschluss-Typ, Verbleib. Nach dem Test ist nur 1 Demo-Incident in der DB uebrig (Grossveranstaltung Messe, demo=true).",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "tests/test_incidents_api.py, test_step04/05/06_api.py", "issue": "5 pre-existing Tests asserten hardcoded alte Versionsstrings (0.2.0/0.4.0/0.5.0/0.6.0). App liefert korrekt 1.0.0 gemaess server.py. Refactor-unabhaengig, sollte bei Gelegenheit auf dynamische/aktuelle Version geupdated werden."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_step07_09_role_demo_abschluss.py",
+    "/app/backend/tests/test_step10_12_abschnitte_betten.py",
+    "/app/test_reports/pytest/iteration_9_full.xml"
+  ],
+  "action_items": [
+    "Optional: die 5 hardcoded Versionsassertions in test_incidents_api.py / test_step04_api.py / test_step05_transport_api.py / test_step06_resources_messages_konflikte.py entfernen oder auf '1.0.0' bzw. dynamisch auf meta['version'] is not None umstellen. Keine funktionale Aenderung noetig."
+  ],
+  "critical_code_review_comments": [
+    "server.py sauber auf 70 Zeilen runtergebrochen (<<700-Grenze, alle Domainimports in routes/*). Gutes Modul-Layout: core/db.py, core/time.py, core/types.py, models.py, services/{seeds,demo,analytics}.py.",
+    "Migration (S4->S0) bleibt idempotent im startup-event. Shutdown schliesst Mongo-Client sauber.",
+    "routes/incidents.py: DELETE /api/incidents/{id} cascaded jetzt auch report_versions + betten + abschnitte - konsistent und richtig.",
+    "services/demo.py: Seed-Logik deterministisch fuer Counts (7 Patienten, 6 Betten, 2 Abschnitte, 3 Meldungen); Zufall nur in name/typ/ort/notiz - gut fuer wiederholbare Tests.",
+    "conftest.py existiert weiterhin nicht in tests/; REACT_APP_BACKEND_URL muss beim pytest-Lauf exportiert werden (nicht Testing-Agent-Kritik, nur Dev-Ergonomie: optional conftest.py mit load_dotenv('/app/frontend/.env'))."
+  ],
+  "updated_files": [],
+  "success_rate": {
+    "backend": "96.3% (130/135; die 5 Fails sind pre-existing Version-String-Asserts, nicht durch Refactor verursacht). Neue Kern-Suites 64/64 (100%).",
+    "frontend": "100% (alle 9 Hauptrouten + PatientDetail rendern fehlerfrei, 0 console errors, 0 error boundaries)."
+  },
+  "test_credentials": "Keine Auth. localStorage['els-role']='einsatzleiter' und localStorage['els-active-incident']=<demo_incident_id>.",
+  "seed_data_creation": "POST /api/incidents/demo erzeugt kompletten Demo. Cleanup: 4 ueberfluessige Demo-Incidents via DELETE /api/incidents/{id} entfernt. Aktuell nur 1 Demo-Incident in DB (Grossveranstaltung Messe, id=f08b5f8b-83f4-4863-8335-d1cbdc051da3).",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Refactor validiert. server.py 70 Zeilen ok. pytest-Run-Kommando: `cd /app/backend && REACT_APP_BACKEND_URL=<preview-url> python -m pytest tests/ -v --tb=short`. Die 5 Version-String-Fails sind pre-existing. Frontend-Routen alle gruen mit localStorage-Rolle + Incident-ID.",
+  "rca_of_the_issue": "Kein Bug. Refactor ist funktional aequivalent zum Monolithen: alle Endpunkte (incidents/meta/patients/transports/resources/messages/abschnitte/betten/auswertung/abschluss-check/report/report-versions/patch-meta/konflikte) und alle Seiteneffekte (auto-kennung, timestamps, resource-status-sync, bett-auto-release bei fallabschluss) arbeiten identisch. 130/135 Tests gruen, 5 Fails sind Test-Assertion-Drift auf alte Versionsstrings."
+}
