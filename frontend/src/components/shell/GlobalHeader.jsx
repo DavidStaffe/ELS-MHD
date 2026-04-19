@@ -4,7 +4,8 @@ import { StatusBadge } from "@/components/primitives/StatusBadge";
 import { Button } from "@/components/ui/button";
 import { CommandPaletteTrigger } from "@/components/command/CommandPalette";
 import { formatDuration } from "@/lib/time";
-import { Sun, Moon, ShieldCheck, Clock3, LayoutGrid } from "lucide-react";
+import { useRole, ROLES } from "@/context/RoleContext";
+import { Sun, Moon, ShieldCheck, Clock3, LayoutGrid, UserCog } from "lucide-react";
 
 function useClock(intervalMs = 1000) {
     const [now, setNow] = React.useState(() => new Date());
@@ -39,13 +40,13 @@ const STATUS_MAP = {
 
 export function GlobalHeader({
     incident,
-    role = "Einsatzleiter",
     theme,
     onToggleTheme,
     onGoToIncidents,
     className
 }) {
     const now = useClock(1000);
+    const { roleMeta, setPickerOpen } = useRole();
 
     // Live-Dauer seit Incident-Start
     const duration = React.useMemo(() => {

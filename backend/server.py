@@ -167,8 +167,8 @@ async def meta():
     return {
         "app": "ELS MHD",
         "name": "Einsatzleitsystem Malteser Hilfsdienst",
-        "version": "0.6.0",
-        "step": "06 – Ressourcen, Kommunikation & Konflikte",
+        "version": "0.9.0",
+        "step": "07–09 Rollen · Demo · Auswertung",
     }
 
 
@@ -255,8 +255,131 @@ async def create_demo_incident():
 
     await db.incidents.insert_one(doc)
     await _seed_default_resources(obj.id)
+
+    # --- Schritt 08: Realistische Vordaten (Patienten, Transporte, Meldungen) ---
+    await _seed_demo_data(obj.id, start)
+
     logger.info("Demo-Incident erstellt: %s (%s)", obj.name, obj.id)
     return serialize_incident(doc)
+
+
+async def _seed_demo_data(incident_id: str, incident_start: datetime):
+    """Legt Patienten, Transporte und Meldungen fuer einen Demo-Incident an."""
+    now = now_utc()
+
+    notizen_by_sichtung = {
+        "S1": [
+            "Kollaps am Hauptzugang, reagiert nicht auf Ansprache",
+            "Starke Blutung Oberschenkel nach Sturz",
+        ],
+        "S2": [
+            "Kreislaufstoerung, hyperton",
+            "Knieverletzung, gehfaehig mit Hilfe",
+            "Hitzeerschoepfung, desorientiert",
+        ],
+        "S3": [
+            "Schnittwunde Handflaeche, Wunde gesaeubert",
+            "Insektenstich Ohrlaeppchen",
+            "Leichter Kreislauf, Wasser erhalten",
+        ],
+        "S0": [
+            "Pflasterwunsch Knie",
+            "Hitzebeschwerden, Ruhe erhalten",
+        ],
+    }
+
+    patients_plan = [
+        ("S1", "in_behandlung", "unbekannt", 5),
+        ("S1", "transportbereit", "rd", 18),
+        ("S2", "in_behandlung", "unbekannt", 11),
+        ("S2", "uebergeben", "rd", 42),
+        ("S3", "entlassen", "event", 28),
+        ("S0", "entlassen", "event", 7),
+        ("S3", "in_behandlung", "unbekannt", 3),
+    ]
+
+    counter = 0
+    for (sichtung, status, verbleib, ago_min) in patients_plan:
+        counter += 1
+        await db.incidents.update_one({"id": incident_id}, {"$inc": {"patient_counter": 1}})
+        kennung = f"P-{counter:04d}"
+        ankunft = now - timedelta(minutes=ago_min)
+        sichtung_at = ankunft + timedelta(minutes=1)
+        behandlung_start_at = sichtung_at
+        transport_at = None
+        fallabschluss_at = None
+        if status in ("transportbereit", "uebergeben"):
+            transport_at = sichtung_at + timedelta(minutes=4)
+        if status in ("uebergeben", "entlassen"):
+            fallabschluss_at = (transport_at or sichtung_at) + timedelta(minutes=6)
+
+        notiz = random.choice(notizen_by_sichtung[sichtung])
+        patient_doc = {
+            "id": str(uuid.uuid4()),
+            "incident_id": incident_id,
+            "kennung": kennung,
+            "sichtung": sichtung,
+            "status": status,
+            "verbleib": verbleib,
+            "notiz": notiz,
+            "transport_typ": "extern" if status in ("transportbereit", "uebergeben") else None,
+            "fallabschluss_typ": "rd_uebergabe" if status == "uebergeben" else ("entlassung" if status == "entlassen" else None),
+            "created_at": iso(ankunft),
+            "updated_at": iso(now),
+            "sichtung_at": iso(sichtung_at),
+            "behandlung_start_at": iso(behandlung_start_at),
+            "transport_angefordert_at": iso(transport_at) if transport_at else None,
+            "fallabschluss_at": iso(fallabschluss_at) if fallabschluss_at else None,
+        }
+        await db.patients.insert_one(patient_doc)
+
+        # Transport-Eintrag
+        if patient_doc["transport_typ"]:
+            t_status = (
+                "abgeschlossen" if status == "uebergeben"
+                else "unterwegs" if status == "transportbereit"
+                else "offen"
+            )
+            ressource = "RTW 1" if t_status in ("unterwegs", "abgeschlossen") else None
+            transport_doc = {
+                "id": str(uuid.uuid4()),
+                "incident_id": incident_id,
+                "patient_id": patient_doc["id"],
+                "patient_kennung": kennung,
+                "patient_sichtung": sichtung,
+                "typ": "extern",
+                "ziel": "krankenhaus" if t_status != "offen" else "rd",
+                "ressource": ressource,
+                "notiz": "",
+                "status": t_status,
+                "created_at": iso(transport_at or sichtung_at),
+                "updated_at": iso(now),
+                "zugewiesen_at": iso(transport_at) if ressource else None,
+                "gestartet_at": iso(transport_at + timedelta(minutes=1)) if t_status in ("unterwegs", "abgeschlossen") else None,
+                "abgeschlossen_at": iso(fallabschluss_at) if t_status == "abgeschlossen" else None,
+            }
+            await db.transports.insert_one(transport_doc)
+            if ressource and t_status != "abgeschlossen":
+                await _update_resource_status_by_name(incident_id, ressource, "im_einsatz")
+
+    # --- Meldungen ---
+    messages = [
+        ("kritisch", "anforderung", "SAN 1", "Kollaps Haupteingang, zweiten Trupp alarmieren!", now - timedelta(minutes=9)),
+        ("dringend", "lage", "UHS", "UHS Kapazitaet 80% erreicht", now - timedelta(minutes=15)),
+        ("normal", "info", "EL", "Einsatz laeuft planmaessig", now - timedelta(minutes=30)),
+    ]
+    for prio, kat, von, text, when in messages:
+        await db.messages.insert_one({
+            "id": str(uuid.uuid4()),
+            "incident_id": incident_id,
+            "text": text,
+            "prioritaet": prio,
+            "kategorie": kat,
+            "von": von,
+            "quittiert_at": iso(now - timedelta(minutes=2)) if prio == "normal" else None,
+            "quittiert_von": "Einsatzleiter" if prio == "normal" else None,
+            "created_at": iso(when),
+        })
 
 
 @api_router.get("/incidents/{incident_id}", response_model=dict)
@@ -1103,6 +1226,320 @@ async def detect_konflikte(incident_id: str):
     order = {"rot": 0, "gelb": 1, "info": 2}
     konflikte.sort(key=lambda k: order.get(k["schwere"], 9))
     return konflikte
+
+
+# ---------------------------------------------------------------------------
+# Schritt 09: Auswertung & Abschluss
+# ---------------------------------------------------------------------------
+
+
+def _duration_ms(a, b):
+    if not a or not b:
+        return None
+    return (parse_iso(b) - parse_iso(a)).total_seconds() * 1000
+
+
+def _avg_minutes(values):
+    nums = [v for v in values if v is not None and v > 0]
+    if not nums:
+        return 0
+    return round(sum(nums) / len(nums) / 1000 / 60, 1)
+
+
+@api_router.get("/incidents/{incident_id}/auswertung", response_model=dict)
+async def get_auswertung(incident_id: str):
+    inc = await db.incidents.find_one({"id": incident_id}, {"_id": 0})
+    if not inc:
+        raise HTTPException(status_code=404, detail="Incident nicht gefunden")
+
+    patients = await db.patients.find({"incident_id": incident_id}, {"_id": 0}).to_list(2000)
+    transports = await db.transports.find({"incident_id": incident_id}, {"_id": 0}).to_list(2000)
+    messages = await db.messages.find({"incident_id": incident_id}, {"_id": 0}).to_list(2000)
+    resources = await db.resources.find({"incident_id": incident_id}, {"_id": 0}).to_list(500)
+
+    # A Patienten
+    sichtung_counts = {"S1": 0, "S2": 0, "S3": 0, "S0": 0, "ohne": 0}
+    status_counts = {k: 0 for k in ["wartend", "in_behandlung", "transportbereit", "uebergeben", "entlassen"]}
+    wartezeiten = []
+    behandlungsdauern = []
+    for p in patients:
+        if p.get("sichtung") in sichtung_counts:
+            sichtung_counts[p["sichtung"]] += 1
+        else:
+            sichtung_counts["ohne"] += 1
+        st = p.get("status")
+        if st in status_counts:
+            status_counts[st] += 1
+        wartezeiten.append(_duration_ms(p.get("created_at"), p.get("sichtung_at")))
+        behandlungsdauern.append(_duration_ms(p.get("behandlung_start_at"), p.get("fallabschluss_at")))
+
+    block_a = {
+        "total": len(patients),
+        "sichtung": sichtung_counts,
+        "status": status_counts,
+        "wartezeit_min_avg": _avg_minutes(wartezeiten),
+        "behandlungsdauer_min_avg": _avg_minutes(behandlungsdauern),
+    }
+
+    # B Transporte
+    t_by_status = {"offen": 0, "zugewiesen": 0, "unterwegs": 0, "abgeschlossen": 0}
+    t_by_typ = {"intern": 0, "extern": 0}
+    t_dauern = []
+    for t in transports:
+        if t.get("status") in t_by_status:
+            t_by_status[t["status"]] += 1
+        if t.get("typ") in t_by_typ:
+            t_by_typ[t["typ"]] += 1
+        t_dauern.append(_duration_ms(t.get("gestartet_at"), t.get("abgeschlossen_at")))
+    block_b = {
+        "total": len(transports),
+        "status": t_by_status,
+        "typ": t_by_typ,
+        "fahrtdauer_min_avg": _avg_minutes(t_dauern),
+    }
+
+    # C Meldungen
+    m_prio = {"kritisch": 0, "dringend": 0, "normal": 0}
+    m_offen = 0
+    ack_dauern = []
+    for m in messages:
+        if m.get("prioritaet") in m_prio:
+            m_prio[m["prioritaet"]] += 1
+        if not m.get("quittiert_at"):
+            m_offen += 1
+        ack_dauern.append(_duration_ms(m.get("created_at"), m.get("quittiert_at")))
+    block_c = {
+        "total": len(messages),
+        "prioritaet": m_prio,
+        "offen": m_offen,
+        "quittier_dauer_min_avg": _avg_minutes(ack_dauern),
+    }
+
+    # D Ressourcen
+    r_status = {"verfuegbar": 0, "im_einsatz": 0, "wartung": 0, "offline": 0}
+    for r in resources:
+        if r.get("status") in r_status:
+            r_status[r["status"]] += 1
+    block_d = {"total": len(resources), "status": r_status}
+
+    # E Konflikte
+    konflikte = await detect_konflikte(incident_id)
+    block_e = {
+        "total": len(konflikte),
+        "rot": sum(1 for k in konflikte if k["schwere"] == "rot"),
+        "gelb": sum(1 for k in konflikte if k["schwere"] == "gelb"),
+    }
+
+    # F Metadaten
+    end_ref = inc.get("end_at") or iso(now_utc())
+    dauer_ms = _duration_ms(inc.get("start_at"), end_ref)
+    block_f = {
+        "incident_id": inc["id"],
+        "name": inc["name"],
+        "typ": inc.get("typ"),
+        "ort": inc.get("ort"),
+        "status": inc.get("status"),
+        "demo": bool(inc.get("demo")),
+        "start_at": inc.get("start_at"),
+        "end_at": inc.get("end_at"),
+        "einsatzdauer_min": round((dauer_ms or 0) / 1000 / 60, 1),
+    }
+
+    return {"A_patienten": block_a, "B_transporte": block_b, "C_kommunikation": block_c,
+            "D_ressourcen": block_d, "E_konflikte": block_e, "F_metadaten": block_f}
+
+
+@api_router.get("/incidents/{incident_id}/abschluss-check", response_model=dict)
+async def get_abschluss_check(incident_id: str):
+    inc = await db.incidents.find_one({"id": incident_id}, {"_id": 0})
+    if not inc:
+        raise HTTPException(status_code=404, detail="Incident nicht gefunden")
+
+    patients = await db.patients.find({"incident_id": incident_id}, {"_id": 0}).to_list(2000)
+    transports = await db.transports.find({"incident_id": incident_id}, {"_id": 0}).to_list(2000)
+    messages = await db.messages.find({"incident_id": incident_id}, {"_id": 0}).to_list(2000)
+
+    blockers: list[dict] = []
+    warnings: list[dict] = []
+
+    # Blocker: Patienten noch nicht abgeschlossen
+    offene = [p for p in patients if p.get("status") in ("wartend", "in_behandlung", "transportbereit")]
+    if offene:
+        blockers.append({
+            "id": "offene_patienten",
+            "titel": f"{len(offene)} offene Patienten",
+            "beschreibung": "Alle Patienten muessen abgeschlossen (uebergeben oder entlassen) sein.",
+            "typ": "patienten",
+            "count": len(offene),
+        })
+
+    # Blocker: Transporte unterwegs
+    unterwegs = [t for t in transports if t.get("status") in ("offen", "zugewiesen", "unterwegs")]
+    if unterwegs:
+        blockers.append({
+            "id": "offene_transporte",
+            "titel": f"{len(unterwegs)} offene Transporte",
+            "beschreibung": "Alle Transporte muessen abgeschlossen sein.",
+            "typ": "transporte",
+            "count": len(unterwegs),
+        })
+
+    # Blocker: Unquittierte kritische Meldungen
+    krit = [m for m in messages if m.get("prioritaet") == "kritisch" and not m.get("quittiert_at")]
+    if krit:
+        blockers.append({
+            "id": "offene_kritisch",
+            "titel": f"{len(krit)} kritische Meldungen unquittiert",
+            "beschreibung": "Kritische Meldungen muessen vor Abschluss quittiert sein.",
+            "typ": "meldungen",
+            "count": len(krit),
+        })
+
+    # Warnung: Unquittierte dringende Meldungen
+    drng = [m for m in messages if m.get("prioritaet") == "dringend" and not m.get("quittiert_at")]
+    if drng:
+        warnings.append({
+            "id": "offene_dringend",
+            "titel": f"{len(drng)} dringende Meldungen unquittiert",
+            "beschreibung": "Empfehlung: vor Abschluss quittieren.",
+            "typ": "meldungen",
+            "count": len(drng),
+        })
+
+    # Warnung: Patienten ohne Sichtung
+    ohne_s = [p for p in patients if not p.get("sichtung")]
+    if ohne_s:
+        warnings.append({
+            "id": "ohne_sichtung",
+            "titel": f"{len(ohne_s)} Patienten ohne Sichtung",
+            "beschreibung": "Sichtung nachtragen fuer vollstaendigen Bericht.",
+            "typ": "patienten",
+            "count": len(ohne_s),
+        })
+
+    # Warnung: Keine Meldungen erfasst
+    if not messages:
+        warnings.append({
+            "id": "keine_meldungen",
+            "titel": "Keine Meldungen erfasst",
+            "beschreibung": "Fuer vollstaendige Dokumentation sollten Meldungen erfasst sein.",
+            "typ": "meldungen",
+            "count": 0,
+        })
+
+    return {
+        "incident_status": inc.get("status"),
+        "bereit_fuer_abschluss": len(blockers) == 0,
+        "blockers": blockers,
+        "warnings": warnings,
+    }
+
+
+@api_router.get("/incidents/{incident_id}/report", response_model=dict)
+async def get_report(incident_id: str):
+    """Liefert die 14 Kapitel des Abschlussberichts als strukturierte Daten."""
+    inc = await db.incidents.find_one({"id": incident_id}, {"_id": 0})
+    if not inc:
+        raise HTTPException(status_code=404, detail="Incident nicht gefunden")
+
+    auswertung = await get_auswertung(incident_id)
+    patients = await db.patients.find({"incident_id": incident_id}, {"_id": 0}).sort("kennung", 1).to_list(2000)
+    transports = await db.transports.find({"incident_id": incident_id}, {"_id": 0}).sort("created_at", 1).to_list(2000)
+    messages = await db.messages.find({"incident_id": incident_id}, {"_id": 0}).sort("created_at", 1).to_list(2000)
+    resources = await db.resources.find({"incident_id": incident_id}, {"_id": 0}).to_list(500)
+
+    kapitel = [
+        {"nr": 1, "titel": "Einsatzgrunddaten", "inhalt": {
+            "name": inc["name"], "typ": inc.get("typ"), "ort": inc.get("ort"),
+            "start": inc.get("start_at"), "ende": inc.get("end_at"),
+            "dauer_min": auswertung["F_metadaten"]["einsatzdauer_min"],
+            "demo": inc.get("demo", False),
+        }},
+        {"nr": 2, "titel": "Organisation & Rollen", "inhalt": {
+            "einsatzleiter": "Einsatzleiter (Rolle)",
+            "rollen": ["Einsatzleiter", "Sanitaeter / Helfer", "Dokumentar"],
+        }},
+        {"nr": 3, "titel": "Patientenuebersicht", "inhalt": auswertung["A_patienten"]},
+        {"nr": 4, "titel": "Patientenliste", "inhalt": {"patienten": patients}},
+        {"nr": 5, "titel": "Sichtungsverteilung", "inhalt": auswertung["A_patienten"]["sichtung"]},
+        {"nr": 6, "titel": "Behandlungszeiten", "inhalt": {
+            "wartezeit_min_avg": auswertung["A_patienten"]["wartezeit_min_avg"],
+            "behandlungsdauer_min_avg": auswertung["A_patienten"]["behandlungsdauer_min_avg"],
+        }},
+        {"nr": 7, "titel": "Transporte", "inhalt": {"transporte": transports, "summary": auswertung["B_transporte"]}},
+        {"nr": 8, "titel": "Ressourcen", "inhalt": {"ressourcen": resources, "summary": auswertung["D_ressourcen"]}},
+        {"nr": 9, "titel": "Kommunikation", "inhalt": {"meldungen": messages, "summary": auswertung["C_kommunikation"]}},
+        {"nr": 10, "titel": "Konflikte & Blocker", "inhalt": auswertung["E_konflikte"]},
+        {"nr": 11, "titel": "Besondere Vorkommnisse", "inhalt": {
+            "text": inc.get("meta", {}).get("besondere_vorkommnisse", "Keine besonderen Vorkommnisse dokumentiert."),
+        }},
+        {"nr": 12, "titel": "Nachbearbeitung & Anmerkungen", "inhalt": {
+            "text": inc.get("meta", {}).get("nachbearbeitung", ""),
+        }},
+        {"nr": 13, "titel": "Freigabe", "inhalt": {
+            "bereit_fuer_abschluss": inc.get("status") == "abgeschlossen",
+            "freigegeben_von": inc.get("meta", {}).get("freigegeben_von"),
+            "freigabe_at": inc.get("meta", {}).get("freigabe_at"),
+        }},
+        {"nr": 14, "titel": "Anhaenge & Quellen", "inhalt": {
+            "quellen": "Generiert aus ELS-MHD Systemdaten.",
+            "generiert_at": iso(now_utc()),
+        }},
+    ]
+
+    return {"incident": inc, "kapitel": kapitel, "generiert_at": iso(now_utc())}
+
+
+class ReportVersionCreate(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    freigegeben_von: Optional[str] = None
+    kommentar: str = Field(default="", max_length=2000)
+
+
+@api_router.get("/incidents/{incident_id}/report-versions", response_model=List[dict])
+async def list_report_versions(incident_id: str):
+    cursor = db.report_versions.find({"incident_id": incident_id}, {"_id": 0}).sort("created_at", -1)
+    return await cursor.to_list(200)
+
+
+@api_router.post("/incidents/{incident_id}/report-versions", response_model=dict, status_code=201)
+async def create_report_version(incident_id: str, payload: ReportVersionCreate):
+    inc = await db.incidents.find_one({"id": incident_id}, {"_id": 0})
+    if not inc:
+        raise HTTPException(status_code=404, detail="Incident nicht gefunden")
+    count = await db.report_versions.count_documents({"incident_id": incident_id})
+    report = await get_report(incident_id)
+    doc = {
+        "id": str(uuid.uuid4()),
+        "incident_id": incident_id,
+        "version": count + 1,
+        "freigegeben_von": payload.freigegeben_von or "Einsatzleiter",
+        "kommentar": payload.kommentar,
+        "snapshot": report,
+        "created_at": iso(now_utc()),
+    }
+    await db.report_versions.insert_one(doc)
+    return {k: v for k, v in doc.items() if k != "_id"}
+
+
+class PatchMeta(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    besondere_vorkommnisse: Optional[str] = None
+    nachbearbeitung: Optional[str] = None
+
+
+@api_router.patch("/incidents/{incident_id}/meta", response_model=dict)
+async def patch_incident_meta(incident_id: str, payload: PatchMeta):
+    upd = {f"meta.{k}": v for k, v in payload.model_dump(exclude_none=True).items()}
+    if not upd:
+        raise HTTPException(status_code=400, detail="Keine Aenderungen")
+    upd["updated_at"] = iso(now_utc())
+    result = await db.incidents.find_one_and_update(
+        {"id": incident_id}, {"$set": upd}, return_document=True, projection={"_id": 0}
+    )
+    if not result:
+        raise HTTPException(status_code=404, detail="Incident nicht gefunden")
+    return result
 
 
 # ---------------------------------------------------------------------------
