@@ -23,6 +23,8 @@ import {
     Sun,
     Moon,
     Search,
+    Layers,
+    Bed,
     Command as CommandIcon
 } from "lucide-react";
 
@@ -131,6 +133,8 @@ export function CommandPaletteProvider({
             { id: "nav-patienten", icon: ICON_MAP.patienten, label: "Patienten", path: "/patienten", available: true, shortcut: "G P" },
             { id: "nav-transport", icon: ICON_MAP.transport, label: "Transport", path: "/transport", available: true, shortcut: "G T" },
             { id: "nav-ressourcen", icon: ICON_MAP.ressourcen, label: "Ressourcen", path: "/ressourcen", available: true, shortcut: "G R" },
+            { id: "nav-abschnitte", icon: Layers, label: "Einsatzabschnitte", path: "/abschnitte", available: true, shortcut: "G S" },
+            { id: "nav-betten", icon: Bed, label: "Behandlungsplaetze", path: "/betten", available: true, shortcut: "G B" },
             { id: "nav-kommunikation", icon: ICON_MAP.kommunikation, label: "Kommunikation", path: "/kommunikation", available: true, shortcut: "G K" },
             { id: "nav-konflikte", icon: ICON_MAP.konflikte, label: "Konflikte", path: "/konflikte", available: true, shortcut: "G X" },
             { id: "nav-abschluss", icon: ICON_MAP.abschluss, label: "Auswertung & Abschluss", path: "/abschluss", available: true, shortcut: "G A" }

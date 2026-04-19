@@ -74,7 +74,22 @@ const PERMS = {
     "abschluss.freigabe": ["einsatzleiter"],
     "abschluss.export_pdf": ["einsatzleiter", "dokumentar"],
     "abschluss.edit_meta": ["einsatzleiter", "dokumentar"],
-    "abschluss.version_create": ["einsatzleiter"]
+    "abschluss.version_create": ["einsatzleiter"],
+
+    // Schritt 10: Einsatzabschnitte
+    "abschnitt.view": ["einsatzleiter", "helfer", "dokumentar"],
+    "abschnitt.create": ["einsatzleiter"],
+    "abschnitt.update": ["einsatzleiter"],
+    "abschnitt.delete": ["einsatzleiter"],
+    "abschnitt.assign_resource": ["einsatzleiter", "helfer"],
+
+    // Schritt 11: Behandlungsbetten
+    "bett.view": ["einsatzleiter", "helfer", "dokumentar"],
+    "bett.create": ["einsatzleiter", "helfer"],
+    "bett.update": ["einsatzleiter", "helfer"],
+    "bett.delete": ["einsatzleiter"],
+    "bett.assign_patient": ["einsatzleiter", "helfer"],
+    "bett.release": ["einsatzleiter", "helfer"]
 };
 
 export function canRole(role, action) {

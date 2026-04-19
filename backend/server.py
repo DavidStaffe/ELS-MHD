@@ -381,6 +381,94 @@ async def _seed_demo_data(incident_id: str, incident_start: datetime):
             "created_at": iso(when),
         })
 
+    # --- Schritt 10: Einsatzabschnitte ---
+    abschnitt_nord = {
+        "id": str(uuid.uuid4()),
+        "incident_id": incident_id,
+        "name": "Abschnitt Nord",
+        "farbe": "red",
+        "beschreibung": "Hauptbuehne / Eingang Nord",
+        "aktiv": True,
+        "erstellt_um": iso(incident_start),
+    }
+    abschnitt_bhp = {
+        "id": str(uuid.uuid4()),
+        "incident_id": incident_id,
+        "name": "BHP / UHS",
+        "farbe": "blue",
+        "beschreibung": "Behandlungsplatz, Zelt Sued",
+        "aktiv": True,
+        "erstellt_um": iso(incident_start),
+    }
+    await db.abschnitte.insert_many([abschnitt_nord, abschnitt_bhp])
+
+    # Ordne Demo-Ressourcen den Abschnitten zu
+    uhs_resources = await db.resources.find(
+        {"incident_id": incident_id, "kategorie": "uhs"}, {"_id": 0}
+    ).to_list(20)
+    for r in uhs_resources[:2]:
+        await db.resources.update_one(
+            {"id": r["id"]}, {"$set": {"abschnitt_id": abschnitt_bhp["id"]}}
+        )
+    for r in uhs_resources[2:]:
+        await db.resources.update_one(
+            {"id": r["id"]}, {"$set": {"abschnitt_id": abschnitt_nord["id"]}}
+        )
+    rtw_resources = await db.resources.find(
+        {"incident_id": incident_id, "kategorie": {"$in": ["rtw", "ktw"]}}, {"_id": 0}
+    ).to_list(20)
+    for r in rtw_resources[:2]:
+        await db.resources.update_one(
+            {"id": r["id"]}, {"$set": {"abschnitt_id": abschnitt_bhp["id"]}}
+        )
+
+    # --- Schritt 11: Behandlungsbetten (6 Betten: 4 belegt, 2 frei) ---
+    betten_plan = [
+        {"name": "Bett 1", "typ": "liegend", "abschnitt": abschnitt_bhp["id"]},
+        {"name": "Bett 2", "typ": "liegend", "abschnitt": abschnitt_bhp["id"]},
+        {"name": "Bett 3", "typ": "sitzend", "abschnitt": abschnitt_bhp["id"]},
+        {"name": "Bett 4", "typ": "sitzend", "abschnitt": abschnitt_bhp["id"]},
+        {"name": "Schockraum 1", "typ": "schockraum", "abschnitt": abschnitt_bhp["id"]},
+        {"name": "Beobachtung A", "typ": "beobachtung", "abschnitt": abschnitt_nord["id"]},
+    ]
+    bett_ids = []
+    for i, bp in enumerate(betten_plan):
+        bdoc = {
+            "id": str(uuid.uuid4()),
+            "incident_id": incident_id,
+            "name": bp["name"],
+            "typ": bp["typ"],
+            "status": "frei",
+            "abschnitt_id": bp["abschnitt"],
+            "notiz": "",
+            "patient_id": None,
+            "belegt_seit": None,
+            "erstellt_um": iso(incident_start + timedelta(minutes=i)),
+        }
+        await db.betten.insert_one(bdoc)
+        bett_ids.append(bdoc["id"])
+
+    # 4 der 6 Betten mit aktiven Patienten belegen (in_behandlung + transportbereit)
+    active_patients = await db.patients.find(
+        {"incident_id": incident_id, "status": {"$in": ["in_behandlung", "transportbereit"]}},
+        {"_id": 0},
+    ).to_list(20)
+    for i, p in enumerate(active_patients[:4]):
+        bid = bett_ids[i]
+        belegt = now - timedelta(minutes=random.randint(5, 25))
+        await db.betten.update_one(
+            {"id": bid},
+            {"$set": {
+                "status": "belegt",
+                "patient_id": p["id"],
+                "belegt_seit": iso(belegt),
+            }},
+        )
+        await db.patients.update_one(
+            {"id": p["id"]},
+            {"$set": {"bett_id": bid, "updated_at": iso(now)}},
+        )
+
 
 @api_router.get("/incidents/{incident_id}", response_model=dict)
 async def get_incident(incident_id: str):
@@ -428,6 +516,8 @@ async def delete_incident(incident_id: str):
     await db.transports.delete_many({"incident_id": incident_id})
     await db.resources.delete_many({"incident_id": incident_id})
     await db.messages.delete_many({"incident_id": incident_id})
+    await db.abschnitte.delete_many({"incident_id": incident_id})
+    await db.betten.delete_many({"incident_id": incident_id})
     return None
 
 
@@ -444,6 +534,7 @@ class PatientBase(BaseModel):
     notiz: str = Field(default="", max_length=4000)
     transport_typ: Optional[TransportTyp] = None
     fallabschluss_typ: Optional[FallabschlussTyp] = None
+    bett_id: Optional[str] = None
 
 
 class PatientCreate(PatientBase):
@@ -459,6 +550,7 @@ class PatientUpdate(BaseModel):
     notiz: Optional[str] = None
     transport_typ: Optional[TransportTyp] = None
     fallabschluss_typ: Optional[FallabschlussTyp] = None
+    bett_id: Optional[str] = None
 
 
 class Patient(PatientBase):
@@ -652,6 +744,8 @@ async def update_patient(patient_id: str, payload: PatientUpdate):
                 }
             },
         )
+        # Bett automatisch freigeben
+        await _release_bett_for_patient(patient_id)
     return result
 
 
@@ -901,6 +995,10 @@ async def update_transport(transport_id: str, payload: TransportUpdate):
     if new_status == "abgeschlossen" and new_ressource:
         await _release_if_free(new_ressource)
 
+    # Bett automatisch freigeben wenn Transport abgeschlossen
+    if new_status == "abgeschlossen" and result.get("patient_id"):
+        await _release_bett_for_patient(result["patient_id"])
+
     return result
 
 
@@ -936,6 +1034,7 @@ class ResourceBase(BaseModel):
     kategorie: ResourceKategorie = "sonstiges"
     status: ResourceStatus = "verfuegbar"
     notiz: str = Field(default="", max_length=1000)
+    abschnitt_id: Optional[str] = None
 
 
 class ResourceCreate(ResourceBase):
@@ -949,6 +1048,7 @@ class ResourceUpdate(BaseModel):
     kategorie: Optional[ResourceKategorie] = None
     status: Optional[ResourceStatus] = None
     notiz: Optional[str] = None
+    abschnitt_id: Optional[str] = None  # leer-string = entfernen
 
 
 class Resource(ResourceBase):
@@ -1043,6 +1143,346 @@ async def delete_resource(resource_id: str):
     if r.deleted_count == 0:
         raise HTTPException(status_code=404, detail="Ressource nicht gefunden")
     return None
+
+
+# ---------------------------------------------------------------------------
+# Schritt 10: Einsatzabschnitte
+# ---------------------------------------------------------------------------
+
+ABSCHNITT_FARBEN = ["red", "orange", "yellow", "green", "teal", "blue", "indigo", "purple", "pink", "gray"]
+
+
+class AbschnittBase(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    name: str = Field(min_length=1, max_length=80)
+    farbe: str = Field(default="blue", max_length=20)
+    beschreibung: str = Field(default="", max_length=1000)
+    aktiv: bool = True
+
+
+class AbschnittCreate(AbschnittBase):
+    pass
+
+
+class AbschnittUpdate(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    name: Optional[str] = None
+    farbe: Optional[str] = None
+    beschreibung: Optional[str] = None
+    aktiv: Optional[bool] = None
+
+
+class Abschnitt(AbschnittBase):
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    incident_id: str
+    erstellt_um: datetime = Field(default_factory=now_utc)
+
+
+def _serialize_abschnitt(doc: dict) -> dict:
+    doc = {k: v for k, v in doc.items() if k != "_id"}
+    if isinstance(doc.get("erstellt_um"), datetime):
+        doc["erstellt_um"] = iso(doc["erstellt_um"])
+    return doc
+
+
+@api_router.get("/incidents/{incident_id}/abschnitte", response_model=List[dict])
+async def list_abschnitte(incident_id: str, aktiv: Optional[bool] = None):
+    inc = await db.incidents.find_one({"id": incident_id}, {"_id": 0})
+    if not inc:
+        raise HTTPException(status_code=404, detail="Incident nicht gefunden")
+    query: dict = {"incident_id": incident_id}
+    if aktiv is not None:
+        query["aktiv"] = aktiv
+    cursor = db.abschnitte.find(query, {"_id": 0}).sort("erstellt_um", 1)
+    return await cursor.to_list(200)
+
+
+@api_router.post("/incidents/{incident_id}/abschnitte", response_model=dict, status_code=201)
+async def create_abschnitt(incident_id: str, payload: AbschnittCreate):
+    inc = await db.incidents.find_one({"id": incident_id}, {"_id": 0})
+    if not inc:
+        raise HTTPException(status_code=404, detail="Incident nicht gefunden")
+    a = Abschnitt(incident_id=incident_id, **payload.model_dump(exclude_none=True))
+    d = a.model_dump()
+    if isinstance(d.get("erstellt_um"), datetime):
+        d["erstellt_um"] = iso(d["erstellt_um"])
+    await db.abschnitte.insert_one(d)
+    return _serialize_abschnitt(d)
+
+
+@api_router.get("/abschnitte/{abschnitt_id}", response_model=dict)
+async def get_abschnitt(abschnitt_id: str):
+    d = await db.abschnitte.find_one({"id": abschnitt_id}, {"_id": 0})
+    if not d:
+        raise HTTPException(status_code=404, detail="Abschnitt nicht gefunden")
+    return d
+
+
+@api_router.patch("/abschnitte/{abschnitt_id}", response_model=dict)
+async def update_abschnitt(abschnitt_id: str, payload: AbschnittUpdate):
+    upd = payload.model_dump(exclude_none=True)
+    if not upd:
+        raise HTTPException(status_code=400, detail="Keine Aenderungen")
+    res = await db.abschnitte.find_one_and_update(
+        {"id": abschnitt_id},
+        {"$set": upd},
+        return_document=True,
+        projection={"_id": 0},
+    )
+    if not res:
+        raise HTTPException(status_code=404, detail="Abschnitt nicht gefunden")
+    return res
+
+
+@api_router.delete("/abschnitte/{abschnitt_id}", status_code=204)
+async def delete_abschnitt(abschnitt_id: str):
+    a = await db.abschnitte.find_one({"id": abschnitt_id}, {"_id": 0})
+    if not a:
+        raise HTTPException(status_code=404, detail="Abschnitt nicht gefunden")
+    # Bei laufendem Incident: nur deaktivieren, nicht loeschen
+    inc = await db.incidents.find_one({"id": a["incident_id"]}, {"_id": 0})
+    if inc and inc.get("status") in ("operativ", "geplant"):
+        raise HTTPException(
+            status_code=409,
+            detail="Abschnitt kann bei laufendem Incident nur deaktiviert, nicht geloescht werden",
+        )
+    # Referenzen loesen
+    await db.resources.update_many(
+        {"abschnitt_id": abschnitt_id},
+        {"$set": {"abschnitt_id": None}},
+    )
+    await db.betten.update_many(
+        {"abschnitt_id": abschnitt_id},
+        {"$set": {"abschnitt_id": None}},
+    )
+    await db.abschnitte.delete_one({"id": abschnitt_id})
+    return None
+
+
+# ---------------------------------------------------------------------------
+# Schritt 11: Behandlungsbetten (UHS)
+# ---------------------------------------------------------------------------
+
+BettTyp = Literal["liegend", "sitzend", "schockraum", "beobachtung", "sonstiges"]
+BettStatus = Literal["frei", "belegt", "gesperrt"]
+
+
+class BettBase(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    name: str = Field(min_length=1, max_length=60)
+    typ: BettTyp = "liegend"
+    status: BettStatus = "frei"
+    abschnitt_id: Optional[str] = None
+    notiz: str = Field(default="", max_length=500)
+
+
+class BettCreate(BettBase):
+    pass
+
+
+class BettUpdate(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    name: Optional[str] = None
+    typ: Optional[BettTyp] = None
+    status: Optional[BettStatus] = None
+    abschnitt_id: Optional[str] = None
+    notiz: Optional[str] = None
+
+
+class BettBulkCreate(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    anzahl: int = Field(ge=1, le=50)
+    typ: BettTyp = "liegend"
+    praefix: str = Field(default="Bett", max_length=30)
+    abschnitt_id: Optional[str] = None
+    start_index: int = Field(default=1, ge=1)
+
+
+class BettAssign(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    patient_id: str
+
+
+class Bett(BettBase):
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    incident_id: str
+    patient_id: Optional[str] = None
+    belegt_seit: Optional[datetime] = None
+    erstellt_um: datetime = Field(default_factory=now_utc)
+
+
+def _serialize_bett(doc: dict) -> dict:
+    doc = {k: v for k, v in doc.items() if k != "_id"}
+    for k in ("belegt_seit", "erstellt_um"):
+        if k in doc and isinstance(doc[k], datetime):
+            doc[k] = iso(doc[k])
+    return doc
+
+
+@api_router.get("/incidents/{incident_id}/betten", response_model=List[dict])
+async def list_betten(
+    incident_id: str,
+    status: Optional[str] = None,
+    abschnitt_id: Optional[str] = None,
+):
+    inc = await db.incidents.find_one({"id": incident_id}, {"_id": 0})
+    if not inc:
+        raise HTTPException(status_code=404, detail="Incident nicht gefunden")
+    query: dict = {"incident_id": incident_id}
+    if status:
+        query["status"] = {"$in": [v.strip() for v in status.split(",") if v.strip()]}
+    if abschnitt_id:
+        query["abschnitt_id"] = abschnitt_id
+    cursor = db.betten.find(query, {"_id": 0}).sort("erstellt_um", 1)
+    return await cursor.to_list(500)
+
+
+@api_router.post("/incidents/{incident_id}/betten", response_model=dict, status_code=201)
+async def create_bett(incident_id: str, payload: BettCreate):
+    inc = await db.incidents.find_one({"id": incident_id}, {"_id": 0})
+    if not inc:
+        raise HTTPException(status_code=404, detail="Incident nicht gefunden")
+    b = Bett(incident_id=incident_id, **payload.model_dump(exclude_none=True))
+    d = b.model_dump()
+    for k in ("belegt_seit", "erstellt_um"):
+        if isinstance(d.get(k), datetime):
+            d[k] = iso(d[k])
+    await db.betten.insert_one(d)
+    return _serialize_bett(d)
+
+
+@api_router.post("/incidents/{incident_id}/betten/bulk", response_model=List[dict], status_code=201)
+async def create_betten_bulk(incident_id: str, payload: BettBulkCreate):
+    inc = await db.incidents.find_one({"id": incident_id}, {"_id": 0})
+    if not inc:
+        raise HTTPException(status_code=404, detail="Incident nicht gefunden")
+    created = []
+    for i in range(payload.anzahl):
+        b = Bett(
+            incident_id=incident_id,
+            name=f"{payload.praefix} {payload.start_index + i}",
+            typ=payload.typ,
+            abschnitt_id=payload.abschnitt_id,
+        )
+        d = b.model_dump()
+        for k in ("belegt_seit", "erstellt_um"):
+            if isinstance(d.get(k), datetime):
+                d[k] = iso(d[k])
+        await db.betten.insert_one(d)
+        created.append(_serialize_bett(d))
+    return created
+
+
+@api_router.get("/betten/{bett_id}", response_model=dict)
+async def get_bett(bett_id: str):
+    d = await db.betten.find_one({"id": bett_id}, {"_id": 0})
+    if not d:
+        raise HTTPException(status_code=404, detail="Bett nicht gefunden")
+    return d
+
+
+@api_router.patch("/betten/{bett_id}", response_model=dict)
+async def update_bett(bett_id: str, payload: BettUpdate):
+    upd = payload.model_dump(exclude_none=True)
+    if not upd:
+        raise HTTPException(status_code=400, detail="Keine Aenderungen")
+    res = await db.betten.find_one_and_update(
+        {"id": bett_id},
+        {"$set": upd},
+        return_document=True,
+        projection={"_id": 0},
+    )
+    if not res:
+        raise HTTPException(status_code=404, detail="Bett nicht gefunden")
+    return res
+
+
+@api_router.delete("/betten/{bett_id}", status_code=204)
+async def delete_bett(bett_id: str):
+    b = await db.betten.find_one({"id": bett_id}, {"_id": 0})
+    if not b:
+        raise HTTPException(status_code=404, detail="Bett nicht gefunden")
+    if b.get("status") == "belegt" or b.get("patient_id"):
+        raise HTTPException(
+            status_code=409,
+            detail="Belegtes Bett kann nicht geloescht werden. Erst Patient entfernen.",
+        )
+    await db.betten.delete_one({"id": bett_id})
+    return None
+
+
+@api_router.post("/betten/{bett_id}/assign", response_model=dict)
+async def assign_bett(bett_id: str, payload: BettAssign):
+    bett = await db.betten.find_one({"id": bett_id}, {"_id": 0})
+    if not bett:
+        raise HTTPException(status_code=404, detail="Bett nicht gefunden")
+    if bett.get("status") == "gesperrt":
+        raise HTTPException(status_code=409, detail="Bett ist gesperrt")
+    if bett.get("status") == "belegt" and bett.get("patient_id") != payload.patient_id:
+        raise HTTPException(status_code=409, detail="Bett bereits belegt")
+
+    patient = await db.patients.find_one({"id": payload.patient_id}, {"_id": 0})
+    if not patient:
+        raise HTTPException(status_code=404, detail="Patient nicht gefunden")
+    if patient.get("incident_id") != bett.get("incident_id"):
+        raise HTTPException(status_code=400, detail="Patient gehoert nicht zu diesem Incident")
+
+    now = now_utc()
+    # Falls Patient bereits in einem anderen Bett: dort freigeben
+    if patient.get("bett_id") and patient["bett_id"] != bett_id:
+        await db.betten.update_one(
+            {"id": patient["bett_id"]},
+            {"$set": {"status": "frei", "patient_id": None, "belegt_seit": None}},
+        )
+
+    await db.betten.update_one(
+        {"id": bett_id},
+        {"$set": {
+            "status": "belegt",
+            "patient_id": payload.patient_id,
+            "belegt_seit": iso(now),
+        }},
+    )
+    await db.patients.update_one(
+        {"id": payload.patient_id},
+        {"$set": {"bett_id": bett_id, "updated_at": iso(now)}},
+    )
+    out = await db.betten.find_one({"id": bett_id}, {"_id": 0})
+    return out
+
+
+@api_router.post("/betten/{bett_id}/release", response_model=dict)
+async def release_bett(bett_id: str):
+    bett = await db.betten.find_one({"id": bett_id}, {"_id": 0})
+    if not bett:
+        raise HTTPException(status_code=404, detail="Bett nicht gefunden")
+    patient_id = bett.get("patient_id")
+    await db.betten.update_one(
+        {"id": bett_id},
+        {"$set": {"status": "frei", "patient_id": None, "belegt_seit": None}},
+    )
+    if patient_id:
+        await db.patients.update_one(
+            {"id": patient_id, "bett_id": bett_id},
+            {"$set": {"bett_id": None, "updated_at": iso(now_utc())}},
+        )
+    out = await db.betten.find_one({"id": bett_id}, {"_id": 0})
+    return out
+
+
+async def _release_bett_for_patient(patient_id: str):
+    """Wird beim Transport-Abschluss oder Fallabschluss aufgerufen."""
+    b = await db.betten.find_one({"patient_id": patient_id, "status": "belegt"}, {"_id": 0})
+    if not b:
+        return
+    await db.betten.update_one(
+        {"id": b["id"]},
+        {"$set": {"status": "frei", "patient_id": None, "belegt_seit": None}},
+    )
+    await db.patients.update_one(
+        {"id": patient_id},
+        {"$set": {"bett_id": None, "updated_at": iso(now_utc())}},
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -1256,6 +1696,8 @@ async def get_auswertung(incident_id: str):
     transports = await db.transports.find({"incident_id": incident_id}, {"_id": 0}).to_list(2000)
     messages = await db.messages.find({"incident_id": incident_id}, {"_id": 0}).to_list(2000)
     resources = await db.resources.find({"incident_id": incident_id}, {"_id": 0}).to_list(500)
+    abschnitte = await db.abschnitte.find({"incident_id": incident_id}, {"_id": 0}).to_list(200)
+    betten = await db.betten.find({"incident_id": incident_id}, {"_id": 0}).to_list(500)
 
     # A Patienten
     sichtung_counts = {"S1": 0, "S2": 0, "S3": 0, "S0": 0, "ohne": 0}
@@ -1279,6 +1721,26 @@ async def get_auswertung(incident_id: str):
         "status": status_counts,
         "wartezeit_min_avg": _avg_minutes(wartezeiten),
         "behandlungsdauer_min_avg": _avg_minutes(behandlungsdauern),
+    }
+
+    # Schritt 11: Bett-KPIs in Block A
+    bett_belegt = [b for b in betten if b.get("status") == "belegt"]
+    bett_belegungsdauern = []
+    now_dt = now_utc()
+    for b in betten:
+        if b.get("belegt_seit"):
+            bett_belegungsdauern.append(_duration_ms(b["belegt_seit"], iso(now_dt)))
+    max_gleichzeitig = len(bett_belegt)  # naive: aktuell gleichzeitig belegte
+    total_betten = len(betten)
+    auslastung = round(100.0 * len(bett_belegt) / total_betten, 1) if total_betten else 0.0
+    block_a["betten"] = {
+        "total": total_betten,
+        "frei": sum(1 for b in betten if b.get("status") == "frei"),
+        "belegt": len(bett_belegt),
+        "gesperrt": sum(1 for b in betten if b.get("status") == "gesperrt"),
+        "auslastung_pct": auslastung,
+        "belegungsdauer_min_avg": _avg_minutes(bett_belegungsdauern),
+        "max_gleichzeitig": max_gleichzeitig,
     }
 
     # B Transporte
@@ -1320,7 +1782,46 @@ async def get_auswertung(incident_id: str):
     for r in resources:
         if r.get("status") in r_status:
             r_status[r["status"]] += 1
-    block_d = {"total": len(resources), "status": r_status}
+    ohne_abschnitt = [r for r in resources if not r.get("abschnitt_id")]
+    block_d = {
+        "total": len(resources),
+        "status": r_status,
+        "ohne_abschnitt": len(ohne_abschnitt),
+        "ohne_abschnitt_pct": round(100.0 * len(ohne_abschnitt) / len(resources), 1) if resources else 0.0,
+    }
+
+    # Schritt 10: Abschnitte-Zusammenfassung als eigener Block
+    abschnitte_summary = []
+    for a in abschnitte:
+        a_res = [r for r in resources if r.get("abschnitt_id") == a["id"]]
+        a_bet = [b for b in betten if b.get("abschnitt_id") == a["id"]]
+        im_einsatz = sum(1 for r in a_res if r.get("status") == "im_einsatz")
+        belegt = sum(1 for b in a_bet if b.get("status") == "belegt")
+        # Ampel: rot = alle Ressourcen im Einsatz, gelb = teilweise, gruen = alle verfuegbar
+        if not a_res:
+            ampel = "gray"
+        elif im_einsatz == len(a_res):
+            ampel = "red"
+        elif im_einsatz > 0:
+            ampel = "yellow"
+        else:
+            ampel = "green"
+        abschnitte_summary.append({
+            "id": a["id"],
+            "name": a["name"],
+            "farbe": a.get("farbe", "blue"),
+            "aktiv": a.get("aktiv", True),
+            "ressourcen_total": len(a_res),
+            "ressourcen_im_einsatz": im_einsatz,
+            "betten_total": len(a_bet),
+            "betten_belegt": belegt,
+            "ampel": ampel,
+        })
+    block_g = {
+        "total": len(abschnitte),
+        "aktiv": sum(1 for a in abschnitte if a.get("aktiv", True)),
+        "abschnitte": abschnitte_summary,
+    }
 
     # E Konflikte
     konflikte = await detect_konflikte(incident_id)
@@ -1346,7 +1847,8 @@ async def get_auswertung(incident_id: str):
     }
 
     return {"A_patienten": block_a, "B_transporte": block_b, "C_kommunikation": block_c,
-            "D_ressourcen": block_d, "E_konflikte": block_e, "F_metadaten": block_f}
+            "D_ressourcen": block_d, "E_konflikte": block_e, "F_metadaten": block_f,
+            "G_abschnitte": block_g}
 
 
 @api_router.get("/incidents/{incident_id}/abschluss-check", response_model=dict)
@@ -1358,6 +1860,9 @@ async def get_abschluss_check(incident_id: str):
     patients = await db.patients.find({"incident_id": incident_id}, {"_id": 0}).to_list(2000)
     transports = await db.transports.find({"incident_id": incident_id}, {"_id": 0}).to_list(2000)
     messages = await db.messages.find({"incident_id": incident_id}, {"_id": 0}).to_list(2000)
+    resources = await db.resources.find({"incident_id": incident_id}, {"_id": 0}).to_list(500)
+    abschnitte = await db.abschnitte.find({"incident_id": incident_id}, {"_id": 0}).to_list(200)
+    betten = await db.betten.find({"incident_id": incident_id}, {"_id": 0}).to_list(500)
 
     blockers: list[dict] = []
     warnings: list[dict] = []
@@ -1427,6 +1932,62 @@ async def get_abschluss_check(incident_id: str):
             "count": 0,
         })
 
+    # Schritt 12: Blocker - aktive Patienten ohne Bett und ohne Transport
+    transport_patient_ids = {t.get("patient_id") for t in transports if t.get("patient_id")}
+    aktiv_ohne_bett_ohne_transport = []
+    for p in patients:
+        if p.get("status") in ("in_behandlung", "transportbereit"):
+            if not p.get("bett_id") and p.get("id") not in transport_patient_ids:
+                aktiv_ohne_bett_ohne_transport.append(p)
+    if aktiv_ohne_bett_ohne_transport:
+        blockers.append({
+            "id": "aktive_ohne_bett_transport",
+            "titel": f"{len(aktiv_ohne_bett_ohne_transport)} aktive Patienten ohne Bett und ohne Transport",
+            "beschreibung": "Aktiver Patient muss einem Bett zugewiesen oder in Transport sein.",
+            "typ": "patienten",
+            "count": len(aktiv_ohne_bett_ohne_transport),
+        })
+
+    # Schritt 10: Warnung - Ressourcen ohne Abschnitt > 20%
+    if resources:
+        ohne_abschnitt = [r for r in resources if not r.get("abschnitt_id")]
+        pct = 100.0 * len(ohne_abschnitt) / len(resources)
+        if pct > 20:
+            warnings.append({
+                "id": "ressourcen_ohne_abschnitt",
+                "titel": f"{len(ohne_abschnitt)} Ressourcen ohne Abschnitt ({pct:.0f}%)",
+                "beschreibung": "Empfehlung: Ressourcen einem Einsatzabschnitt zuweisen.",
+                "typ": "ressourcen",
+                "count": len(ohne_abschnitt),
+            })
+
+    # Schritt 10: Warnung - Abschnitte ohne Ressourcen
+    leere_abschnitte = []
+    for a in abschnitte:
+        if not any(r.get("abschnitt_id") == a["id"] for r in resources):
+            leere_abschnitte.append(a)
+    if leere_abschnitte:
+        warnings.append({
+            "id": "abschnitte_leer",
+            "titel": f"{len(leere_abschnitte)} Abschnitte ohne Ressourcen",
+            "beschreibung": "Diese Abschnitte haben keine zugeordneten Ressourcen: "
+                            + ", ".join(a["name"] for a in leere_abschnitte[:3])
+                            + ("…" if len(leere_abschnitte) > 3 else ""),
+            "typ": "abschnitte",
+            "count": len(leere_abschnitte),
+        })
+
+    # Schritt 11: Warnung - Betten gesperrt/nie belegt
+    nie_belegt = [b for b in betten if not b.get("belegt_seit") and b.get("status") == "gesperrt"]
+    if nie_belegt:
+        warnings.append({
+            "id": "betten_nie_belegt",
+            "titel": f"{len(nie_belegt)} Betten gesperrt und nie belegt",
+            "beschreibung": "Diese Betten wurden wahrscheinlich nicht benoetigt.",
+            "typ": "betten",
+            "count": len(nie_belegt),
+        })
+
     return {
         "incident_status": inc.get("status"),
         "bereit_fuer_abschluss": len(blockers) == 0,
@@ -1447,6 +2008,8 @@ async def get_report(incident_id: str):
     transports = await db.transports.find({"incident_id": incident_id}, {"_id": 0}).sort("created_at", 1).to_list(2000)
     messages = await db.messages.find({"incident_id": incident_id}, {"_id": 0}).sort("created_at", 1).to_list(2000)
     resources = await db.resources.find({"incident_id": incident_id}, {"_id": 0}).to_list(500)
+    abschnitte = await db.abschnitte.find({"incident_id": incident_id}, {"_id": 0}).to_list(200)
+    betten = await db.betten.find({"incident_id": incident_id}, {"_id": 0}).to_list(500)
 
     kapitel = [
         {"nr": 1, "titel": "Einsatzgrunddaten", "inhalt": {
@@ -1458,6 +2021,10 @@ async def get_report(incident_id: str):
         {"nr": 2, "titel": "Organisation & Rollen", "inhalt": {
             "einsatzleiter": "Einsatzleiter (Rolle)",
             "rollen": ["Einsatzleiter", "Sanitaeter / Helfer", "Dokumentar"],
+            "abschnitte": [
+                {"id": a["id"], "name": a["name"], "farbe": a.get("farbe", "blue"), "aktiv": a.get("aktiv", True)}
+                for a in abschnitte
+            ],
         }},
         {"nr": 3, "titel": "Patientenuebersicht", "inhalt": auswertung["A_patienten"]},
         {"nr": 4, "titel": "Patientenliste", "inhalt": {"patienten": patients}},
@@ -1467,7 +2034,7 @@ async def get_report(incident_id: str):
             "behandlungsdauer_min_avg": auswertung["A_patienten"]["behandlungsdauer_min_avg"],
         }},
         {"nr": 7, "titel": "Transporte", "inhalt": {"transporte": transports, "summary": auswertung["B_transporte"]}},
-        {"nr": 8, "titel": "Ressourcen", "inhalt": {"ressourcen": resources, "summary": auswertung["D_ressourcen"]}},
+        {"nr": 8, "titel": "Ressourcen", "inhalt": {"ressourcen": resources, "summary": auswertung["D_ressourcen"], "abschnitte": auswertung["G_abschnitte"], "betten": auswertung["A_patienten"].get("betten", {}), "bettliste": betten}},
         {"nr": 9, "titel": "Kommunikation", "inhalt": {"meldungen": messages, "summary": auswertung["C_kommunikation"]}},
         {"nr": 10, "titel": "Konflikte & Blocker", "inhalt": auswertung["E_konflikte"]},
         {"nr": 11, "titel": "Besondere Vorkommnisse", "inhalt": {

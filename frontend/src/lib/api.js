@@ -180,3 +180,53 @@ export async function patchIncidentMeta(incidentId, payload) {
     const { data } = await api.patch(`/incidents/${incidentId}/meta`, payload);
     return data;
 }
+
+/* =====================================================================
+   Abschnitte (Schritt 10)
+   ===================================================================== */
+export async function listAbschnitte(incidentId, params = {}) {
+    const { data } = await api.get(`/incidents/${incidentId}/abschnitte`, { params });
+    return data;
+}
+export async function createAbschnitt(incidentId, payload) {
+    const { data } = await api.post(`/incidents/${incidentId}/abschnitte`, payload);
+    return data;
+}
+export async function updateAbschnitt(id, payload) {
+    const { data } = await api.patch(`/abschnitte/${id}`, payload);
+    return data;
+}
+export async function deleteAbschnitt(id) {
+    await api.delete(`/abschnitte/${id}`);
+}
+
+/* =====================================================================
+   Behandlungsbetten (Schritt 11)
+   ===================================================================== */
+export async function listBetten(incidentId, params = {}) {
+    const { data } = await api.get(`/incidents/${incidentId}/betten`, { params });
+    return data;
+}
+export async function createBett(incidentId, payload) {
+    const { data } = await api.post(`/incidents/${incidentId}/betten`, payload);
+    return data;
+}
+export async function createBettenBulk(incidentId, payload) {
+    const { data } = await api.post(`/incidents/${incidentId}/betten/bulk`, payload);
+    return data;
+}
+export async function updateBett(id, payload) {
+    const { data } = await api.patch(`/betten/${id}`, payload);
+    return data;
+}
+export async function deleteBett(id) {
+    await api.delete(`/betten/${id}`);
+}
+export async function assignBett(bettId, patientId) {
+    const { data } = await api.post(`/betten/${bettId}/assign`, { patient_id: patientId });
+    return data;
+}
+export async function releaseBett(bettId) {
+    const { data } = await api.post(`/betten/${bettId}/release`);
+    return data;
+}

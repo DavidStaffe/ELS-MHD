@@ -1,0 +1,54 @@
+{
+  "summary": "Testing der Schritte 10 (Einsatzabschnitte), 11 (Behandlungsbetten/UHS) und 12 (Integration). Backend: 15/15 pytest-Tests in test_step10_12_abschnitte_betten.py gruen: CRUD Abschnitte (create/get/patch/list, delete 409 bei aktivem Incident, delete 204 nach Incident-Abschluss), Demo-Seed exakt 2 Abschnitte (Abschnitt Nord + BHP / UHS) mit zugewiesenen Ressourcen, Bett-CRUD + Bulk (anzahl/typ/praefix/start_index), assign/release (Patient.bett_id gesetzt/entfernt, belegt_seit gesetzt), belegtes Bett => DELETE 409, gesperrtes Bett => assign 409, Patient.status=entlassen => Bett automatisch freigegeben, Demo-Seed 6 Betten (4 belegt / 2 frei mit aktiven Patienten), Auswertung Block G_abschnitte (Ampel+Ressourcen/Betten pro Abschnitt) und A_patienten.betten (total/belegt/frei/auslastung_pct/belegungsdauer_min_avg/max_gleichzeitig), Abschluss-Check neuer Blocker 'aktive_ohne_bett_transport' greift bei aktiven Patienten ohne Bett und ohne Transport, Report 14 Kapitel inkl. Abschnitte/Betten in Kap 2 und 8, Regression Demo-Patienten+Transporte vorhanden. Frontend: Sidebar nav-abschnitte und nav-betten vorhanden, /abschnitte rendert abschnitte-grid mit genau 2 Kacheln + abschnitt-new-btn, /betten rendert betten-grid mit 6 Kacheln + alle Filter-Chips (alle/frei/belegt/gesperrt/ohne-abschnitt/pro Abschnitt) + bulk-open + bett-new-btn. Abschluss Dashboard zeigt alle neuen KPI-Tiles (kpi-abschnitte=2, kpi-betten-auslastung=66.7%, kpi-betten-dauer=15.3 min, kpi-ohne-abschnitt=4 / 44.4%) + card-abschnitte mit 2 dashboard-abschnitt-* Eintraegen. PatientDetail hat section-bett + pd-bett-assign fuer wartende Patienten. Rollen: Dokumentar sieht abschnitt-new-btn/bulk-open/bett-new-btn gar nicht (korrekt, entfernt aus DOM). Helfer sieht Buttons, aber Gates nicht validiert (siehe Issue). Helfer kann bett-assign nutzen (2 freie Betten klickbar).",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [
+      {
+        "component": "ResourceList.jsx (ResourceRow fuer interne Ressourcen)",
+        "issue": "React-Crash: 'Cannot read properties of undefined (reading map)' in ResourceRow. Der intern-Block (Zeile 337-343) uebergibt die Props 'abschnitte' und 'abschnitt' sowie 'onChangeAbschnitt' NICHT an ResourceRow, waehrend der extern-Block (Zeile 353-361) das tut. Damit stuerzt die Darstellung jeder internen Ressource ab und die testID resource-abschnitt-select-{id} fehlt fuer interne Ressourcen. Spec verlangt 'je Ressource' => der Select muss auch bei internen Ressourcen erscheinen.",
+        "selector": "[data-testid^=\"resource-abschnitt-select-\"]",
+        "priority": "HIGH"
+      },
+      {
+        "component": "BettenPage.jsx Rollen-Gate (Helfer)",
+        "issue": "Fuer Rolle 'helfer' sind bulk-open und bett-new-btn im DOM sichtbar und haben weder disabled noch aria-disabled Attribute. Dokumentar bekommt die Buttons gar nicht (korrekt via PERMS entfernt). Empfehlung: Auch fuer Helfer die Create-Aktionen gaten (gemaess Spec 'Helfer darf Betten-Patient zuweisen, aber nicht Abschnitt erstellen/loeschen' - Betten-Create ist in der Spec nicht explizit geregelt, aber dokumentarisch inkonsistent zur Dokumentar-Behandlung).",
+        "selector": "[data-testid=\"bulk-open\"], [data-testid=\"bett-new-btn\"]",
+        "priority": "LOW"
+      }
+    ],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_step10_12_abschnitte_betten.py",
+    "/app/test_reports/pytest/pytest_step10_12_results.xml"
+  ],
+  "action_items": [
+    "CRITICAL: In /app/frontend/src/pages/ResourceList.jsx Zeile 337-343 die Props {abschnitt, abschnitte, onChangeAbschnitt} analog zum extern-Block auch an die intern-ResourceRow uebergeben - andernfalls crasht die Ressourcen-Seite fuer jede interne Ressource (z.B. Demo: KTW, NEF, NA).",
+    "Optional: Konsistenz pruefen, ob Helfer bulk-open/bett-new-btn sehen darf. Falls nicht, PERMS['helfer'] Bett-Create Rechte entziehen und Buttons analog zu Dokumentar entfernen/disabled setzen."
+  ],
+  "critical_code_review_comments": [
+    "server.py hat 2162 Zeilen - Spec >700 deutlich ueberschritten, sollte in Module aufgespalten werden (incidents/patients/abschnitte/betten/auswertung/report).",
+    "_release_bett_for_patient wird mehrfach aufgerufen (Patient-Fallabschluss UND Transport-Abschluss), was korrekt ist - gut, dass dies zentralisiert ist.",
+    "get_report() ruft intern get_auswertung() auf - doppelte DB-Queries. Optional Refactor.",
+    "BettBulkCreate erlaubt anzahl bis 50 - fuer eine Bulk-Anlage sinnvoll, aber ohne Transaktion: Wenn ein Insert mittendrin scheitert, sind Teil-Betten angelegt. Bei Bedarf Bulk-Insert ueber insert_many.",
+    "ResourceList.jsx: intern und extern Bloecke haben sehr aehnlichen Code. Props ungleich uebergeben - DRY-Violation und Bugquelle (siehe ui_bugs).",
+    "AbschnittList/BettenPage.jsx enthalten Dialog+Form+Grid im gleichen File - bei Erweiterung kann Refactoring in kleinere Komponenten sinnvoll werden."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_step10_12_abschnitte_betten.py"
+  ],
+  "success_rate": {
+    "backend": "100% (15/15)",
+    "frontend": "~90% (1 kritischer Crash in ResourceList fuer interne Ressourcen; alle anderen neuen Routen/Flows funktionieren)"
+  },
+  "test_credentials": "Keine Auth erforderlich. Fuer Rollen-Tests: localStorage['els-role'] = 'einsatzleiter'|'helfer'|'dokumentar' VOR Reload setzen (sonst oeffnet RoleSelectorDialog).",
+  "seed_data_creation": "Demo-Incident via POST /api/incidents/demo erzeugt (2 Abschnitte, 6 Betten davon 4 belegt, 7 Patienten, 2 Transporte). Zusaetzlich TEST_-Incident fuer isolierte CRUD-Tests angelegt+geloescht.",
+  "retest_needed": true,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Backend ist vollstaendig gruen (15/15). Frontend: Nur der ResourceList-Crash ist kritisch - nach Fix muss /ressourcen erneut getestet werden (resource-abschnitt-select-{id} soll fuer JEDE Ressource erscheinen und Aenderung persistieren). Alle neuen Routen (/abschnitte, /betten) und Abschluss-Dashboard KPIs funktionieren. Nach Neuanlage eines Incidents via IncidentList-btn-new wurde aus Zeitgruenden nicht validiert (Redirect auf /abschnitte + Toast) - einfach zu validieren: btn-new klicken -> NewIncidentDialog -> Speichern -> URL=/abschnitte? Data-testids der wichtigsten neuen Elemente: nav-abschnitte, nav-betten, abschnitte-grid, abschnitt-kachel-{id}, abschnitt-new-btn, abschnitt-dialog, abschnitt-name-input, abschnitt-farbe-{key}, abschnitt-save, abschnitt-toggle/edit/delete-{id}, betten-grid, bett-kachel-{id}, bett-assign/release/lock/unlock/edit/delete-{id}, bulk-open, bulk-dialog, bulk-save, bett-new-btn, filter-alle/frei/belegt/gesperrt/ohne-abschnitt/ab-{id}, section-bett, pd-bett-assign/change/release, bett-pick-list, bett-pick-{id}, kpi-abschnitte, kpi-betten-auslastung, kpi-betten-dauer, kpi-ohne-abschnitt, card-abschnitte, dashboard-abschnitt-{id}.",
+  "rca_of_the_issue": "ResourceList-Crash: Refactoring fuer Abschnitt-Zuweisung hat den extern-Block erweitert (abschnitt/abschnitte/onChangeAbschnitt Props) - der parallele intern-Block wurde vergessen. ResourceRow.map() auf abschnitte.map laeuft leer, weil abschnitte=undefined ist. Reproduktion: /ressourcen oeffnen -> ErrorBoundary-Warning in Console + 'Cannot read properties of undefined (reading map)'. Fix: intern.map Block ebenfalls abschnitt/abschnitte/onChangeAbschnitt mitgeben."
+}

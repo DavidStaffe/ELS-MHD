@@ -11,7 +11,9 @@ import {
     Radio,
     AlertOctagon,
     FileCheck2,
-    Settings
+    Settings,
+    Layers,
+    Bed
 } from "lucide-react";
 
 /**
@@ -65,6 +67,22 @@ const NAV_GROUPS = (hasIncident) => [
                 icon: Boxes,
                 label: "Ressourcen",
                 testId: "nav-ressourcen",
+                disabled: !hasIncident,
+                hint: hasIncident ? null : "inaktiv"
+            },
+            {
+                to: "/abschnitte",
+                icon: Layers,
+                label: "Abschnitte",
+                testId: "nav-abschnitte",
+                disabled: !hasIncident,
+                hint: hasIncident ? null : "inaktiv"
+            },
+            {
+                to: "/betten",
+                icon: Bed,
+                label: "Behandlungsplaetze",
+                testId: "nav-betten",
                 disabled: !hasIncident,
                 hint: hasIncident ? null : "inaktiv"
             },

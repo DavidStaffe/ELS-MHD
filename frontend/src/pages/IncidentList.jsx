@@ -19,8 +19,10 @@ import {
     RefreshCw,
     Command as CommandIcon,
     ArrowRight,
-    Inbox
+    Inbox,
+    Layers
 } from "lucide-react";
+import { toast } from "sonner";
 
 const FILTERS = [
     { key: "alle", label: "Alle", match: () => true },
@@ -337,7 +339,15 @@ export default function IncidentList() {
                     const created = await create(payload);
                     if (created?.id) {
                         setActive(created.id);
-                        navigate("/lage");
+                        // Hybrid-Wizard: direkt zu Abschnitte navigieren, wenn neu angelegt
+                        navigate("/abschnitte");
+                        toast.success("Incident angelegt – Einsatzabschnitte jetzt konfigurieren (optional).", {
+                            action: {
+                                label: "Zur Lage",
+                                onClick: () => navigate("/lage")
+                            },
+                            duration: 8000
+                        });
                     }
                     return created;
                 }}

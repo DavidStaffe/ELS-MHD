@@ -24,6 +24,9 @@ import {
 } from "@/components/patients/ChoiceDialogs";
 import { usePatients } from "@/context/PatientContext";
 import { useIncidents } from "@/context/IncidentContext";
+import { useRole } from "@/context/RoleContext";
+import { listBetten, listAbschnitte, assignBett, releaseBett } from "@/lib/api";
+import { getFarbe } from "@/lib/abschnitt-meta";
 import {
     ArrowLeft,
     ArrowRight,
@@ -32,7 +35,9 @@ import {
     CheckCircle2,
     Loader2,
     Truck,
-    FileCheck2
+    FileCheck2,
+    Bed,
+    UserMinus
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { formatDuration } from "@/lib/time";
@@ -166,6 +171,68 @@ export default function PatientDetail() {
     const [busy, setBusy] = React.useState(false);
     const [notizSaved, setNotizSaved] = React.useState(true);
     const [error, setError] = React.useState(null);
+    const [betten, setBetten] = React.useState([]);
+    const [abschnitte, setAbschnitte] = React.useState([]);
+    const [bettModalOpen, setBettModalOpen] = React.useState(false);
+    const { can } = useRole();
+
+    // Betten & Abschnitte fuer Zuweisungs-UI laden
+    React.useEffect(() => {
+        if (!activeIncident?.id) return;
+        let cancelled = false;
+        (async () => {
+            try {
+                const [b, a] = await Promise.all([
+                    listBetten(activeIncident.id),
+                    listAbschnitte(activeIncident.id)
+                ]);
+                if (!cancelled) {
+                    setBetten(b);
+                    setAbschnitte(a);
+                }
+            } catch {
+                /* silent */
+            }
+        })();
+        return () => {
+            cancelled = true;
+        };
+    }, [activeIncident?.id, patient?.bett_id]);
+
+    const currentBett = React.useMemo(() => {
+        if (!patient?.bett_id) return null;
+        return betten.find((b) => b.id === patient.bett_id) || null;
+    }, [betten, patient?.bett_id]);
+
+    const abschnittById = React.useMemo(() => {
+        const m = new Map();
+        for (const a of abschnitte) m.set(a.id, a);
+        return m;
+    }, [abschnitte]);
+
+    const handleAssignBett = async (bettId) => {
+        try {
+            await assignBett(bettId, patient.id);
+            await refresh();
+            const b = await listBetten(activeIncident.id);
+            setBetten(b);
+            setBettModalOpen(false);
+        } catch (e) {
+            // noop
+        }
+    };
+
+    const handleReleaseBett = async () => {
+        if (!currentBett) return;
+        try {
+            await releaseBett(currentBett.id);
+            await refresh();
+            const b = await listBetten(activeIncident.id);
+            setBetten(b);
+        } catch (e) {
+            // noop
+        }
+    };
 
     // Sync aus Liste (z.B. nach refresh)
     React.useEffect(() => {
@@ -502,6 +569,74 @@ export default function PatientDetail() {
                         )}
                     </SectionCard>
 
+                    <SectionCard title="Bett-Zuweisung" testId="section-bett">
+                        {currentBett ? (
+                            <div className="flex items-center justify-between gap-3">
+                                <div className="flex items-center gap-2 min-w-0">
+                                    <Bed className="h-4 w-4 text-primary shrink-0" />
+                                    <div className="min-w-0">
+                                        <div className="text-body font-medium truncate">
+                                            {currentBett.name}
+                                        </div>
+                                        <div className="text-caption text-muted-foreground flex items-center gap-1.5">
+                                            <span>{currentBett.typ}</span>
+                                            {currentBett.abschnitt_id && abschnittById.get(currentBett.abschnitt_id) && (
+                                                <>
+                                                    <span>·</span>
+                                                    <span
+                                                        className={cn(
+                                                            "inline-flex items-center gap-1 rounded px-1.5 py-0.5",
+                                                            getFarbe(abschnittById.get(currentBett.abschnitt_id).farbe).soft
+                                                        )}
+                                                    >
+                                                        <span className={cn("h-1.5 w-1.5 rounded-full", getFarbe(abschnittById.get(currentBett.abschnitt_id).farbe).dot)} />
+                                                        {abschnittById.get(currentBett.abschnitt_id).name}
+                                                    </span>
+                                                </>
+                                            )}
+                                        </div>
+                                    </div>
+                                </div>
+                                <div className="flex gap-2">
+                                    <Button
+                                        variant="outline"
+                                        size="sm"
+                                        onClick={() => setBettModalOpen(true)}
+                                        disabled={busy || closed || !can("bett.assign_patient")}
+                                        data-testid="pd-bett-change"
+                                    >
+                                        Aendern
+                                    </Button>
+                                    <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        className="text-status-red"
+                                        onClick={handleReleaseBett}
+                                        disabled={busy || closed || !can("bett.release")}
+                                        data-testid="pd-bett-release"
+                                    >
+                                        <UserMinus className="h-3.5 w-3.5" />
+                                        Freigeben
+                                    </Button>
+                                </div>
+                            </div>
+                        ) : (
+                            <div className="flex items-center justify-between gap-3">
+                                <div className="text-caption text-muted-foreground">
+                                    Kein Bett zugewiesen.
+                                </div>
+                                <Button
+                                    onClick={() => setBettModalOpen(true)}
+                                    disabled={busy || closed || !can("bett.assign_patient")}
+                                    data-testid="pd-bett-assign"
+                                >
+                                    <Bed className="h-4 w-4" />
+                                    Bett zuweisen
+                                </Button>
+                            </div>
+                        )}
+                    </SectionCard>
+
                     <SectionCard
                         title="Fallabschluss"
                         subtitle="Verbleib wird automatisch gesetzt."
@@ -614,6 +749,71 @@ export default function PatientDetail() {
                 tone="destructive"
                 onConfirm={handleDelete}
             />
+
+            {/* Bett-Zuweisungs-Dialog */}
+            {bettModalOpen && (
+                <BettPickDialog
+                    open={bettModalOpen}
+                    onOpenChange={setBettModalOpen}
+                    betten={betten.filter((b) => b.status !== "gesperrt" && (b.status !== "belegt" || b.id === currentBett?.id))}
+                    abschnittById={abschnittById}
+                    currentBettId={currentBett?.id}
+                    onPick={handleAssignBett}
+                />
+            )}
         </div>
+    );
+}
+
+// Kompaktes Bett-Auswahl-Dialog (lokal, da nur hier genutzt)
+function BettPickDialog({ open, onOpenChange, betten, abschnittById, currentBettId, onPick }) {
+    return (
+        <ConfirmModal
+            open={open}
+            onOpenChange={onOpenChange}
+            title="Bett zuweisen"
+            description={
+                betten.length === 0
+                    ? "Keine freien Betten verfuegbar."
+                    : "Waehle ein freies Bett. Belegte und gesperrte Betten sind ausgeblendet."
+            }
+            confirmLabel="Abbrechen"
+            onConfirm={() => onOpenChange(false)}
+        >
+            <ul className="max-h-[50vh] overflow-y-auto space-y-1.5" data-testid="bett-pick-list">
+                {betten.map((b) => {
+                    const a = b.abschnitt_id ? abschnittById.get(b.abschnitt_id) : null;
+                    const farbe = a ? getFarbe(a.farbe) : null;
+                    const isCurrent = b.id === currentBettId;
+                    return (
+                        <li key={b.id}>
+                            <button
+                                type="button"
+                                onClick={() => onPick(b.id)}
+                                className="flex w-full items-center gap-2 rounded-md bg-surface-raised px-3 py-2 text-left hover:border-primary/60 border border-transparent els-focus-ring"
+                                data-testid={`bett-pick-${b.id}`}
+                            >
+                                <Bed className="h-4 w-4 text-muted-foreground" />
+                                <div className="flex-1 min-w-0">
+                                    <div className="text-body font-medium">{b.name}</div>
+                                    <div className="text-caption text-muted-foreground flex items-center gap-1.5">
+                                        <span>{b.typ}</span>
+                                        {a && (
+                                            <span className={cn("inline-flex items-center gap-1 rounded px-1 py-0.5", farbe.soft)}>
+                                                <span className={cn("h-1 w-1 rounded-full", farbe.dot)} />
+                                                {a.name}
+                                            </span>
+                                        )}
+                                    </div>
+                                </div>
+                                {isCurrent && (
+                                    <StatusBadge tone="info" variant="soft" size="sm">AKTUELL</StatusBadge>
+                                )}
+                            </button>
+                        </li>
+                    );
+                })}
+            </ul>
+        </ConfirmModal>
     );
 }

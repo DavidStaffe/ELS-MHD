@@ -7,6 +7,8 @@ import {
 import { StatusBadge, SectionCard, KpiTile } from "@/components/primitives";
 import { useOps } from "@/context/OpsContext";
 import { useIncidents } from "@/context/IncidentContext";
+import { listAbschnitte, updateResource as apiUpdateResource } from "@/lib/api";
+import { getFarbe } from "@/lib/abschnitt-meta";
 import {
     RESOURCE_STATUS, RESOURCE_STATUS_KEYS,
     RESOURCE_KATEGORIE, RESOURCE_KAT_KEYS
@@ -14,7 +16,7 @@ import {
 import { cn } from "@/lib/utils";
 import {
     ArrowLeft, Boxes, RefreshCw, Truck, Stethoscope, Bike,
-    AlertTriangle, Circle
+    AlertTriangle, Circle, Layers
 } from "lucide-react";
 
 const KAT_ICON = {
@@ -26,7 +28,31 @@ const KAT_ICON = {
     sonstiges: Boxes
 };
 
-function ResourceRow({ resource, onChangeStatus }) {
+function AbschnittChip({ abschnitt }) {
+    if (!abschnitt) {
+        return (
+            <span className="inline-flex items-center gap-1 rounded bg-surface-raised px-1.5 py-0.5 text-[0.65rem] text-muted-foreground">
+                <span className="h-1.5 w-1.5 rounded-full bg-status-gray" />
+                kein Abschnitt
+            </span>
+        );
+    }
+    const farbe = getFarbe(abschnitt.farbe);
+    return (
+        <span
+            className={cn(
+                "inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[0.65rem]",
+                farbe.soft
+            )}
+            data-testid={`res-abschnitt-${abschnitt.id}`}
+        >
+            <span className={cn("h-1.5 w-1.5 rounded-full", farbe.dot)} />
+            {abschnitt.name}
+        </span>
+    );
+}
+
+function ResourceRow({ resource, abschnitt, abschnitte, onChangeStatus, onChangeAbschnitt }) {
     const meta = RESOURCE_STATUS[resource.status] || { label: resource.status, tone: "neutral" };
     const KatIcon = KAT_ICON[resource.kategorie] || Boxes;
     return (
@@ -37,11 +63,33 @@ function ResourceRow({ resource, onChangeStatus }) {
             <KatIcon className="h-4 w-4 shrink-0 text-primary" />
             <div className="min-w-0 flex-1">
                 <div className="text-body font-medium truncate">{resource.name}</div>
-                <div className="text-caption text-muted-foreground">
-                    {RESOURCE_KATEGORIE[resource.kategorie]?.label} ·{" "}
-                    {resource.typ === "intern" ? "Intern" : "Extern"}
+                <div className="flex items-center gap-1.5 text-caption text-muted-foreground">
+                    <span>
+                        {RESOURCE_KATEGORIE[resource.kategorie]?.label} ·{" "}
+                        {resource.typ === "intern" ? "Intern" : "Extern"}
+                    </span>
+                    <AbschnittChip abschnitt={abschnitt} />
                 </div>
             </div>
+            <Select
+                value={resource.abschnitt_id || "none"}
+                onValueChange={(v) => onChangeAbschnitt(resource.id, v === "none" ? null : v)}
+            >
+                <SelectTrigger
+                    className="w-28 h-8 bg-background text-caption"
+                    data-testid={`resource-abschnitt-select-${resource.id}`}
+                >
+                    <SelectValue placeholder="Abschnitt" />
+                </SelectTrigger>
+                <SelectContent>
+                    <SelectItem value="none">(keiner)</SelectItem>
+                    {abschnitte.map((a) => (
+                        <SelectItem key={a.id} value={a.id}>
+                            {a.name}
+                        </SelectItem>
+                    ))}
+                </SelectContent>
+            </Select>
             <StatusBadge tone={meta.tone} variant="soft" size="sm">
                 {meta.label}
             </StatusBadge>
@@ -180,6 +228,35 @@ export default function ResourceList() {
     const navigate = useNavigate();
     const { activeIncident } = useIncidents();
     const { resources, refreshResources, updResource } = useOps();
+    const [abschnitte, setAbschnitte] = React.useState([]);
+
+    const loadAbschnitte = React.useCallback(async () => {
+        if (!activeIncident?.id) return;
+        try {
+            setAbschnitte(await listAbschnitte(activeIncident.id));
+        } catch (e) {
+            // silent
+        }
+    }, [activeIncident?.id]);
+
+    React.useEffect(() => {
+        loadAbschnitte();
+    }, [loadAbschnitte]);
+
+    const abschnittById = React.useMemo(() => {
+        const m = new Map();
+        for (const a of abschnitte) m.set(a.id, a);
+        return m;
+    }, [abschnitte]);
+
+    const handleChangeAbschnitt = async (id, abschnittId) => {
+        try {
+            await apiUpdateResource(id, { abschnitt_id: abschnittId });
+            await refreshResources();
+        } catch (e) {
+            // ignore
+        }
+    };
 
     const kpis = React.useMemo(() => {
         const b = { total: resources.length };
@@ -277,7 +354,10 @@ export default function ResourceList() {
                             <ResourceRow
                                 key={r.id}
                                 resource={r}
+                                abschnitt={r.abschnitt_id ? abschnittById.get(r.abschnitt_id) : null}
+                                abschnitte={abschnitte}
                                 onChangeStatus={(id, status) => updResource(id, { status })}
+                                onChangeAbschnitt={handleChangeAbschnitt}
                             />
                         ))}
                     </div>

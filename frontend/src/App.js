@@ -16,6 +16,8 @@ import ResourceList from "@/pages/ResourceList";
 import MessageList from "@/pages/MessageList";
 import KonfliktList from "@/pages/KonfliktList";
 import AbschlussPage from "@/pages/AbschlussPage";
+import AbschnittList from "@/pages/AbschnittList";
+import BettenPage from "@/pages/BettenPage";
 
 function App() {
     return (
@@ -33,6 +35,8 @@ function App() {
                                         <Route path="/patienten/:patientId" element={<PatientDetail />} />
                                         <Route path="/transport" element={<TransportList />} />
                                         <Route path="/ressourcen" element={<ResourceList />} />
+                                        <Route path="/abschnitte" element={<AbschnittList />} />
+                                        <Route path="/betten" element={<BettenPage />} />
                                         <Route path="/kommunikation" element={<MessageList />} />
                                         <Route path="/konflikte" element={<KonfliktList />} />
                                         <Route path="/abschluss" element={<AbschlussPage />} />

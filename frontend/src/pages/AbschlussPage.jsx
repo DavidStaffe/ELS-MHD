@@ -139,6 +139,8 @@ function DashboardTab({ auswertung, loading }) {
     const d = auswertung.D_ressourcen;
     const e = auswertung.E_konflikte;
     const f = auswertung.F_metadaten;
+    const g = auswertung.G_abschnitte || { total: 0, abschnitte: [] };
+    const bettKpi = a.betten || { total: 0, belegt: 0, frei: 0, gesperrt: 0, auslastung_pct: 0, belegungsdauer_min_avg: 0 };
 
     return (
         <div className="space-y-5" data-testid="abschluss-dashboard">
@@ -175,6 +177,41 @@ function DashboardTab({ auswertung, loading }) {
                     unit=""
                     tone={e.rot > 0 ? "red" : e.gelb > 0 ? "yellow" : "green"}
                     hint={`${e.rot} rot · ${e.gelb} gelb`}
+                />
+            </div>
+
+            {/* Schritt 10+11 KPIs: Abschnitte + Betten */}
+            <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+                <KpiTile
+                    testId="kpi-abschnitte"
+                    label="Abschnitte"
+                    value={g.total}
+                    unit=""
+                    tone="default"
+                    hint={`${g.aktiv || 0} aktiv`}
+                />
+                <KpiTile
+                    testId="kpi-betten-auslastung"
+                    label="Bett-Auslastung"
+                    value={bettKpi.auslastung_pct}
+                    unit="%"
+                    tone={bettKpi.auslastung_pct > 80 ? "red" : bettKpi.auslastung_pct > 50 ? "yellow" : "green"}
+                    hint={`${bettKpi.belegt}/${bettKpi.total} belegt`}
+                />
+                <KpiTile
+                    testId="kpi-betten-dauer"
+                    label="Ø Belegungsdauer"
+                    value={bettKpi.belegungsdauer_min_avg}
+                    unit="min"
+                    tone="default"
+                />
+                <KpiTile
+                    testId="kpi-ohne-abschnitt"
+                    label="Ress. ohne Abschnitt"
+                    value={d.ohne_abschnitt || 0}
+                    unit=""
+                    tone={(d.ohne_abschnitt_pct || 0) > 20 ? "yellow" : "green"}
+                    hint={`${d.ohne_abschnitt_pct || 0}%`}
                 />
             </div>
 
@@ -317,6 +354,55 @@ function DashboardTab({ auswertung, loading }) {
                         </div>
                     </div>
                 </SectionCard>
+
+                {/* Schritt 10: Abschnitte-Uebersicht */}
+                {g.abschnitte && g.abschnitte.length > 0 && (
+                    <SectionCard
+                        title="Einsatzabschnitte"
+                        subtitle={`${g.total} Abschnitte · Ressourcen und Betten je Abschnitt`}
+                        testId="card-abschnitte"
+                    >
+                        <ul className="space-y-1.5">
+                            {g.abschnitte.map((ab) => (
+                                <li
+                                    key={ab.id}
+                                    className="flex items-center gap-2 rounded-md bg-surface-raised px-3 py-1.5"
+                                    data-testid={`dashboard-abschnitt-${ab.id}`}
+                                >
+                                    <span
+                                        aria-hidden
+                                        className={
+                                            "inline-block h-2.5 w-2.5 rounded-full " +
+                                            (ab.farbe === "red" ? "bg-rose-500" :
+                                             ab.farbe === "orange" ? "bg-orange-500" :
+                                             ab.farbe === "yellow" ? "bg-amber-500" :
+                                             ab.farbe === "green" ? "bg-emerald-500" :
+                                             ab.farbe === "teal" ? "bg-teal-500" :
+                                             ab.farbe === "blue" ? "bg-sky-500" :
+                                             ab.farbe === "indigo" ? "bg-indigo-500" :
+                                             ab.farbe === "purple" ? "bg-violet-500" :
+                                             ab.farbe === "pink" ? "bg-pink-500" : "bg-slate-500")
+                                        }
+                                    />
+                                    <span className="flex-1 truncate text-body">{ab.name}</span>
+                                    <span className="font-mono text-caption text-muted-foreground tabular-nums">
+                                        Res {ab.ressourcen_im_einsatz}/{ab.ressourcen_total}
+                                    </span>
+                                    <span className="font-mono text-caption text-muted-foreground tabular-nums">
+                                        Bett {ab.betten_belegt}/{ab.betten_total}
+                                    </span>
+                                    <StatusBadge
+                                        tone={ab.ampel === "red" ? "red" : ab.ampel === "yellow" ? "yellow" : ab.ampel === "green" ? "green" : "gray"}
+                                        variant="soft"
+                                        size="sm"
+                                    >
+                                        {ab.ampel === "red" ? "voll" : ab.ampel === "yellow" ? "teilw." : ab.ampel === "green" ? "bereit" : "leer"}
+                                    </StatusBadge>
+                                </li>
+                            ))}
+                        </ul>
+                    </SectionCard>
+                )}
             </div>
         </div>
     );
