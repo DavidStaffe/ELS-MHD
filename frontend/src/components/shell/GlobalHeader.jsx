@@ -3,14 +3,15 @@ import { cn } from "@/lib/utils";
 import { StatusBadge } from "@/components/primitives/StatusBadge";
 import { Button } from "@/components/ui/button";
 import { CommandPaletteTrigger } from "@/components/command/CommandPalette";
-import { Sun, Moon, ShieldCheck, Clock3 } from "lucide-react";
+import { formatDuration } from "@/lib/time";
+import { Sun, Moon, ShieldCheck, Clock3, LayoutGrid } from "lucide-react";
 
-function useClock() {
+function useClock(intervalMs = 1000) {
     const [now, setNow] = React.useState(() => new Date());
     React.useEffect(() => {
-        const id = setInterval(() => setNow(new Date()), 1000);
+        const id = setInterval(() => setNow(new Date()), intervalMs);
         return () => clearInterval(id);
-    }, []);
+    }, [intervalMs]);
     return now;
 }
 
@@ -21,7 +22,6 @@ function formatTime(d) {
         second: "2-digit"
     });
 }
-
 function formatDate(d) {
     return d.toLocaleDateString("de-DE", {
         day: "2-digit",
@@ -30,18 +30,31 @@ function formatDate(d) {
     });
 }
 
-/**
- * GlobalHeader – Incident-Kontext, Rolle, Uhrzeit, Theme-Toggle.
- * Laut Spec: Zeigt aktiven Incident, Rolle, Abschlussstatus.
- */
+const STATUS_MAP = {
+    operativ: { label: "Operativ", tone: "green" },
+    geplant: { label: "Geplant", tone: "gray" },
+    abgeschlossen: { label: "Abgeschlossen", tone: "gray" },
+    archiviert: { label: "Archiviert", tone: "neutral" }
+};
+
 export function GlobalHeader({
     incident,
     role = "Einsatzleiter",
     theme,
     onToggleTheme,
+    onGoToIncidents,
     className
 }) {
-    const now = useClock();
+    const now = useClock(1000);
+
+    // Live-Dauer seit Incident-Start
+    const duration = React.useMemo(() => {
+        if (!incident?.start_at) return null;
+        const end = incident.end_at ? new Date(incident.end_at) : now;
+        return formatDuration(end - new Date(incident.start_at));
+    }, [incident, now]);
+
+    const statusMeta = incident ? STATUS_MAP[incident.status] : null;
 
     return (
         <header
@@ -56,15 +69,33 @@ export function GlobalHeader({
                 {incident ? (
                     <>
                         <div className="relative">
-                            <span className="block h-2.5 w-2.5 rounded-full bg-status-green" />
                             <span
-                                aria-hidden
-                                className="absolute inset-0 rounded-full bg-status-green animate-pulse-ring"
+                                className={cn(
+                                    "block h-2.5 w-2.5 rounded-full",
+                                    incident.status === "operativ"
+                                        ? "bg-status-green"
+                                        : "bg-status-gray"
+                                )}
                             />
+                            {incident.status === "operativ" && (
+                                <span
+                                    aria-hidden
+                                    className="absolute inset-0 rounded-full bg-status-green animate-pulse-ring"
+                                />
+                            )}
                         </div>
-                        <div className="min-w-0">
+                        <button
+                            type="button"
+                            onClick={onGoToIncidents}
+                            className="min-w-0 text-left els-focus-ring"
+                            title="Zur Incident-Uebersicht"
+                            data-testid="header-incident-button"
+                        >
                             <div className="flex items-center gap-2">
-                                <span className="text-heading truncate">
+                                <span
+                                    className="text-heading truncate"
+                                    data-testid="header-incident-name"
+                                >
                                     {incident.name}
                                 </span>
                                 {incident.demo && (
@@ -72,19 +103,34 @@ export function GlobalHeader({
                                         tone="yellow"
                                         variant="solid"
                                         size="sm"
-                                        data-testid="incident-demo-badge"
+                                        data-testid="header-demo-badge"
                                     >
                                         DEMO
                                     </StatusBadge>
                                 )}
-                                <StatusBadge tone="green" variant="soft" size="sm">
-                                    {incident.status ?? "Operativ"}
-                                </StatusBadge>
+                                {statusMeta && (
+                                    <StatusBadge
+                                        tone={statusMeta.tone}
+                                        variant="soft"
+                                        size="sm"
+                                    >
+                                        {statusMeta.label}
+                                    </StatusBadge>
+                                )}
+                                {duration && (
+                                    <span
+                                        className="ml-1 rounded bg-surface-raised px-1.5 py-0.5 font-mono text-[0.7rem] tabular-nums text-muted-foreground"
+                                        data-testid="header-duration"
+                                    >
+                                        {duration}
+                                    </span>
+                                )}
                             </div>
                             <div className="text-caption text-muted-foreground truncate font-mono">
-                                {incident.id} · {incident.type} · {incident.location}
+                                {incident.id.slice(0, 8)} · {incident.typ} ·{" "}
+                                {incident.ort || "–"}
                             </div>
-                        </div>
+                        </button>
                     </>
                 ) : (
                     <div className="flex items-center gap-2 text-muted-foreground">
@@ -92,6 +138,18 @@ export function GlobalHeader({
                         <span className="text-body">
                             Kein Incident aktiv – bitte starten oder auswaehlen
                         </span>
+                        {onGoToIncidents && (
+                            <Button
+                                type="button"
+                                variant="ghost"
+                                size="sm"
+                                onClick={onGoToIncidents}
+                                data-testid="header-no-incident-cta"
+                            >
+                                <LayoutGrid className="h-3.5 w-3.5" />
+                                Uebersicht
+                            </Button>
+                        )}
                     </div>
                 )}
             </div>

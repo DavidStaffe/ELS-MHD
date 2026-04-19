@@ -1,0 +1,72 @@
+{
+  "summary": "Completed comprehensive testing of ELS MHD Step 02 - Incident Management. All 13 backend API tests passed (100%). Frontend UI tests passed for core functionality including incident list, filters, DEMO badges, Command Palette, and incident CRUD operations.",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [
+      {
+        "flow": "Demo-Incident button on IncidentList",
+        "issue": "Clicking 'Demo-Incident starten' button creates incident and activates it but does NOT navigate to /lage. The incident is created and shown in header, but user stays on incident list. This differs from the AppShell's handleStartDemo which does navigate.",
+        "affected_selectors": ["[data-testid='btn-demo']"],
+        "priority": "LOW"
+      },
+      {
+        "flow": "New Incident Dialog on IncidentList",
+        "issue": "After creating new incident via dialog on IncidentList page, user stays on incident list instead of navigating to /lage. The AppShell's NewIncidentDialog does navigate to /lage.",
+        "affected_selectors": ["[data-testid='new-incident-dialog']"],
+        "priority": "LOW"
+      }
+    ],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_incidents_api.py",
+    "/app/test_reports/pytest/pytest_results.xml"
+  ],
+  "action_items": [
+    "OPTIONAL: Consider making Demo-Incident button behavior consistent - either always navigate to /lage or never. Currently IncidentList stays on list while AppShell navigates.",
+    "OPTIONAL: Consider making NewIncidentDialog behavior consistent between IncidentList and AppShell usage."
+  ],
+  "critical_code_review_comments": [],
+  "updated_files": [
+    "/app/backend/tests/test_incidents_api.py"
+  ],
+  "success_rate": {
+    "backend": "100% (13/13 tests passed)",
+    "frontend": "95% (all core features working, minor navigation inconsistency)"
+  },
+  "test_credentials": "No authentication required",
+  "seed_data_creation": "Created and cleaned up TEST_Playwright_Incident for testing",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Backend API fully tested with pytest. Frontend tested with Playwright for: incident list display, filter chips with counts, DEMO badges, Command Palette (Ctrl+K), incident CRUD (create, activate, close, reopen), localStorage persistence, header display with active incident. All data-testid attributes are properly implemented. Existing demo incidents in DB: MANV-Uebung Sued, Stadtfest 2026, Marathon Muenchen, Test Veranstaltung 2026.",
+  "features_tested": {
+    "backend": [
+      "GET /api/meta returns version 0.2.0 and step info",
+      "GET /api/incidents returns array",
+      "GET /api/incidents?status=operativ filters correctly",
+      "GET /api/incidents?demo=true filters correctly",
+      "POST /api/incidents/demo creates demo incident with demo:true, status:operativ",
+      "POST /api/incidents creates non-demo incident with start_at set",
+      "POST /api/incidents with invalid name returns 422",
+      "GET /api/incidents/{id} returns 200 for existing, 404 for unknown",
+      "PATCH /api/incidents/{id} with status=abgeschlossen sets end_at automatically",
+      "DELETE /api/incidents/{id} returns 204 and removes entry"
+    ],
+    "frontend": [
+      "Incident list displays with title 'Incidents' (data-testid=incident-list-title)",
+      "Filter chips (alle/operativ/geplant/abgeschlossen/demo) show counts and filter",
+      "Demo-Incident button creates incident and activates it",
+      "New Incident dialog opens and creates incident",
+      "Incident cards show DEMO badge only for demo=true",
+      "Header shows active incident name, DEMO badge (when demo), live duration",
+      "Header incident button navigates back to /",
+      "Command Palette opens via Ctrl+K with incident-switch entries",
+      "Active incident ID persisted in localStorage (els-active-incident)",
+      "Sidebar Lage is active when incident selected, disabled otherwise"
+    ]
+  }
+}

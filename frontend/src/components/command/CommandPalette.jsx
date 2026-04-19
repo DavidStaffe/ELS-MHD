@@ -123,10 +123,11 @@ export function CommandPaletteProvider({
         []
     );
 
-    // Standard-Commands (Schritt 01 – Platzhalter fuer gesperrte Module)
+    // Standard-Commands (Schritt 02: Einstieg + Lage)
     const moduleNav = React.useMemo(
         () => [
-            { id: "nav-einstieg", icon: ICON_MAP.einstieg, label: "Einstieg", path: "/", available: true, shortcut: "G E" },
+            { id: "nav-einstieg", icon: LayoutDashboard, label: "Einstieg (Incidents)", path: "/", available: true, shortcut: "G E" },
+            { id: "nav-lage", icon: ICON_MAP.patienten, label: "Lage (aktiver Incident)", path: "/lage", available: true, shortcut: "G L" },
             { id: "nav-patienten", icon: ICON_MAP.patienten, label: "Patienten", path: "/patienten", available: false, step: "03" },
             { id: "nav-transport", icon: ICON_MAP.transport, label: "Transport", path: "/transport", available: false, step: "05" },
             { id: "nav-ressourcen", icon: ICON_MAP.ressourcen, label: "Ressourcen", path: "/ressourcen", available: false, step: "06" },
