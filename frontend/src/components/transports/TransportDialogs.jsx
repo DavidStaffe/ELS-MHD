@@ -16,18 +16,19 @@ import {
     SelectTrigger,
     SelectValue
 } from "@/components/ui/select";
-import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import {
-    resourcesForTyp,
     TRANSPORT_ZIEL,
     ZIEL_OPTIONS,
     occupiedResources
 } from "@/lib/transport-meta";
+import { useOps } from "@/context/OpsContext";
 import { Truck } from "lucide-react";
 
 /**
  * ResourceAssignDialog – Ressource fuer Transport waehlen.
+ * Liste stammt aus dem Ressourcen-Modul (OpsContext) – geloeschte Ressourcen
+ * erscheinen nicht mehr.
  */
 export function ResourceAssignDialog({
     open,
@@ -36,8 +37,10 @@ export function ResourceAssignDialog({
     transports = [],
     onAssign
 }) {
+    const { resources } = useOps();
     if (!transport) return null;
-    const options = resourcesForTyp(transport.typ);
+    const options = resources
+        .filter((r) => r.typ === transport.typ && r.status !== "offline");
     const occ = occupiedResources(transports);
 
     return (
@@ -63,6 +66,11 @@ export function ResourceAssignDialog({
                 </DialogHeader>
 
                 <div className="grid grid-cols-2 gap-2">
+                    {options.length === 0 && (
+                        <div className="col-span-2 text-caption italic text-muted-foreground">
+                            Keine {transport.typ === "intern" ? "internen" : "externen"} Ressourcen verfuegbar. Lege eine Ressource unter "Ressourcen" an.
+                        </div>
+                    )}
                     {options.map((r) => {
                         const busy = occ.get(r.name) || [];
                         const isBusy =
@@ -118,6 +126,7 @@ export function ResourceAssignDialog({
  * NewTransportDialog – Transport ohne Patient manuell anlegen.
  */
 export function NewTransportDialog({ open, onOpenChange, onCreate }) {
+    const { resources } = useOps();
     const [typ, setTyp] = React.useState("extern");
     const [ziel, setZiel] = React.useState("krankenhaus");
     const [ressource, setRessource] = React.useState("");
@@ -132,7 +141,10 @@ export function NewTransportDialog({ open, onOpenChange, onCreate }) {
         setError(null);
     }, [open]);
 
-    const options = resourcesForTyp(typ);
+    const options = React.useMemo(
+        () => resources.filter((r) => r.typ === typ && r.status !== "offline"),
+        [resources, typ]
+    );
 
     const handleSubmit = async (e) => {
         e.preventDefault();

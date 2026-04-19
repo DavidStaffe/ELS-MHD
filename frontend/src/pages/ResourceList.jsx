@@ -20,14 +20,14 @@ import {
 } from "@/lib/ops-meta";
 import { cn } from "@/lib/utils";
 import {
-    ArrowLeft, Boxes, RefreshCw, Truck, Stethoscope, Bike,
+    ArrowLeft, Boxes, RefreshCw, Truck, Stethoscope, Users,
     AlertTriangle, Circle, Plus, Edit3, Trash2
 } from "lucide-react";
 import { toast } from "sonner";
 
 const KAT_ICON = {
     uhs: Stethoscope,
-    bike: Bike,
+    evt: Users,
     rtw: Truck,
     ktw: Truck,
     nef: AlertTriangle,

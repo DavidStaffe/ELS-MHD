@@ -1,0 +1,35 @@
+{
+  "summary": "Tested EVT rename + resource-delete persistence. Backend pytest: 139/144 pass (same 5 pre-existing version/S4 failures as iteration 11 – unrelated to this change). New regression test file test_evt_and_delete_persistence.py green (4/4). Frontend: Ressourcen + Transport pages correctly show 'EVT' / 'EVT 1' and no 'Radstreife' anywhere. ResourceBar reads from live OpsContext (9 live drop targets matching backend). End-to-end delete flow: deleted EVT 1 + KTW 2 via API → ResourceBar drops from 9 to 7 drop targets, chips gone; after navigating /lage → /transport round-trip still 7 (no re-seed); Ressourcen page Gesamt goes 9 → 7 with EVT row removed from Statusmatrix.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "/api/meta", "issue": "Reports version 1.0.0 while legacy step04/05/06/incidents tests expect 0.2.0/0.4.0/0.5.0/0.6.0 – pre-existing, unrelated to EVT change"},
+      {"endpoint": "POST /api/patients (sichtung=S4)", "issue": "Returns 422 (S4 not in SichtungStufe Literal S0-S3). Pre-existing, unrelated to EVT change"}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_evt_and_delete_persistence.py",
+    "/app/test_reports/pytest/pytest_iter12.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "routes/resources.py: list_resources no longer calls seed_default_resources – correct. Seed path still invoked by demo-incident creation (expected).",
+    "services/seeds.py: DEFAULT_RESOURCES cleanly renamed (EVT 1 / kategorie='evt'). idempotent via count_documents>0 guard.",
+    "ResourceBar.jsx + TransportDialogs.jsx consume useOps().resources – single source of truth, deleted resources disappear automatically. Good.",
+    "transport-meta.js: hardcoded RESOURCE_POOL + resourcesForTyp removed; occupiedResources helper retained (purely transport-driven)."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_evt_and_delete_persistence.py (new regression tests)"
+  ],
+  "success_rate": {"backend": "96.5% (139/144, 5 pre-existing)", "frontend": "100% (all EVT+delete assertions pass)"},
+  "seed_data_creation": "Created a demo incident via /api/incidents/demo (tests auto-create per-test). Deleted 2 resources (EVT 1, KTW 2) from active incident 72f8fa89-... during E2E test; other demo incidents untouched.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "EVT rename + delete persistence fully green end-to-end. Backend migration (startup bike→evt, Radstreife N→EVT N) ran – no legacy rows. Only remaining red tests are pre-existing META version asserts (tests hard-code old version strings) and S4 sichtung test (S4 not in Literal). Do not regress by re-introducing hardcoded RESOURCE_POOL in frontend.",
+  "rca of the issue": "Not applicable – this iteration is verification of a completed feature + bug fix, no new bugs discovered."
+}

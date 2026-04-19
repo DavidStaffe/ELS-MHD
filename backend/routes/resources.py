@@ -8,7 +8,6 @@ from fastapi import APIRouter, HTTPException
 from core.db import db
 from core.time import iso, now_utc
 from models import ResourceCreate, ResourceUpdate
-from services.seeds import seed_default_resources
 
 router = APIRouter(prefix="/api", tags=["resources"])
 
@@ -18,7 +17,6 @@ async def list_resources(incident_id: str, typ: Optional[str] = None, status: Op
     inc = await db.incidents.find_one({"id": incident_id}, {"_id": 0})
     if not inc:
         raise HTTPException(status_code=404, detail="Incident nicht gefunden")
-    await seed_default_resources(incident_id)
     query: dict = {"incident_id": incident_id}
     if typ:
         query["typ"] = {"$in": [v.strip() for v in typ.split(",") if v.strip()]}

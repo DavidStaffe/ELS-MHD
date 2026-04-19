@@ -1,12 +1,15 @@
 import * as React from "react";
 import { cn } from "@/lib/utils";
 import { Truck, Plus } from "lucide-react";
-import { RESOURCE_POOL, occupiedResources } from "@/lib/transport-meta";
+import { occupiedResources } from "@/lib/transport-meta";
+import { useOps } from "@/context/OpsContext";
 
 /**
  * ResourceBar – Drop-Targets fuer Transport-Zuweisung.
  * Sticky am unteren Bildschirmrand; Drag einer TransportCard auf eine Ressource
  * ruft onAssign(transportId, ressourceName) auf.
+ * Die Ressourcen stammen aus dem zentralen Ressourcen-Modul (OpsContext) –
+ * geloeschte Ressourcen verschwinden automatisch.
  */
 export function ResourceBar({
     transports = [],
@@ -14,6 +17,7 @@ export function ResourceBar({
     onNewTransport,
     className
 }) {
+    const { resources } = useOps();
     const occupied = React.useMemo(
         () => occupiedResources(transports),
         [transports]
@@ -21,9 +25,17 @@ export function ResourceBar({
     const [overId, setOverId] = React.useState(null);
     const [overTyp, setOverTyp] = React.useState(null);
 
+    const pool = React.useMemo(() => {
+        // Nur aktive Ressourcen (nicht offline) als Drop-Target anzeigen
+        const list = resources.filter((r) => r.status !== "offline");
+        return {
+            intern: list.filter((r) => r.typ === "intern"),
+            extern: list.filter((r) => r.typ === "extern")
+        };
+    }, [resources]);
+
     const makeHandlers = (resource) => ({
         onDragOver: (e) => {
-            const dragTyp = e.dataTransfer.types.includes("text/transport-typ");
             e.preventDefault();
             e.dataTransfer.dropEffect = "move";
             setOverId(resource.id);
@@ -37,7 +49,6 @@ export function ResourceBar({
             setOverTyp(null);
             if (!tid) return;
             if (typ && typ !== resource.typ) {
-                // Typ-Mismatch (intern vs. extern) -> nicht zulassen
                 return;
             }
             onAssign?.(tid, resource.name);
@@ -45,13 +56,18 @@ export function ResourceBar({
     });
 
     const renderGroup = (typ) => {
-        const list = RESOURCE_POOL[typ] || [];
+        const list = pool[typ] || [];
         return (
             <div className="flex flex-1 flex-col gap-1.5">
                 <div className="text-[0.7rem] uppercase tracking-wider text-muted-foreground">
                     {typ === "intern" ? "Intern (UHS)" : "Extern (RD/KH)"}
                 </div>
                 <div className="flex flex-wrap gap-2">
+                    {list.length === 0 && (
+                        <div className="text-caption italic text-muted-foreground/80">
+                            keine {typ === "intern" ? "internen" : "externen"} Ressourcen
+                        </div>
+                    )}
                     {list.map((r) => {
                         const busy = occupied.get(r.name) || [];
                         const over = overId === r.id;

@@ -29,7 +29,7 @@ TransportZiel = Literal[
 ]
 TransportStatus = Literal["offen", "zugewiesen", "unterwegs", "abgeschlossen"]
 
-ResourceKategorie = Literal["uhs", "rtw", "ktw", "nef", "bike", "sonstiges"]
+ResourceKategorie = Literal["uhs", "rtw", "ktw", "nef", "evt", "sonstiges"]
 ResourceStatus = Literal["verfuegbar", "im_einsatz", "wartung", "offline"]
 
 MessagePrio = Literal["kritisch", "dringend", "normal"]

@@ -9,7 +9,7 @@ export const RESOURCE_STATUS_KEYS = Object.keys(RESOURCE_STATUS);
 
 export const RESOURCE_KATEGORIE = {
     uhs: { label: "UHS-Team", typ: "intern" },
-    bike: { label: "Radstreife", typ: "intern" },
+    evt: { label: "EVT", typ: "intern" },
     rtw: { label: "RTW", typ: "extern" },
     ktw: { label: "KTW", typ: "extern" },
     nef: { label: "NEF", typ: "extern" },

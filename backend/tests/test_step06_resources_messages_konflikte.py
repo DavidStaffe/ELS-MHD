@@ -62,7 +62,7 @@ class TestResourcesLazySeed:
         # Check expected names
         expected_names = [
             "UHS Team 1", "UHS Team 2", "UHS Team 3",
-            "Radstreife 1",
+            "EVT 1",
             "RTW 1", "RTW 2",
             "KTW 1", "KTW 2",
             "NEF 1"
@@ -152,7 +152,7 @@ class TestResourcesCRUD:
         assert response.status_code == 200
         resources = response.json()
         
-        # Should have 4 intern resources: UHS Team 1-3, Radstreife 1
+        # Should have 4 intern resources: UHS Team 1-3, EVT 1
         assert len(resources) == 4, f"Expected 4 intern resources, got {len(resources)}"
         for r in resources:
             assert r["typ"] == "intern", f"Resource {r['name']} should be intern"

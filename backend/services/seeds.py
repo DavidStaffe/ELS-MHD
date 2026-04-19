@@ -12,7 +12,7 @@ DEFAULT_RESOURCES = [
     {"name": "UHS Team 1", "typ": "intern", "kategorie": "uhs"},
     {"name": "UHS Team 2", "typ": "intern", "kategorie": "uhs"},
     {"name": "UHS Team 3", "typ": "intern", "kategorie": "uhs"},
-    {"name": "Radstreife 1", "typ": "intern", "kategorie": "bike"},
+    {"name": "EVT 1", "typ": "intern", "kategorie": "evt"},
     {"name": "RTW 1", "typ": "extern", "kategorie": "rtw"},
     {"name": "RTW 2", "typ": "extern", "kategorie": "rtw"},
     {"name": "KTW 1", "typ": "extern", "kategorie": "ktw"},

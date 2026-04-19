@@ -61,6 +61,26 @@ async def run_migrations():
                 "Migration: %d Patient(en) von S4 nach S0 umbenannt",
                 result.modified_count,
             )
+        # Ressourcen-Kategorie "bike" -> "evt" (Radstreife -> EVT)
+        bike_cat = await db.resources.update_many(
+            {"kategorie": "bike"}, {"$set": {"kategorie": "evt"}}
+        )
+        if bike_cat.modified_count:
+            logger.info(
+                "Migration: %d Ressource(n) von Kategorie 'bike' nach 'evt' umbenannt",
+                bike_cat.modified_count,
+            )
+        # Default-Ressourcen-Namen "Radstreife N" -> "EVT N"
+        async for r in db.resources.find(
+            {"name": {"$regex": "^Radstreife "}}, {"_id": 0, "id": 1, "name": 1}
+        ):
+            new_name = r["name"].replace("Radstreife ", "EVT ", 1)
+            await db.resources.update_one(
+                {"id": r["id"]}, {"$set": {"name": new_name}}
+            )
+            logger.info(
+                "Migration: Ressource '%s' umbenannt zu '%s'", r["name"], new_name
+            )
     except Exception as exc:  # pragma: no cover
         logger.exception("Migration fehlgeschlagen: %s", exc)
 
