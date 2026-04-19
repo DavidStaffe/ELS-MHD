@@ -338,7 +338,10 @@ export default function ResourceList() {
                             <ResourceRow
                                 key={r.id}
                                 resource={r}
+                                abschnitt={r.abschnitt_id ? abschnittById.get(r.abschnitt_id) : null}
+                                abschnitte={abschnitte}
                                 onChangeStatus={(id, status) => updResource(id, { status })}
+                                onChangeAbschnitt={handleChangeAbschnitt}
                             />
                         ))}
                     </div>

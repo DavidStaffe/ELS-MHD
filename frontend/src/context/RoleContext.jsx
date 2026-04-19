@@ -85,7 +85,7 @@ const PERMS = {
 
     // Schritt 11: Behandlungsbetten
     "bett.view": ["einsatzleiter", "helfer", "dokumentar"],
-    "bett.create": ["einsatzleiter", "helfer"],
+    "bett.create": ["einsatzleiter"],
     "bett.update": ["einsatzleiter", "helfer"],
     "bett.delete": ["einsatzleiter"],
     "bett.assign_patient": ["einsatzleiter", "helfer"],

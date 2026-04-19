@@ -1,0 +1,33 @@
+{
+  "summary": "Retest nach Fixes aus iteration_7: (1) ResourceList-Crash und (2) Helfer-Rollen-Gate fuer Bett-Create. Beide Fixes BESTAeTIGT. /ressourcen rendert als EINSATZLEITER ohne React-Crash fuer den Demo-Incident (9 Ressourcen: 4 intern + 5 extern). Fuer JEDE Ressource (intern und extern) erscheint data-testid=resource-abschnitt-select-{id} (9/9). Aenderung des Abschnitts ueber den Select persistiert via PATCH /api/resources/{id} (verifiziert per API-GET: abschnitt_id wurde korrekt auf Ziel-Abschnitt gesetzt). /betten als HELFER: bulk-open und bett-new-btn sind NICHT im DOM (korrekt entfernt analog zu Dokumentar), bett-assign-{id} und bett-release-{id} bleiben klickbar (2 assigns + 4 releases). /betten als EINSATZLEITER: bulk-open und bett-new-btn weiterhin sichtbar. Regression gruen: /abschnitte rendert abschnitte-grid mit 2 Kacheln + abschnitt-new-btn; /betten rendert betten-grid mit 6 Kacheln; /abschluss zeigt kpi-abschnitte=2 (2 aktiv), kpi-betten-auslastung=66.7% (4/6 belegt), kpi-betten-dauer und kpi-ohne-abschnitt sowie card-abschnitte.",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_step10_12_abschnitte_betten.py",
+    "/app/test_reports/pytest/pytest_step10_12_results.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "ResourceList.jsx: intern/extern Bloecke uebergeben jetzt identische Props - DRY-Refactor (gemeinsame ResourceSection-Komponente) bleibt sinnvoll, verhindert zukuenftige Divergenz.",
+    "server.py (2162 Zeilen) weiterhin >700-Grenze - Moduleaufteilung empfohlen (siehe iteration_7).",
+    "RoleContext: bett.create auf einsatzleiter reduziert - passt zur Dokumentar-Logik. bett.update bleibt fuer helfer (darf Sperren/Entsperren/Edit) - konsistent zur Spec."
+  ],
+  "updated_files": [],
+  "success_rate": {
+    "backend": "nicht getestet in dieser Iteration (war 100% in iteration_7)",
+    "frontend": "100% (alle geforderten Flows + Regression gruen)"
+  },
+  "test_credentials": "Keine Auth. localStorage['els-role']='einsatzleiter'|'helfer' und localStorage['els-active-incident']=<demo_incident_id> vor Navigation setzen.",
+  "seed_data_creation": "POST /api/incidents/demo erzeugt Demo-Incident (2 Abschnitte, 6 Betten davon 4 belegt, 7 Patienten, 9 Ressourcen).",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Beide Fixes aus iteration_7 sind im Produktiv-Preview verifiziert. ResourceList hat keine Divergenz mehr zwischen intern und extern. bett.create-Gate gilt nur noch fuer einsatzleiter. Alle vorhandenen data-testids aus iteration_7 gelten unveraendert.",
+  "rca_of_the_issue": "FIX 1 (ResourceList): intern-Block in ResourceList.jsx uebergibt jetzt {abschnitt, abschnitte, onChangeAbschnitt} analog zum extern-Block => ResourceRow-Select rendert ohne undefined.map Crash. FIX 2 (Rollen-Gate): PERMS['bett.create'] in RoleContext.jsx auf ['einsatzleiter'] reduziert => canCreate=false fuer helfer/dokumentar => bulk-open und bett-new-btn werden gar nicht mehr im DOM gerendert."
+}
