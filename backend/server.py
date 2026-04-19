@@ -693,6 +693,8 @@ async def create_transport(incident_id: str, payload: TransportCreate):
             doc[k] = iso(doc[k])
 
     await db.transports.insert_one(doc)
+    if payload.ressource:
+        await _update_resource_status_by_name(incident_id, payload.ressource, "im_einsatz")
     return _serialize_transport(doc)
 
 

@@ -118,6 +118,42 @@ Abschlussbericht mit PDF-Export.
 
 ### ✅ Schritt 05 – Transportuebersicht + Drag & Drop (2026-04)
 - **Fix QuickEntryBar**: Sichtungs-Buttons zentriert (flex-1 justify-center), rechter Spacer w-44
+  reserviert Platz fuer Made-with-Emergent-Badge
+- Backend: Transport-Modell + CRUD, **Auto-Create** beim Setzen von patient.transport_typ,
+  **Auto-Complete** bei Patient-Fallabschluss, Cascade-Delete
+- Frontend `/transport`: 2-Spalten Intern/Extern, je 4 Status-Buckets, 6 KPIs, draggable
+  TransportCards, "N ohne Ressource"-Warnung
+- **Smart Enhancement Drag & Drop ResourceBar**: 9 Drop-Targets, Drag Card auf Ressource weist zu,
+  Typ-Mismatch verhindert Drop. Alternative Click: `ResourceAssignDialog`
+- `NewTransportDialog` fuer manuelle Anlage
+- Backend-Tests (19/19 passed), Frontend-E2E (100%)
+
+### ✅ Schritt 06 – Ressourcen, Kommunikation & Konflikte (2026-04)
+- **Backend**: 3 neue Modelle (Resource, Message) + Konflikt-Auto-Detection (nicht persistiert)
+  - Resource-CRUD mit Lazy-Seed (9 Standard-Ressourcen on first GET: UHS Team 1-3, Radstreife 1,
+    RTW 1-2, KTW 1-2, NEF 1)
+  - **Resource-Sync**: Transport-Zuweisung → Ressource auf `im_einsatz`, Transport-Abschluss
+    bzw. Ressource-Wechsel → `verfuegbar` (wenn nicht anderweitig belegt), sowohl bei POST als PATCH
+  - Message-CRUD mit `POST /messages/{id}/ack` (quittiert_at + quittiert_von), Filter `?open_only=true`
+  - **Konflikt-Auto-Detection** (`GET /incidents/{id}/konflikte`) mit 4 Regeln:
+    1. S1-Patient wartend >5min (rot)
+    2. Transport offen ohne Ressource >10min (gelb)
+    3. Transport unterwegs >60min (gelb)
+    4. Kritische Meldung unquittiert (rot)
+  - Cascade-Delete: Incident entfernt auch resources + messages
+- **Frontend** (shared `OpsContext` + 3 Seiten):
+  - `/ressourcen` mit **Statusmatrix** (5 Kategorien × 4 Status farbkodiert mit Counts), 5 KPIs,
+    zwei Spalten (Intern/Extern) mit inline Status-Select
+  - `/kommunikation` mit priorisierter Liste (rot für kritisch mit linker Seitenleiste, gelb für
+    dringend), 4 KPIs, Filter-Chips (alle/offen/kritisch), Neu-Dialog mit Prio/Kat/Von/Text,
+    Quittieren + Delete
+  - `/konflikte` mit Auto-Refresh (30s), farbkodierte Cards (data-schwere=rot/gelb/info), Live-Dauer,
+    "Oeffnen" navigiert zu Bezug (Patient/Transport/Kommunikation), "Quittieren" fuer Meldungs-Konflikte
+- Sidebar + Command-Palette: Ressourcen/Kommunikation/Konflikte aktiv (Shortcuts G R / G K / G X)
+- LagePlaceholder: alle Module verlinkt
+- Backend-Tests (27/27 passed), Frontend-E2E (100%, null Issues; ein LOW-Priority-Hinweis zu
+  POST-Sync direkt gefixt)
+- **Fix QuickEntryBar**: Sichtungs-Buttons zentriert (flex-1 justify-center), rechter Spacer w-44
   reserviert Platz fuer "Made with Emergent"-Badge (S0-Button >180px vom rechten Rand)
 - Backend: `Transport`-Modell (typ, ziel, ressource, status, 4 Zeitstempel), CRUD-Endpoints
   `/api/incidents/{id}/transports` + `/api/transports/{id}`, Filter `?typ=` `?status=`
@@ -194,8 +230,7 @@ Abschlussbericht mit PDF-Export.
 - LagePlaceholder (`/lage`): Uebersicht mit Modulen, Hinweis auf Folge-Schritte
 - Backend-Test (13/13 passed), Frontend-E2E (95%+, nur 2 LOW Issues gefunden und gefixt)
 
-### 🔜 Backlog (Schritte 06–09)
-- **Schritt 06 (P1)**: Ressourcen + Kommunikation + Konflikte
+### 🔜 Backlog (Schritte 07–09)
 - **Schritt 07 (P1)**: Produktreife – Leer-/Fehler-/Loading-States, Navigation
 - **Schritt 08 (P2)**: Demo-Integration – realistische Vordaten (Patienten, Transporte etc.)
 - **Schritt 09 (P1)**: Auswertung & Abschluss – 14-Kapitel-Bericht, PDF-Export, Blocker-Check
