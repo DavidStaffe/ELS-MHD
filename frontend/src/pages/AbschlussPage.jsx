@@ -10,14 +10,12 @@ import {
 } from "@/components/ui/tabs";
 import {
     StatusBadge,
-    KpiTile,
     SectionCard,
     ConfirmModal
 } from "@/components/primitives";
 import { useIncidents } from "@/context/IncidentContext";
 import { useRole } from "@/context/RoleContext";
 import {
-    getAuswertung,
     getAbschlussCheck,
     getReport,
     listReportVersions,
@@ -35,20 +33,9 @@ import {
     ArrowLeft,
     FileText,
     Lock,
-    Users,
-    Truck,
-    Radio,
-    Boxes,
     RefreshCw
 } from "lucide-react";
 import { toast } from "sonner";
-
-const SICHTUNG_META = {
-    S1: { tone: "red", label: "S1", hint: "sofort" },
-    S2: { tone: "yellow", label: "S2", hint: "dringend" },
-    S3: { tone: "green", label: "S3", hint: "normal" },
-    S0: { tone: "gray", label: "S0", hint: "leicht" }
-};
 
 const STATUS_LABEL = {
     wartend: "Wartend",
@@ -115,298 +102,6 @@ function NoIncidentState() {
     );
 }
 
-/* ====================================================================
-   DASHBOARD Tab
-==================================================================== */
-function DashboardTab({ auswertung, loading }) {
-    if (loading || !auswertung) {
-        return (
-            <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
-                {Array.from({ length: 8 }).map((_, i) => (
-                    <div
-                        key={i}
-                        className="els-surface h-24 animate-pulse bg-surface-raised/60"
-                        aria-hidden
-                    />
-                ))}
-            </div>
-        );
-    }
-
-    const a = auswertung.A_patienten;
-    const b = auswertung.B_transporte;
-    const c = auswertung.C_kommunikation;
-    const d = auswertung.D_ressourcen;
-    const e = auswertung.E_konflikte;
-    const f = auswertung.F_metadaten;
-    const g = auswertung.G_abschnitte || { total: 0, abschnitte: [] };
-    const bettKpi = a.betten || { total: 0, belegt: 0, frei: 0, gesperrt: 0, auslastung_pct: 0, belegungsdauer_min_avg: 0 };
-
-    return (
-        <div className="space-y-5" data-testid="abschluss-dashboard">
-            {/* Top KPIs */}
-            <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
-                <KpiTile
-                    testId="kpi-einsatzdauer"
-                    label="Einsatzdauer"
-                    value={f.einsatzdauer_min}
-                    unit="min"
-                    tone="default"
-                    hint={f.end_at ? "abgeschlossen" : "laufend"}
-                />
-                <KpiTile
-                    testId="kpi-patienten"
-                    label="Patienten gesamt"
-                    value={a.total}
-                    unit=""
-                    tone="default"
-                    hint={`${a.status.uebergeben + a.status.entlassen} abgeschlossen`}
-                />
-                <KpiTile
-                    testId="kpi-transporte"
-                    label="Transporte"
-                    value={b.total}
-                    unit=""
-                    tone="yellow"
-                    hint={`${b.status.abgeschlossen} abgeschlossen`}
-                />
-                <KpiTile
-                    testId="kpi-konflikte"
-                    label="Konflikte"
-                    value={e.total}
-                    unit=""
-                    tone={e.rot > 0 ? "red" : e.gelb > 0 ? "yellow" : "green"}
-                    hint={`${e.rot} rot · ${e.gelb} gelb`}
-                />
-            </div>
-
-            {/* Schritt 10+11 KPIs: Abschnitte + Betten */}
-            <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
-                <KpiTile
-                    testId="kpi-abschnitte"
-                    label="Abschnitte"
-                    value={g.total}
-                    unit=""
-                    tone="default"
-                    hint={`${g.aktiv || 0} aktiv`}
-                />
-                <KpiTile
-                    testId="kpi-betten-auslastung"
-                    label="Bett-Auslastung"
-                    value={bettKpi.auslastung_pct}
-                    unit="%"
-                    tone={bettKpi.auslastung_pct > 80 ? "red" : bettKpi.auslastung_pct > 50 ? "yellow" : "green"}
-                    hint={`${bettKpi.belegt}/${bettKpi.total} belegt`}
-                />
-                <KpiTile
-                    testId="kpi-betten-dauer"
-                    label="Ø Belegungsdauer"
-                    value={bettKpi.belegungsdauer_min_avg}
-                    unit="min"
-                    tone="default"
-                />
-                <KpiTile
-                    testId="kpi-ohne-abschnitt"
-                    label="Ress. ohne Abschnitt"
-                    value={d.ohne_abschnitt || 0}
-                    unit=""
-                    tone={(d.ohne_abschnitt_pct || 0) > 20 ? "yellow" : "green"}
-                    hint={`${d.ohne_abschnitt_pct || 0}%`}
-                />
-            </div>
-
-            <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-                {/* Sichtungsverteilung */}
-                <SectionCard
-                    title="Sichtungsverteilung"
-                    subtitle="Patienten nach Sichtungsstufe"
-                    testId="card-sichtung"
-                >
-                    <div className="grid grid-cols-4 gap-2">
-                        {["S1", "S2", "S3", "S0"].map((s) => {
-                            const meta = SICHTUNG_META[s];
-                            const count = a.sichtung[s] || 0;
-                            return (
-                                <div
-                                    key={s}
-                                    className="els-surface flex flex-col items-center gap-1 p-3"
-                                    data-testid={`sichtung-count-${s}`}
-                                >
-                                    <StatusBadge
-                                        tone={meta.tone}
-                                        variant="solid"
-                                        size="sm"
-                                        className="font-mono"
-                                    >
-                                        {meta.label}
-                                    </StatusBadge>
-                                    <div className="text-kpi tabular-nums">{count}</div>
-                                    <div className="text-[0.65rem] uppercase tracking-wider text-muted-foreground">
-                                        {meta.hint}
-                                    </div>
-                                </div>
-                            );
-                        })}
-                    </div>
-                    {a.sichtung.ohne > 0 && (
-                        <div className="mt-3 rounded-md border border-status-yellow/30 bg-status-yellow/10 px-3 py-2 text-caption text-status-yellow">
-                            <AlertTriangle className="inline h-3.5 w-3.5 mr-1" />
-                            {a.sichtung.ohne} Patient(en) ohne Sichtung
-                        </div>
-                    )}
-                </SectionCard>
-
-                {/* Zeiten */}
-                <SectionCard
-                    title="Zeiten & Durchsatz"
-                    subtitle="Mittelwerte"
-                    testId="card-zeiten"
-                >
-                    <dl className="grid grid-cols-2 gap-y-3 text-body">
-                        <dt className="text-muted-foreground">Wartezeit Ø</dt>
-                        <dd className="font-mono tabular-nums">
-                            {fmtMin(a.wartezeit_min_avg)}
-                        </dd>
-                        <dt className="text-muted-foreground">Behandlungsdauer Ø</dt>
-                        <dd className="font-mono tabular-nums">
-                            {fmtMin(a.behandlungsdauer_min_avg)}
-                        </dd>
-                        <dt className="text-muted-foreground">Fahrtdauer Ø</dt>
-                        <dd className="font-mono tabular-nums">
-                            {fmtMin(b.fahrtdauer_min_avg)}
-                        </dd>
-                        <dt className="text-muted-foreground">Quittierdauer Ø</dt>
-                        <dd className="font-mono tabular-nums">
-                            {fmtMin(c.quittier_dauer_min_avg)}
-                        </dd>
-                    </dl>
-                </SectionCard>
-
-                {/* Transporte */}
-                <SectionCard
-                    title="Transporte"
-                    subtitle={`${b.total} gesamt · ${b.typ.intern} intern · ${b.typ.extern} extern`}
-                    testId="card-transporte"
-                >
-                    <div className="grid grid-cols-2 gap-2 text-body">
-                        {Object.entries(b.status).map(([k, v]) => (
-                            <div
-                                key={k}
-                                className="flex items-center justify-between rounded-md bg-surface-raised px-3 py-1.5"
-                            >
-                                <span className="text-muted-foreground">
-                                    {TRANSPORT_STATUS_LABEL[k]}
-                                </span>
-                                <span className="font-mono tabular-nums">{v}</span>
-                            </div>
-                        ))}
-                    </div>
-                </SectionCard>
-
-                {/* Ressourcen + Meldungen */}
-                <SectionCard
-                    title="Ressourcen & Meldungen"
-                    testId="card-ressourcen"
-                >
-                    <div className="grid grid-cols-2 gap-3 text-body">
-                        <div>
-                            <div className="text-caption uppercase tracking-wider text-muted-foreground mb-1.5">
-                                <Boxes className="inline h-3 w-3 mr-1" />
-                                Ressourcen
-                            </div>
-                            {Object.entries(d.status).map(([k, v]) => (
-                                <div
-                                    key={k}
-                                    className="flex justify-between py-0.5"
-                                >
-                                    <span className="text-muted-foreground">{k}</span>
-                                    <span className="font-mono tabular-nums">{v}</span>
-                                </div>
-                            ))}
-                        </div>
-                        <div>
-                            <div className="text-caption uppercase tracking-wider text-muted-foreground mb-1.5">
-                                <Radio className="inline h-3 w-3 mr-1" />
-                                Meldungen
-                            </div>
-                            <div className="flex justify-between py-0.5">
-                                <span className="text-muted-foreground">kritisch</span>
-                                <span className="font-mono tabular-nums">
-                                    {c.prioritaet.kritisch}
-                                </span>
-                            </div>
-                            <div className="flex justify-between py-0.5">
-                                <span className="text-muted-foreground">dringend</span>
-                                <span className="font-mono tabular-nums">
-                                    {c.prioritaet.dringend}
-                                </span>
-                            </div>
-                            <div className="flex justify-between py-0.5">
-                                <span className="text-muted-foreground">normal</span>
-                                <span className="font-mono tabular-nums">
-                                    {c.prioritaet.normal}
-                                </span>
-                            </div>
-                            <div className="flex justify-between py-0.5 mt-1 border-t border-border pt-1">
-                                <span className="text-muted-foreground">offen</span>
-                                <span className="font-mono tabular-nums">{c.offen}</span>
-                            </div>
-                        </div>
-                    </div>
-                </SectionCard>
-
-                {/* Schritt 10: Abschnitte-Uebersicht */}
-                {g.abschnitte && g.abschnitte.length > 0 && (
-                    <SectionCard
-                        title="Einsatzabschnitte"
-                        subtitle={`${g.total} Abschnitte · Ressourcen und Betten je Abschnitt`}
-                        testId="card-abschnitte"
-                    >
-                        <ul className="space-y-1.5">
-                            {g.abschnitte.map((ab) => (
-                                <li
-                                    key={ab.id}
-                                    className="flex items-center gap-2 rounded-md bg-surface-raised px-3 py-1.5"
-                                    data-testid={`dashboard-abschnitt-${ab.id}`}
-                                >
-                                    <span
-                                        aria-hidden
-                                        className={
-                                            "inline-block h-2.5 w-2.5 rounded-full " +
-                                            (ab.farbe === "red" ? "bg-rose-500" :
-                                             ab.farbe === "orange" ? "bg-orange-500" :
-                                             ab.farbe === "yellow" ? "bg-amber-500" :
-                                             ab.farbe === "green" ? "bg-emerald-500" :
-                                             ab.farbe === "teal" ? "bg-teal-500" :
-                                             ab.farbe === "blue" ? "bg-sky-500" :
-                                             ab.farbe === "indigo" ? "bg-indigo-500" :
-                                             ab.farbe === "purple" ? "bg-violet-500" :
-                                             ab.farbe === "pink" ? "bg-pink-500" : "bg-slate-500")
-                                        }
-                                    />
-                                    <span className="flex-1 truncate text-body">{ab.name}</span>
-                                    <span className="font-mono text-caption text-muted-foreground tabular-nums">
-                                        Res {ab.ressourcen_im_einsatz}/{ab.ressourcen_total}
-                                    </span>
-                                    <span className="font-mono text-caption text-muted-foreground tabular-nums">
-                                        Bett {ab.betten_belegt}/{ab.betten_total}
-                                    </span>
-                                    <StatusBadge
-                                        tone={ab.ampel === "red" ? "red" : ab.ampel === "yellow" ? "yellow" : ab.ampel === "green" ? "green" : "gray"}
-                                        variant="soft"
-                                        size="sm"
-                                    >
-                                        {ab.ampel === "red" ? "voll" : ab.ampel === "yellow" ? "teilw." : ab.ampel === "green" ? "bereit" : "leer"}
-                                    </StatusBadge>
-                                </li>
-                            ))}
-                        </ul>
-                    </SectionCard>
-                )}
-            </div>
-        </div>
-    );
-}
 
 /* ====================================================================
    ABSCHLUSS-CHECK Tab
@@ -1032,13 +727,11 @@ export default function AbschlussPage() {
         useIncidents();
     const { can, roleMeta } = useRole();
 
-    const [tab, setTab] = React.useState("dashboard");
-    const [auswertung, setAuswertung] = React.useState(null);
+    const [tab, setTab] = React.useState("check");
     const [check, setCheck] = React.useState(null);
     const [report, setReport] = React.useState(null);
     const [versions, setVersions] = React.useState([]);
     const [loading, setLoading] = React.useState({
-        ausw: false,
         check: false,
         report: false,
         versions: false
@@ -1046,18 +739,15 @@ export default function AbschlussPage() {
     const [confirmFreigabe, setConfirmFreigabe] = React.useState(false);
 
     const incidentId = activeIncident?.id;
+    const isArchived = activeIncident?.status === "abgeschlossen";
 
-    const loadAuswertung = React.useCallback(async () => {
-        if (!incidentId) return;
-        setLoading((l) => ({ ...l, ausw: true }));
-        try {
-            setAuswertung(await getAuswertung(incidentId));
-        } catch (e) {
-            toast.error("Auswertung konnte nicht geladen werden");
-        } finally {
-            setLoading((l) => ({ ...l, ausw: false }));
-        }
-    }, [incidentId]);
+    // Default-Tab: fuer Archiv "bericht", sonst "check"
+    const [tabSet, setTabSet] = React.useState(false);
+    React.useEffect(() => {
+        if (tabSet) return;
+        setTab(isArchived ? "bericht" : "check");
+        setTabSet(true);
+    }, [isArchived, tabSet]);
 
     const loadCheck = React.useCallback(async () => {
         if (!incidentId) return;
@@ -1097,11 +787,10 @@ export default function AbschlussPage() {
 
     React.useEffect(() => {
         if (!incidentId) return;
-        loadAuswertung();
         loadCheck();
         loadReport();
         loadVersions();
-    }, [incidentId, loadAuswertung, loadCheck, loadReport, loadVersions]);
+    }, [incidentId, loadCheck, loadReport, loadVersions]);
 
     if (!activeIncident) return <NoIncidentState />;
 
@@ -1182,28 +871,24 @@ export default function AbschlussPage() {
                 data-testid="abschluss-tabs"
             >
                 <TabsList className="bg-surface-sunken">
-                    <TabsTrigger
-                        value="dashboard"
-                        data-testid="tab-dashboard"
-                    >
-                        Dashboard
-                    </TabsTrigger>
-                    <TabsTrigger
-                        value="check"
-                        data-testid="tab-check"
-                    >
-                        Abschluss-Check
-                        {check && check.blockers.length > 0 && (
-                            <StatusBadge
-                                tone="red"
-                                variant="solid"
-                                size="sm"
-                                className="ml-2"
-                            >
-                                {check.blockers.length}
-                            </StatusBadge>
-                        )}
-                    </TabsTrigger>
+                    {!isArchived && (
+                        <TabsTrigger
+                            value="check"
+                            data-testid="tab-check"
+                        >
+                            Abschluss-Check
+                            {check && check.blockers.length > 0 && (
+                                <StatusBadge
+                                    tone="red"
+                                    variant="solid"
+                                    size="sm"
+                                    className="ml-2"
+                                >
+                                    {check.blockers.length}
+                                </StatusBadge>
+                            )}
+                        </TabsTrigger>
+                    )}
                     <TabsTrigger
                         value="bericht"
                         data-testid="tab-bericht"
@@ -1226,34 +911,31 @@ export default function AbschlussPage() {
                             </StatusBadge>
                         )}
                     </TabsTrigger>
-                    <TabsTrigger
-                        value="meta"
-                        data-testid="tab-meta"
-                    >
-                        Nachbearbeitung
-                    </TabsTrigger>
+                    {!isArchived && (
+                        <TabsTrigger
+                            value="meta"
+                            data-testid="tab-meta"
+                        >
+                            Nachbearbeitung
+                        </TabsTrigger>
+                    )}
                 </TabsList>
 
                 <div className="mt-4">
-                    <TabsContent value="dashboard">
-                        <DashboardTab
-                            auswertung={auswertung}
-                            loading={loading.ausw}
-                        />
-                    </TabsContent>
-                    <TabsContent value="check">
-                        <AbschlussCheckTab
-                            check={check}
-                            loading={loading.check}
-                            onRefresh={() => {
-                                loadCheck();
-                                loadAuswertung();
-                            }}
-                            onFreigabe={() => setConfirmFreigabe(true)}
-                            canFreigabe={can("abschluss.freigabe")}
-                            incident={activeIncident}
-                        />
-                    </TabsContent>
+                    {!isArchived && (
+                        <TabsContent value="check">
+                            <AbschlussCheckTab
+                                check={check}
+                                loading={loading.check}
+                                onRefresh={() => {
+                                    loadCheck();
+                                }}
+                                onFreigabe={() => setConfirmFreigabe(true)}
+                                canFreigabe={can("abschluss.freigabe")}
+                                incident={activeIncident}
+                            />
+                        </TabsContent>
+                    )}
                     <TabsContent value="bericht">
                         <ReportPreviewTab
                             report={report}
@@ -1267,20 +949,22 @@ export default function AbschlussPage() {
                             versions={versions}
                             loading={loading.versions}
                             onCreate={handleCreateVersion}
-                            canCreate={can("abschluss.version_create")}
+                            canCreate={can("abschluss.version_create") && !isArchived}
                             onRefresh={loadVersions}
                         />
                     </TabsContent>
-                    <TabsContent value="meta">
-                        <NachbearbeitungTab
-                            incident={activeIncident}
-                            canEdit={can("abschluss.edit_meta")}
-                            onSaved={() => {
-                                loadReport();
-                                refreshIncidents();
-                            }}
-                        />
-                    </TabsContent>
+                    {!isArchived && (
+                        <TabsContent value="meta">
+                            <NachbearbeitungTab
+                                incident={activeIncident}
+                                canEdit={can("abschluss.edit_meta")}
+                                onSaved={() => {
+                                    loadReport();
+                                    refreshIncidents();
+                                }}
+                            />
+                        </TabsContent>
+                    )}
                 </div>
             </Tabs>
 

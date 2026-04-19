@@ -1,0 +1,59 @@
+{
+  "summary": "Full regression + new feature test for Archive section, LOESCHEN-confirmation delete, Dashboard moved into Lage, and read-only mode for archived incidents. Backend regression: 139/144 pytest green (only 5 pre-existing Meta version asserts failing, same as prior baseline). Frontend: all new flows verified (archive page, delete modal, role-based permissions, Lage dashboard with 8 KPIs + 4 SectionCards, AbschlussPage tab changes for active vs archived, sidebar operative-lock).",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "/api/meta", "issue": "Returns version '1.0.0' while 5 test_step*_api.py tests assert old step versions (0.2.0/0.3.0/0.4.0/0.5.0/0.6.0). Pre-existing issue, unrelated to this change; tests should be updated to expect 1.0.0."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [],
+    "minor_nits": [
+      {"component": "AbschlussPage tabs", "issue": "Nachbearbeitung tab testid is 'tab-meta' (code), not 'tab-nachbearbeitung' (as named in review request). Functionally the tab exists & works; only a naming/testid inconsistency. Consider renaming to 'tab-nachbearbeitung' for clarity."}
+    ]
+  },
+  "verified_flows": [
+    "Backend pytest 139/144 green via REACT_APP_BACKEND_URL (5 pre-existing version asserts failing – unchanged baseline)",
+    "Einstieg (/): filter chips are Alle/Operativ/Geplant/Demo only; no 'Abgeschlossen' chip; data-testid='btn-archiv' visible and navigates to /archiv",
+    "/archiv: loads with data-testid='archiv-title' = 'Abgeschlossene Einsaetze', 'nur Lesen' badge, archiv-search, archiv-refresh present; empty state archiv-empty rendered when zero archived",
+    "Closed demo incident disappears from / and appears in /archiv (POST demo → PATCH status=abgeschlossen)",
+    "Archive card: incident-open-<id> (Lesen) visible for all roles; incident-delete-<id> and Reaktivieren visible ONLY for Einsatzleiter; hidden for Helfer and Dokumentar",
+    "DeleteArchivModal: Endgültig loeschen button starts disabled; remains disabled on wrong text 'LOESCHEN'; enabled only after exact 'LÖSCHEN' (umlaut) typed; clicking confirm calls DELETE /api/incidents/{id} and card disappears from archive",
+    "Lage (/lage) with active incident: Dashboard present with all 8 KPIs (kpi-einsatzdauer, kpi-patienten, kpi-transporte, kpi-konflikte, kpi-abschnitte, kpi-betten-auslastung, kpi-betten-dauer, kpi-ohne-abschnitt) and 4 SectionCards (card-sichtung, card-zeiten, card-transporte, card-ressourcen); 8 module tiles; dashboard-refresh button",
+    "Lage for archived incident: 'archiviert · nur Lesen' badge visible; 7/8 module tiles aria-disabled=true with reduced opacity; only /abschluss tile remains enabled and navigable",
+    "Sidebar for archived incident: nav-patienten, nav-transport, nav-ressourcen, nav-abschnitte, nav-betten, nav-kommunikation, nav-konflikte → aria-disabled=true ('gesperrt' hint); nav-lage, nav-abschluss, nav-archiv remain enabled; section label switches to 'ARCHIVIERTER INCIDENT'",
+    "AbschlussPage for ACTIVE incident: tab-check (default), tab-bericht, tab-versionen visible; Nachbearbeitung tab exists (testid 'tab-meta'); tab-dashboard does NOT exist ✓",
+    "AbschlussPage for ARCHIVED incident: only tab-bericht (default) and tab-versionen visible; tab-check and tab-meta (Nachbearbeitung) hidden; version-create-btn (data-testid) is disabled=true ✓",
+    "Role switch (Helfer, Dokumentar): /archiv hides delete and Reaktivieren buttons, only Lesen visible"
+  ],
+  "test_report_links": [
+    "/app/backend/tests/test_incidents_api.py",
+    "/app/backend/tests/test_patients_api.py",
+    "/app/backend/tests/test_step04_api.py",
+    "/app/backend/tests/test_step05_transport_api.py",
+    "/app/backend/tests/test_step06_resources_messages_konflikte.py",
+    "/app/backend/tests/test_step07_09_role_demo_abschluss.py",
+    "/app/backend/tests/test_step10_12_abschnitte_betten.py",
+    "/app/backend/tests/test_step13_funktagebuch.py",
+    "/app/test_reports/pytest/iteration_11_pytest.xml"
+  ],
+  "action_items": [
+    "[OPTIONAL] Rename AbschlussPage Nachbearbeitung tab data-testid from 'tab-meta' to 'tab-nachbearbeitung' to match review-request/naming convention.",
+    "[CLEANUP, not urgent] Update 5 pre-existing test_step*_api.py version assertions to expect current '1.0.0' or remove version asserts since backend now uses semantic whole-app version."
+  ],
+  "critical_code_review_comments": [
+    "ArchivPage, LagePage, DeleteArchivModal, IncidentCard changes are clean, modular and follow existing els-surface + StatusBadge primitives. Role gating uses existing useRole() hook (can('incident.close') + role==='einsatzleiter'), consistent with rest of app.",
+    "LagePage disables module tiles via aria-disabled + opacity-50 rather than conditional rendering – good for accessibility and preserves layout. /abschluss remains reachable for report-only mode.",
+    "Sidebar correctly flips section label to 'Archivierter Incident' and sets aria-disabled=true on the 7 operative module links; hot-path UX is protected.",
+    "Dashboard component was successfully extracted as self-loading; it appears both in LagePage and reusable. The component is no longer in AbschlussPage (tab-dashboard removed as requested). No duplication of fetch logic observed."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "96.5% (139/144; 5 pre-existing version asserts failing – unchanged baseline)", "frontend": "100% on all requested flows"},
+  "test_credentials": "n/a – role picked via localStorage els-role ∈ {einsatzleiter, helfer, dokumentar}",
+  "seed_data_creation": "All tests used POST /api/incidents/demo and cleaned up via DELETE /api/incidents/{id} at end of each scenario. No persistent test data left behind.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "All new Archive/Lage/read-only flows are green. Only outstanding item is the 'tab-meta' vs 'tab-nachbearbeitung' testid naming (functional behaviour correct). Backend pytest has 5 pre-existing Meta version-assertion failures that predate this change; flag those as outdated test expectations rather than backend regressions."
+}

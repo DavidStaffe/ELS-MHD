@@ -20,7 +20,8 @@ import {
     Command as CommandIcon,
     ArrowRight,
     Inbox,
-    Layers
+    Layers,
+    Archive
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -32,11 +33,6 @@ const FILTERS = [
         match: (i) => i.status === "operativ"
     },
     { key: "geplant", label: "Geplant", match: (i) => i.status === "geplant" },
-    {
-        key: "abgeschlossen",
-        label: "Abgeschlossen",
-        match: (i) => i.status === "abgeschlossen"
-    },
     { key: "demo", label: "Demo", match: (i) => i.demo === true, tone: "yellow" }
 ];
 
@@ -117,10 +113,21 @@ export default function IncidentList() {
     const [demoBusy, setDemoBusy] = React.useState(false);
     const [confirmDelete, setConfirmDelete] = React.useState(null);
 
+    // Abgeschlossene Incidents gehoeren ins Archiv – hier ausgeblendet
+    const activeIncidents = React.useMemo(
+        () => incidents.filter((i) => i.status !== "abgeschlossen"),
+        [incidents]
+    );
+
+    const archivedCount = React.useMemo(
+        () => incidents.filter((i) => i.status === "abgeschlossen").length,
+        [incidents]
+    );
+
     const filtered = React.useMemo(() => {
         const f = FILTERS.find((x) => x.key === filter) || FILTERS[0];
         const q = query.trim().toLowerCase();
-        return incidents
+        return activeIncidents
             .filter(f.match)
             .filter((i) =>
                 q
@@ -129,13 +136,13 @@ export default function IncidentList() {
                           .includes(q)
                     : true
             );
-    }, [incidents, filter, query]);
+    }, [activeIncidents, filter, query]);
 
     const counts = React.useMemo(() => {
         const c = {};
-        for (const f of FILTERS) c[f.key] = incidents.filter(f.match).length;
+        for (const f of FILTERS) c[f.key] = activeIncidents.filter(f.match).length;
         return c;
-    }, [incidents]);
+    }, [activeIncidents]);
 
     const handleOpen = React.useCallback(
         (incident) => {
@@ -164,10 +171,10 @@ export default function IncidentList() {
         }
     }, [startDemo, setActive, navigate]);
 
-    // Dynamische Commands: "Incident wechseln" fuer jeden Incident
+    // Dynamische Commands: "Incident wechseln" fuer aktive (nicht-archivierte) Incidents
     React.useEffect(() => {
         const unregisters = [];
-        for (const i of incidents) {
+        for (const i of activeIncidents) {
             unregisters.push(
                 registerCommand({
                     id: `incident-switch-${i.id}`,
@@ -179,7 +186,7 @@ export default function IncidentList() {
             );
         }
         return () => unregisters.forEach((u) => u && u());
-    }, [incidents, registerCommand, handleOpen]);
+    }, [activeIncidents, registerCommand, handleOpen]);
 
     return (
         <div className="mx-auto w-full max-w-[1600px] px-6 py-6">
@@ -202,6 +209,25 @@ export default function IncidentList() {
                     </p>
                 </div>
                 <div className="flex flex-wrap gap-2">
+                    <Button
+                        variant="outline"
+                        onClick={() => navigate("/archiv")}
+                        data-testid="btn-archiv"
+                        title="Archiv abgeschlossener Incidents"
+                    >
+                        <Archive className="h-4 w-4" />
+                        Archiv
+                        {archivedCount > 0 && (
+                            <StatusBadge
+                                tone="neutral"
+                                variant="soft"
+                                size="sm"
+                                className="ml-1"
+                            >
+                                {archivedCount}
+                            </StatusBadge>
+                        )}
+                    </Button>
                     <Button
                         variant="outline"
                         onClick={handleDemo}

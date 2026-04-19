@@ -37,7 +37,8 @@ const STATUS_META = {
 /**
  * IncidentCard – Uebersichtskarte mit Name, Typ, Dauer, Status, DEMO-Badge.
  * Props:
- *   incident, active, onActivate, onOpen, onClose, onReopen, onDelete
+ *   incident, active, onActivate, onOpen, onClose, onReopen, onDelete,
+ *   variant ("default" | "archive"), openLabel, showDelete, showReopen
  */
 export function IncidentCard({
     incident,
@@ -46,7 +47,11 @@ export function IncidentCard({
     onOpen,
     onClose,
     onReopen,
-    onDelete
+    onDelete,
+    variant = "default",
+    openLabel,
+    showDelete,
+    showReopen
 }) {
     const typ = TYP_META[incident.typ] || TYP_META.sonstiges;
     const TypIcon = typ.icon;
@@ -68,11 +73,17 @@ export function IncidentCard({
 
     const isClosed =
         incident.status === "abgeschlossen" || incident.status === "archiviert";
+    const isArchive = variant === "archive";
+    // Show delete: explicit prop override for archive; legacy default = demo only
+    const canShowDelete = showDelete !== undefined ? showDelete : incident.demo;
+    // Show reopen: explicit prop override for archive; legacy default = any closed
+    const canShowReopen = showReopen !== undefined ? showReopen : isClosed;
 
     return (
         <article
             data-testid={`incident-card-${incident.id}`}
             data-active={active}
+            data-variant={variant}
             className={cn(
                 "els-surface relative flex flex-col overflow-hidden transition-all",
                 "hover:border-primary/60 hover:shadow-[0_0_0_1px_hsl(var(--primary)/0.3)]",
@@ -175,18 +186,34 @@ export function IncidentCard({
 
             <div className="flex items-center justify-between gap-2 border-t border-border bg-surface-sunken px-3 py-2">
                 <div className="flex items-center gap-1">
-                    {isClosed ? (
-                        <Button
-                            type="button"
-                            size="sm"
-                            variant="ghost"
-                            onClick={() => onReopen?.(incident)}
-                            data-testid={`incident-reopen-${incident.id}`}
-                            title="Wieder aktivieren"
-                        >
-                            <RotateCcw className="h-3.5 w-3.5" />
-                            Reaktivieren
-                        </Button>
+                    {isArchive ? (
+                        canShowReopen && (
+                            <Button
+                                type="button"
+                                size="sm"
+                                variant="ghost"
+                                onClick={() => onReopen?.(incident)}
+                                data-testid={`incident-reopen-${incident.id}`}
+                                title="Wieder aktivieren"
+                            >
+                                <RotateCcw className="h-3.5 w-3.5" />
+                                Reaktivieren
+                            </Button>
+                        )
+                    ) : isClosed ? (
+                        canShowReopen && (
+                            <Button
+                                type="button"
+                                size="sm"
+                                variant="ghost"
+                                onClick={() => onReopen?.(incident)}
+                                data-testid={`incident-reopen-${incident.id}`}
+                                title="Wieder aktivieren"
+                            >
+                                <RotateCcw className="h-3.5 w-3.5" />
+                                Reaktivieren
+                            </Button>
+                        )
                     ) : (
                         !active && (
                             <Button
@@ -201,7 +228,7 @@ export function IncidentCard({
                             </Button>
                         )
                     )}
-                    {incident.status === "operativ" && (
+                    {!isArchive && incident.status === "operativ" && (
                         <Button
                             type="button"
                             size="sm"
@@ -213,7 +240,7 @@ export function IncidentCard({
                             Abschliessen
                         </Button>
                     )}
-                    {incident.demo && (
+                    {canShowDelete && (
                         <Button
                             type="button"
                             size="sm"
@@ -221,6 +248,7 @@ export function IncidentCard({
                             onClick={() => onDelete?.(incident)}
                             data-testid={`incident-delete-${incident.id}`}
                             className="text-muted-foreground hover:text-destructive"
+                            title={isArchive ? "Endgueltig loeschen (EL)" : "Loeschen"}
                         >
                             <Trash2 className="h-3.5 w-3.5" />
                         </Button>
@@ -233,7 +261,7 @@ export function IncidentCard({
                     onClick={() => onOpen?.(incident)}
                     data-testid={`incident-open-${incident.id}`}
                 >
-                    Lage oeffnen
+                    {openLabel || "Lage oeffnen"}
                     <ChevronRight className="h-4 w-4" />
                 </Button>
             </div>

@@ -13,16 +13,17 @@ import {
     FileCheck2,
     Settings,
     Layers,
-    Bed
+    Bed,
+    Archive
 } from "lucide-react";
 
 /**
  * Sidebar – Modul-Navigation ELS MHD.
- * - Einstieg (Incident-Uebersicht) immer verfuegbar.
+ * - Einstieg (Incident-Uebersicht) + Archiv immer verfuegbar.
  * - Lage + Module nur verfuegbar wenn aktiver Incident existiert.
- * - Module ab Schritt 03–09 sind bis zur Umsetzung als disabled markiert.
+ * - Bei archiviertem Incident: operative Module gesperrt (Lese-Modus).
  */
-const NAV_GROUPS = (hasIncident) => [
+const NAV_GROUPS = (hasIncident, isArchived) => [
     {
         label: "Start",
         items: [
@@ -32,11 +33,17 @@ const NAV_GROUPS = (hasIncident) => [
                 label: "Einstieg",
                 testId: "nav-einstieg",
                 end: true
+            },
+            {
+                to: "/archiv",
+                icon: Archive,
+                label: "Archiv",
+                testId: "nav-archiv"
             }
         ]
     },
     {
-        label: "Aktiver Incident",
+        label: isArchived ? "Archivierter Incident" : "Aktiver Incident",
         items: [
             {
                 to: "/lage",
@@ -44,63 +51,63 @@ const NAV_GROUPS = (hasIncident) => [
                 label: "Lage",
                 testId: "nav-lage",
                 disabled: !hasIncident,
-                hint: hasIncident ? null : "inaktiv"
+                hint: hasIncident ? (isArchived ? "lesen" : null) : "inaktiv"
             },
             {
                 to: "/patienten",
                 icon: Users,
                 label: "Patienten",
                 testId: "nav-patienten",
-                disabled: !hasIncident,
-                hint: hasIncident ? null : "inaktiv"
+                disabled: !hasIncident || isArchived,
+                hint: !hasIncident ? "inaktiv" : isArchived ? "gesperrt" : null
             },
             {
                 to: "/transport",
                 icon: Truck,
                 label: "Transport",
                 testId: "nav-transport",
-                disabled: !hasIncident,
-                hint: hasIncident ? null : "inaktiv"
+                disabled: !hasIncident || isArchived,
+                hint: !hasIncident ? "inaktiv" : isArchived ? "gesperrt" : null
             },
             {
                 to: "/ressourcen",
                 icon: Boxes,
                 label: "Ressourcen",
                 testId: "nav-ressourcen",
-                disabled: !hasIncident,
-                hint: hasIncident ? null : "inaktiv"
+                disabled: !hasIncident || isArchived,
+                hint: !hasIncident ? "inaktiv" : isArchived ? "gesperrt" : null
             },
             {
                 to: "/abschnitte",
                 icon: Layers,
                 label: "Abschnitte",
                 testId: "nav-abschnitte",
-                disabled: !hasIncident,
-                hint: hasIncident ? null : "inaktiv"
+                disabled: !hasIncident || isArchived,
+                hint: !hasIncident ? "inaktiv" : isArchived ? "gesperrt" : null
             },
             {
                 to: "/betten",
                 icon: Bed,
                 label: "Behandlungsplaetze",
                 testId: "nav-betten",
-                disabled: !hasIncident,
-                hint: hasIncident ? null : "inaktiv"
+                disabled: !hasIncident || isArchived,
+                hint: !hasIncident ? "inaktiv" : isArchived ? "gesperrt" : null
             },
             {
                 to: "/kommunikation",
                 icon: Radio,
                 label: "Funktagebuch",
                 testId: "nav-kommunikation",
-                disabled: !hasIncident,
-                hint: hasIncident ? null : "inaktiv"
+                disabled: !hasIncident || isArchived,
+                hint: !hasIncident ? "inaktiv" : isArchived ? "gesperrt" : null
             },
             {
                 to: "/konflikte",
                 icon: AlertOctagon,
                 label: "Konflikte",
                 testId: "nav-konflikte",
-                disabled: !hasIncident,
-                hint: hasIncident ? null : "inaktiv"
+                disabled: !hasIncident || isArchived,
+                hint: !hasIncident ? "inaktiv" : isArchived ? "gesperrt" : null
             }
         ]
     },
@@ -113,7 +120,7 @@ const NAV_GROUPS = (hasIncident) => [
                 label: "Auswertung",
                 testId: "nav-abschluss",
                 disabled: !hasIncident,
-                hint: hasIncident ? null : "inaktiv"
+                hint: hasIncident ? (isArchived ? "lesen" : null) : "inaktiv"
             }
         ]
     }
@@ -121,7 +128,9 @@ const NAV_GROUPS = (hasIncident) => [
 
 export function Sidebar({ className }) {
     const { activeIncident } = useIncidents();
-    const groups = NAV_GROUPS(Boolean(activeIncident));
+    const hasIncident = Boolean(activeIncident);
+    const isArchived = activeIncident?.status === "abgeschlossen";
+    const groups = NAV_GROUPS(hasIncident, isArchived);
 
     return (
         <aside

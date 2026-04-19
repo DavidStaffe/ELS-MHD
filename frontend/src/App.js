@@ -8,7 +8,8 @@ import { TransportProvider } from "@/context/TransportContext";
 import { OpsProvider } from "@/context/OpsContext";
 import { RoleProvider } from "@/context/RoleContext";
 import IncidentList from "@/pages/IncidentList";
-import LagePlaceholder from "@/pages/LagePlaceholder";
+import LagePage from "@/pages/LagePage";
+import ArchivPage from "@/pages/ArchivPage";
 import PatientList from "@/pages/PatientList";
 import PatientDetail from "@/pages/PatientDetail";
 import TransportList from "@/pages/TransportList";
@@ -31,7 +32,8 @@ function App() {
                                 <AppShell>
                                     <Routes>
                                         <Route path="/" element={<IncidentList />} />
-                                        <Route path="/lage" element={<LagePlaceholder />} />
+                                        <Route path="/archiv" element={<ArchivPage />} />
+                                        <Route path="/lage" element={<LagePage />} />
                                         <Route path="/patienten" element={<PatientList />} />
                                         <Route path="/patienten/:patientId" element={<PatientDetail />} />
                                         <Route path="/transport" element={<TransportList />} />
