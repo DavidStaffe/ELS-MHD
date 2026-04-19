@@ -94,8 +94,8 @@ const NAV_GROUPS = (hasIncident) => [
                 icon: FileCheck2,
                 label: "Auswertung",
                 testId: "nav-abschluss",
-                disabled: true,
-                step: "09"
+                disabled: !hasIncident,
+                hint: hasIncident ? null : "inaktiv"
             }
         ]
     }

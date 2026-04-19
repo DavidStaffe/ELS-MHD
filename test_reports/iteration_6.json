@@ -1,0 +1,48 @@
+{
+  "summary": "Vollständiges Testing von Schritt 07 (Rollenauswahl), Schritt 08 (Demo-Integration) und Schritt 09 (Auswertung / Abschluss-Check / A4-Bericht / Versionen / Nachbearbeitung). Backend: 21/21 pytest-Tests in test_step07_09_role_demo_abschluss.py grün (POST /incidents/demo, GET /auswertung, GET /abschluss-check, GET /report mit 14 Kapiteln + korrekte Titel, POST+GET /report-versions inkl. meta.freigegeben_von/freigabe_at, PATCH /meta, alle 404-Pfade). Frontend: RoleSelectorDialog öffnet automatisch bei leerem localStorage, alle 3 Rollen wählbar, persist in 'els-role'. Header-Role-Badge zeigt aktuelle Rolle und öffnet Dialog erneut. Rollen-Gates korrekt: Einsatzleiter voller Zugriff, Helfer/Dokumentar btn-new disabled, btn-demo bleibt für alle Rollen aktiv. Demo-Klick navigiert zu /lage und erzeugt 7 Patienten, 2 Transporte, Ressourcen, Meldungen. /abschluss rendert mit allen 5 Tabs; abschluss-no-incident State korrekt. Dashboard zeigt alle KPIs (einsatzdauer/patienten/transporte/konflikte) und SectionCards (sichtung/zeiten/transporte/ressourcen). Check-Tab zeigt Blocker + Refresh-Button, Freigabe-Btn korrekt unsichtbar bei frischem Demo. Bericht-Tab rendert report-a4 mit Druck-Button. Versionen-Tab: Version 1 wurde per version-create-btn erstellt. Meta-Tab speichert besondere/nachbearbeitung erfolgreich. Rollen-Gates auf /abschluss verhalten sich korrekt (Dokumentar: version-create disabled, meta-save/print erlaubt; Helfer: alles disabled). CommandPalette: 'Auswertung' → /abschluss, 'Rolle wechseln' → öffnet Dialog.",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {
+        "screen": "Sidebar",
+        "issues": [
+          "Sidebar zeigt 'INAKTIV' neben 'Auswertung' auch wenn kein Incident aktiv ist, aber das ist konsistent mit anderen Menüpunkten. Klickbar ist der Link dennoch (aria-disabled=null, pointerEvents=auto) – Verhalten entspricht Spezifikation."
+        ]
+      },
+      {
+        "screen": "Active Incident Persistenz",
+        "issues": [
+          "Der aktive Incident wird nicht in localStorage persistiert. Nach einem harten Reload geht der State verloren und /abschluss zeigt 'abschluss-no-incident'. Dies ist allerdings von der Task-Spec so erwartet (Demo startet → navigiert zu /lage, nach Reload muss neu ausgewählt werden). Nur als Hinweis für zukünftige UX-Verbesserung."
+        ]
+      }
+    ]
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_step07_09_role_demo_abschluss.py",
+    "/app/test_reports/pytest/pytest_step07_09_results.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "server.py überschreitet 700 Zeilen (1596 Zeilen) – bei Gelegenheit in Module aufsplitten (incidents, patients, transports, resources, messages, auswertung/report)",
+    "get_report() ruft intern get_auswertung() auf – funktioniert, aber doppelte DB-Queries. Optional: Auswertung als Unterfunktion ohne HTTPException-Layer extrahieren.",
+    "PatchMeta lässt keine Validierung von max_length zu (im Gegensatz zu ReportVersionCreate.kommentar) – könnte Field(max_length=...) erhalten um Missbrauch zu verhindern."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_step07_09_role_demo_abschluss.py"
+  ],
+  "success_rate": {
+    "backend": "100% (21/21 Tests)",
+    "frontend": "100% (alle getesteten Flows funktionieren wie spezifiziert)"
+  },
+  "test_credentials": "Keine Authentifizierung erforderlich",
+  "seed_data_creation": "Demo-Incident via POST /api/incidents/demo für Tests erzeugt + am Ende gelöscht. PATCH /meta setzt 'TEST_' Präfixe – werden beim Incident-Delete mit entfernt.",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Schritt 07-09 komplett getestet und grün. Backend-Endpoints: POST /api/incidents/demo (seedet 7 Patienten/2 Transporte/Resources/Messages), GET /api/incidents/{id}/auswertung (Blocks A-F), GET /api/incidents/{id}/abschluss-check (bereit_fuer_abschluss+blockers+warnings), GET /api/incidents/{id}/report (14 Kapitel mit festen Titeln), POST/GET /api/incidents/{id}/report-versions (Snapshot + setzt meta.freigegeben_von/freigabe_at), PATCH /api/incidents/{id}/meta (besondere_vorkommnisse/nachbearbeitung). Frontend data-testids: role-selector, role-opt-einsatzleiter/helfer/dokumentar, header-role-button, header-role, btn-new, btn-demo, nav-abschluss, abschluss-title, abschluss-no-incident, tab-dashboard/check/bericht/versionen/meta, kpi-einsatzdauer/patienten/transporte/konflikte, card-sichtung/zeiten/transporte/ressourcen, abschluss-check-refresh, blocker-*, abschluss-freigabe-btn, report-a4, report-print-btn, version-create-btn, version-1..N, meta-besondere, meta-nachbearbeitung, meta-save-btn. Rollen-Gates funktionieren: Einsatzleiter=full, Dokumentar=Freigabe+Versionen disabled/Rest erlaubt, Helfer=alles disabled. CommandPalette hat Einträge 'Auswertung & Abschluss' und 'Rolle wechseln'.",
+  "rca of the issue": "Keine Bugs gefunden."
+}

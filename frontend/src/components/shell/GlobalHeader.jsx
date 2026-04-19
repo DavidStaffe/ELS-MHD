@@ -5,7 +5,13 @@ import { Button } from "@/components/ui/button";
 import { CommandPaletteTrigger } from "@/components/command/CommandPalette";
 import { formatDuration } from "@/lib/time";
 import { useRole, ROLES } from "@/context/RoleContext";
-import { Sun, Moon, ShieldCheck, Clock3, LayoutGrid, UserCog } from "lucide-react";
+import { Sun, Moon, ShieldCheck, Stethoscope, FileCheck2, Clock3, LayoutGrid, UserCog } from "lucide-react";
+
+const ROLE_ICON = {
+    einsatzleiter: ShieldCheck,
+    helfer: Stethoscope,
+    dokumentar: FileCheck2
+};
 
 function useClock(intervalMs = 1000) {
     const [now, setNow] = React.useState(() => new Date());
@@ -156,13 +162,29 @@ export function GlobalHeader({
             </div>
 
             {/* Rolle */}
-            <div className="hidden sm:flex items-center gap-1.5 rounded-md bg-surface-raised px-2.5 py-1 text-caption">
-                <ShieldCheck className="h-3.5 w-3.5 text-primary" />
-                <span className="text-muted-foreground">Rolle:</span>
-                <span className="font-medium" data-testid="header-role">
-                    {role}
-                </span>
-            </div>
+            {(() => {
+                const RoleIcon = roleMeta ? ROLE_ICON[roleMeta.key] : UserCog;
+                return (
+                    <button
+                        type="button"
+                        onClick={() => setPickerOpen(true)}
+                        data-testid="header-role-button"
+                        title="Rolle wechseln"
+                        className="hidden sm:flex items-center gap-1.5 rounded-md bg-surface-raised px-2.5 h-8 text-caption els-focus-ring hover:border-primary/60 border border-border transition-colors"
+                    >
+                        <RoleIcon className="h-3.5 w-3.5 text-primary" />
+                        <span className="text-muted-foreground">Rolle:</span>
+                        <span className="font-medium" data-testid="header-role">
+                            {roleMeta ? roleMeta.label : "waehlen"}
+                        </span>
+                        {roleMeta && (
+                            <span className="rounded bg-background px-1.5 py-0.5 font-mono text-[0.65rem] text-muted-foreground">
+                                {roleMeta.kurz}
+                            </span>
+                        )}
+                    </button>
+                );
+            })()}
 
             {/* Command Palette Trigger */}
             <CommandPaletteTrigger />

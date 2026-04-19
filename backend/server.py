@@ -1519,6 +1519,16 @@ async def create_report_version(incident_id: str, payload: ReportVersionCreate):
         "created_at": iso(now_utc()),
     }
     await db.report_versions.insert_one(doc)
+
+    # Freigabe-Metadaten im Incident ablegen
+    await db.incidents.update_one(
+        {"id": incident_id},
+        {"$set": {
+            "meta.freigegeben_von": doc["freigegeben_von"],
+            "meta.freigabe_at": doc["created_at"],
+            "updated_at": iso(now_utc()),
+        }}
+    )
     return {k: v for k, v in doc.items() if k != "_id"}
 
 

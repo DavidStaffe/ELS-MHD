@@ -144,3 +144,39 @@ export async function listKonflikte(incidentId) {
     const { data } = await api.get(`/incidents/${incidentId}/konflikte`);
     return data;
 }
+
+/* =====================================================================
+   Auswertung / Abschluss / Report  (Schritt 09)
+   ===================================================================== */
+export async function getAuswertung(incidentId) {
+    const { data } = await api.get(`/incidents/${incidentId}/auswertung`);
+    return data;
+}
+
+export async function getAbschlussCheck(incidentId) {
+    const { data } = await api.get(`/incidents/${incidentId}/abschluss-check`);
+    return data;
+}
+
+export async function getReport(incidentId) {
+    const { data } = await api.get(`/incidents/${incidentId}/report`);
+    return data;
+}
+
+export async function listReportVersions(incidentId) {
+    const { data } = await api.get(`/incidents/${incidentId}/report-versions`);
+    return data;
+}
+
+export async function createReportVersion(incidentId, payload = {}) {
+    const { data } = await api.post(
+        `/incidents/${incidentId}/report-versions`,
+        payload
+    );
+    return data;
+}
+
+export async function patchIncidentMeta(incidentId, payload) {
+    const { data } = await api.patch(`/incidents/${incidentId}/meta`, payload);
+    return data;
+}

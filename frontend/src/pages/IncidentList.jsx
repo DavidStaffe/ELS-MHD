@@ -11,6 +11,7 @@ import { IncidentCard } from "@/components/incidents/IncidentCard";
 import { NewIncidentDialog } from "@/components/incidents/NewIncidentDialog";
 import { useIncidents } from "@/context/IncidentContext";
 import { useCommandPalette } from "@/components/command/CommandPalette";
+import { useRole } from "@/context/RoleContext";
 import {
     Plus,
     PlayCircle,
@@ -106,6 +107,7 @@ export default function IncidentList() {
     } = useIncidents();
     const navigate = useNavigate();
     const { registerCommand } = useCommandPalette();
+    const { can } = useRole();
 
     const [filter, setFilter] = React.useState("alle");
     const [query, setQuery] = React.useState("");
@@ -201,8 +203,13 @@ export default function IncidentList() {
                     <Button
                         variant="outline"
                         onClick={handleDemo}
-                        disabled={demoBusy}
+                        disabled={demoBusy || !can("incident.demo_start")}
                         data-testid="btn-demo"
+                        title={
+                            can("incident.demo_start")
+                                ? "Demo-Incident mit Vordaten starten"
+                                : "Keine Berechtigung"
+                        }
                     >
                         <PlayCircle className="h-4 w-4" />
                         {demoBusy ? "Starte…" : "Demo-Incident starten"}
@@ -210,6 +217,12 @@ export default function IncidentList() {
                     <Button
                         onClick={() => setNewOpen(true)}
                         data-testid="btn-new"
+                        disabled={!can("incident.create")}
+                        title={
+                            can("incident.create")
+                                ? "Neuen Incident anlegen"
+                                : "Nur Einsatzleiter"
+                        }
                     >
                         <Plus className="h-4 w-4" />
                         Neuen Incident anlegen

@@ -133,7 +133,7 @@ export function CommandPaletteProvider({
             { id: "nav-ressourcen", icon: ICON_MAP.ressourcen, label: "Ressourcen", path: "/ressourcen", available: true, shortcut: "G R" },
             { id: "nav-kommunikation", icon: ICON_MAP.kommunikation, label: "Kommunikation", path: "/kommunikation", available: true, shortcut: "G K" },
             { id: "nav-konflikte", icon: ICON_MAP.konflikte, label: "Konflikte", path: "/konflikte", available: true, shortcut: "G X" },
-            { id: "nav-abschluss", icon: ICON_MAP.abschluss, label: "Auswertung & Abschluss", path: "/abschluss", available: false, step: "09" }
+            { id: "nav-abschluss", icon: ICON_MAP.abschluss, label: "Auswertung & Abschluss", path: "/abschluss", available: true, shortcut: "G A" }
         ],
         []
     );

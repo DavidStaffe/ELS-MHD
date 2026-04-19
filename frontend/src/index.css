@@ -260,3 +260,107 @@
         outline-color: hsl(var(--ring));
     }
 }
+
+
+/* =====================================================================
+   A4-Bericht-Vorschau  (Schritt 09)
+   ===================================================================== */
+.report-a4 {
+    width: 210mm;
+    min-height: 297mm;
+    margin: 0 auto;
+    padding: 18mm 16mm;
+    background: #ffffff;
+    color: #111;
+    box-shadow: 0 8px 40px rgba(0, 0, 0, 0.35);
+    font-family: "Inter", ui-sans-serif, system-ui, sans-serif;
+    font-size: 10.5pt;
+    line-height: 1.45;
+}
+.report-a4 h1,
+.report-a4 h2,
+.report-a4 h3 {
+    color: #0f172a;
+    font-weight: 700;
+}
+.report-a4 h1 { font-size: 20pt; margin-bottom: 2mm; }
+.report-a4 h2 { font-size: 13pt; margin-top: 7mm; margin-bottom: 2mm; border-bottom: 1px solid #cbd5e1; padding-bottom: 1mm; }
+.report-a4 h3 { font-size: 11pt; margin-top: 4mm; margin-bottom: 1.5mm; }
+.report-a4 table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 9.5pt;
+    margin-top: 2mm;
+}
+.report-a4 th, .report-a4 td {
+    border: 1px solid #cbd5e1;
+    padding: 1.5mm 2mm;
+    text-align: left;
+    vertical-align: top;
+}
+.report-a4 th {
+    background: #f1f5f9;
+    font-weight: 600;
+}
+.report-a4 .kap {
+    break-inside: avoid;
+    page-break-inside: avoid;
+    margin-top: 6mm;
+}
+.report-a4 .kv {
+    display: grid;
+    grid-template-columns: 52mm 1fr;
+    gap: 1.2mm 3mm;
+    font-size: 10pt;
+}
+.report-a4 .kv dt { color: #475569; font-weight: 500; }
+.report-a4 .kv dd { margin: 0; color: #0f172a; font-weight: 500; }
+.report-a4 .pill {
+    display: inline-block;
+    padding: 0.5mm 2mm;
+    border-radius: 4px;
+    font-size: 8.5pt;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+    background: #e2e8f0;
+    color: #0f172a;
+}
+.report-a4 .pill-red { background: #fee2e2; color: #991b1b; }
+.report-a4 .pill-yellow { background: #fef3c7; color: #92400e; }
+.report-a4 .pill-green { background: #dcfce7; color: #166534; }
+.report-a4 .pill-gray { background: #e2e8f0; color: #334155; }
+
+@media print {
+    @page {
+        size: A4;
+        margin: 12mm;
+    }
+    html, body {
+        background: #fff !important;
+    }
+    body * {
+        visibility: hidden;
+    }
+    .print-area, .print-area * {
+        visibility: visible;
+    }
+    .print-area {
+        position: absolute;
+        left: 0;
+        top: 0;
+        width: 100%;
+    }
+    .report-a4 {
+        box-shadow: none;
+        margin: 0;
+        width: 100%;
+        min-height: auto;
+        padding: 0;
+    }
+    .no-print, .no-print * {
+        display: none !important;
+    }
+    .page-break {
+        page-break-after: always;
+    }
+}

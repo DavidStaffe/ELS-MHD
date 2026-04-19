@@ -2,10 +2,15 @@ import * as React from "react";
 import { useNavigate } from "react-router-dom";
 import { Sidebar } from "./Sidebar";
 import { GlobalHeader } from "./GlobalHeader";
+import { RoleSelectorDialog } from "./RoleSelector";
 import { cn } from "@/lib/utils";
-import { CommandPaletteProvider } from "@/components/command/CommandPalette";
+import {
+    CommandPaletteProvider,
+    useCommandPalette
+} from "@/components/command/CommandPalette";
 import { NewIncidentDialog } from "@/components/incidents/NewIncidentDialog";
 import { useIncidents } from "@/context/IncidentContext";
+import { useRole } from "@/context/RoleContext";
 
 const THEME_KEY = "els-theme";
 
@@ -15,7 +20,21 @@ function applyTheme(theme) {
     root.classList.add(theme);
 }
 
-export function AppShell({ children, role = "Einsatzleiter" }) {
+function RoleCommandRegistrar() {
+    const { registerCommand } = useCommandPalette();
+    const { setPickerOpen } = useRole();
+    React.useEffect(() => {
+        return registerCommand({
+            id: "role-change",
+            label: "Rolle wechseln",
+            group: "Einstellungen",
+            run: () => setPickerOpen(true)
+        });
+    }, [registerCommand, setPickerOpen]);
+    return null;
+}
+
+export function AppShell({ children }) {
     const [theme, setTheme] = React.useState(() => {
         if (typeof window === "undefined") return "dark";
         return localStorage.getItem(THEME_KEY) || "dark";
@@ -24,6 +43,7 @@ export function AppShell({ children, role = "Einsatzleiter" }) {
     const navigate = useNavigate();
 
     const { activeIncident, create, startDemo, setActive } = useIncidents();
+    const { can } = useRole();
 
     React.useEffect(() => {
         applyTheme(theme);
@@ -54,15 +74,15 @@ export function AppShell({ children, role = "Einsatzleiter" }) {
         <CommandPaletteProvider
             theme={theme}
             onToggleTheme={toggleTheme}
-            onStartDemo={handleStartDemo}
-            onNewIncident={handleNewIncident}
+            onStartDemo={can("incident.demo_start") ? handleStartDemo : undefined}
+            onNewIncident={can("incident.create") ? handleNewIncident : undefined}
         >
+            <RoleCommandRegistrar />
             <div className={cn("flex h-screen w-full bg-background text-foreground")}>
                 <Sidebar />
                 <div className="flex min-w-0 flex-1 flex-col">
                     <GlobalHeader
                         incident={activeIncident}
-                        role={role}
                         theme={theme}
                         onToggleTheme={toggleTheme}
                         onGoToIncidents={() => navigate("/")}
@@ -75,6 +95,8 @@ export function AppShell({ children, role = "Einsatzleiter" }) {
                     </main>
                 </div>
             </div>
+
+            <RoleSelectorDialog />
 
             <NewIncidentDialog
                 open={newOpen}
