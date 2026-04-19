@@ -57,8 +57,8 @@ const NAV_GROUPS = (hasIncident) => [
                 icon: Truck,
                 label: "Transport",
                 testId: "nav-transport",
-                disabled: true,
-                step: "05"
+                disabled: !hasIncident,
+                hint: hasIncident ? null : "inaktiv"
             },
             {
                 to: "/ressourcen",

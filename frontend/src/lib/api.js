@@ -69,3 +69,32 @@ export async function updatePatient(id, payload) {
 export async function deletePatient(id) {
     await api.delete(`/patients/${id}`);
 }
+
+/* =====================================================================
+   Transports
+   ===================================================================== */
+export async function listTransports(incidentId, params = {}) {
+    const { data } = await api.get(`/incidents/${incidentId}/transports`, {
+        params
+    });
+    return data;
+}
+
+export async function createTransport(incidentId, payload) {
+    const { data } = await api.post(`/incidents/${incidentId}/transports`, payload);
+    return data;
+}
+
+export async function getTransport(id) {
+    const { data } = await api.get(`/transports/${id}`);
+    return data;
+}
+
+export async function updateTransport(id, payload) {
+    const { data } = await api.patch(`/transports/${id}`, payload);
+    return data;
+}
+
+export async function deleteTransport(id) {
+    await api.delete(`/transports/${id}`);
+}

@@ -96,6 +96,21 @@ PatientVerbleib = Literal[
 TransportTyp = Literal["intern", "extern"]
 FallabschlussTyp = Literal["rd_uebergabe", "entlassung", "manuell"]
 
+TransportZiel = Literal[
+    "uhs",
+    "krankenhaus",
+    "rd",
+    "event",
+    "heim",
+    "sonstiges",
+]
+TransportStatus = Literal[
+    "offen",
+    "zugewiesen",
+    "unterwegs",
+    "abgeschlossen",
+]
+
 
 class IncidentBase(BaseModel):
     model_config = ConfigDict(extra="ignore")
@@ -146,8 +161,8 @@ async def meta():
     return {
         "app": "ELS MHD",
         "name": "Einsatzleitsystem Malteser Hilfsdienst",
-        "version": "0.4.0",
-        "step": "04 – Patientendetail",
+        "version": "0.5.0",
+        "step": "05 – Transportuebersicht",
     }
 
 
@@ -278,8 +293,9 @@ async def delete_incident(incident_id: str):
     result = await db.incidents.delete_one({"id": incident_id})
     if result.deleted_count == 0:
         raise HTTPException(status_code=404, detail="Incident nicht gefunden")
-    # Zugehoerige Patienten mit entfernen
+    # Zugehoerige Patienten und Transporte mit entfernen
     await db.patients.delete_many({"incident_id": incident_id})
+    await db.transports.delete_many({"incident_id": incident_id})
     return None
 
 
@@ -489,6 +505,21 @@ async def update_patient(patient_id: str, payload: PatientUpdate):
         return_document=True,
         projection={"_id": 0},
     )
+    # Auto-Create Transport falls transport_typ frisch gesetzt wurde
+    if "transport_typ" in update and update["transport_typ"]:
+        await _ensure_transport_for_patient(result)
+    # Bei Fallabschluss: zugehoerigen Transport auf abgeschlossen setzen
+    if update.get("status") in ("uebergeben", "entlassen"):
+        await db.transports.update_many(
+            {"patient_id": patient_id, "status": {"$ne": "abgeschlossen"}},
+            {
+                "$set": {
+                    "status": "abgeschlossen",
+                    "abgeschlossen_at": iso(now),
+                    "updated_at": iso(now),
+                }
+            },
+        )
     return result
 
 
@@ -497,6 +528,219 @@ async def delete_patient(patient_id: str):
     result = await db.patients.delete_one({"id": patient_id})
     if result.deleted_count == 0:
         raise HTTPException(status_code=404, detail="Patient nicht gefunden")
+    # Zugehoerige Transporte mit entfernen
+    await db.transports.delete_many({"patient_id": patient_id})
+    return None
+
+
+# ---------------------------------------------------------------------------
+# Transporte
+# ---------------------------------------------------------------------------
+
+
+class TransportBase(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    typ: TransportTyp
+    ziel: TransportZiel = "sonstiges"
+    ressource: Optional[str] = None
+    notiz: str = Field(default="", max_length=2000)
+
+
+class TransportCreate(TransportBase):
+    patient_id: Optional[str] = None
+
+
+class TransportUpdate(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    typ: Optional[TransportTyp] = None
+    ziel: Optional[TransportZiel] = None
+    ressource: Optional[str] = None
+    status: Optional[TransportStatus] = None
+    notiz: Optional[str] = None
+
+
+class Transport(TransportBase):
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    incident_id: str
+    patient_id: Optional[str] = None
+    patient_kennung: Optional[str] = None
+    patient_sichtung: Optional[SichtungStufe] = None
+    status: TransportStatus = "offen"
+    created_at: datetime = Field(default_factory=now_utc)
+    updated_at: datetime = Field(default_factory=now_utc)
+    zugewiesen_at: Optional[datetime] = None
+    gestartet_at: Optional[datetime] = None
+    abgeschlossen_at: Optional[datetime] = None
+
+
+def _serialize_transport(doc: dict) -> dict:
+    doc = {k: v for k, v in doc.items() if k != "_id"}
+    for k in (
+        "created_at",
+        "updated_at",
+        "zugewiesen_at",
+        "gestartet_at",
+        "abgeschlossen_at",
+    ):
+        if k in doc and isinstance(doc[k], datetime):
+            doc[k] = iso(doc[k])
+    return doc
+
+
+DEFAULT_ZIEL_BY_TYP = {"intern": "uhs", "extern": "krankenhaus"}
+
+
+async def _ensure_transport_for_patient(patient: dict):
+    """
+    Legt einen offenen Transport an, falls noch keiner fuer den Patienten existiert.
+    Wird beim Setzen von patient.transport_typ aufgerufen.
+    """
+    if not patient.get("transport_typ"):
+        return None
+    existing = await db.transports.find_one(
+        {"patient_id": patient["id"]},
+        {"_id": 0},
+    )
+    if existing:
+        return existing
+    typ = patient["transport_typ"]
+    ziel = "rd" if typ == "extern" else "uhs"
+    transport = Transport(
+        incident_id=patient["incident_id"],
+        patient_id=patient["id"],
+        patient_kennung=patient.get("kennung"),
+        patient_sichtung=patient.get("sichtung"),
+        typ=typ,
+        ziel=ziel,
+        status="offen",
+    )
+    doc = transport.model_dump()
+    for k in ("created_at", "updated_at", "zugewiesen_at", "gestartet_at", "abgeschlossen_at"):
+        if isinstance(doc.get(k), datetime):
+            doc[k] = iso(doc[k])
+    await db.transports.insert_one(doc)
+    return _serialize_transport(doc)
+
+
+@api_router.get("/incidents/{incident_id}/transports", response_model=List[dict])
+async def list_transports(
+    incident_id: str,
+    typ: Optional[str] = None,
+    status: Optional[str] = None,
+):
+    incident = await db.incidents.find_one({"id": incident_id}, {"_id": 0})
+    if not incident:
+        raise HTTPException(status_code=404, detail="Incident nicht gefunden")
+
+    query: dict = {"incident_id": incident_id}
+    if typ:
+        vals = [v.strip() for v in typ.split(",") if v.strip()]
+        if vals:
+            query["typ"] = {"$in": vals}
+    if status:
+        vals = [v.strip() for v in status.split(",") if v.strip()]
+        if vals:
+            query["status"] = {"$in": vals}
+
+    cursor = db.transports.find(query, {"_id": 0}).sort("created_at", 1)
+    rows = await cursor.to_list(2000)
+    return rows
+
+
+@api_router.post("/incidents/{incident_id}/transports", response_model=dict, status_code=201)
+async def create_transport(incident_id: str, payload: TransportCreate):
+    incident = await db.incidents.find_one({"id": incident_id}, {"_id": 0})
+    if not incident:
+        raise HTTPException(status_code=404, detail="Incident nicht gefunden")
+
+    patient_kennung = None
+    patient_sichtung = None
+    if payload.patient_id:
+        p = await db.patients.find_one({"id": payload.patient_id}, {"_id": 0})
+        if not p:
+            raise HTTPException(status_code=404, detail="Patient nicht gefunden")
+        if p.get("incident_id") != incident_id:
+            raise HTTPException(status_code=400, detail="Patient gehoert nicht zu diesem Incident")
+        patient_kennung = p.get("kennung")
+        patient_sichtung = p.get("sichtung")
+
+    transport = Transport(
+        incident_id=incident_id,
+        patient_id=payload.patient_id,
+        patient_kennung=patient_kennung,
+        patient_sichtung=patient_sichtung,
+        typ=payload.typ,
+        ziel=payload.ziel or DEFAULT_ZIEL_BY_TYP.get(payload.typ, "sonstiges"),
+        ressource=payload.ressource,
+        notiz=payload.notiz,
+        status="zugewiesen" if payload.ressource else "offen",
+    )
+    if payload.ressource:
+        transport.zugewiesen_at = now_utc()
+
+    doc = transport.model_dump()
+    for k in ("created_at", "updated_at", "zugewiesen_at", "gestartet_at", "abgeschlossen_at"):
+        if isinstance(doc.get(k), datetime):
+            doc[k] = iso(doc[k])
+
+    await db.transports.insert_one(doc)
+    return _serialize_transport(doc)
+
+
+@api_router.get("/transports/{transport_id}", response_model=dict)
+async def get_transport(transport_id: str):
+    doc = await db.transports.find_one({"id": transport_id}, {"_id": 0})
+    if not doc:
+        raise HTTPException(status_code=404, detail="Transport nicht gefunden")
+    return doc
+
+
+@api_router.patch("/transports/{transport_id}", response_model=dict)
+async def update_transport(transport_id: str, payload: TransportUpdate):
+    existing = await db.transports.find_one({"id": transport_id}, {"_id": 0})
+    if not existing:
+        raise HTTPException(status_code=404, detail="Transport nicht gefunden")
+
+    update = payload.model_dump(exclude_none=True)
+    if not update:
+        raise HTTPException(status_code=400, detail="Keine Aenderungen angegeben")
+
+    now = now_utc()
+    update["updated_at"] = iso(now)
+
+    # Ressource gesetzt -> wenn noch offen, auf zugewiesen + Zeitstempel
+    if "ressource" in update and update["ressource"]:
+        if existing.get("status") in (None, "offen"):
+            update.setdefault("status", "zugewiesen")
+        if not existing.get("zugewiesen_at"):
+            update["zugewiesen_at"] = iso(now)
+    elif "ressource" in update and update["ressource"] in (None, ""):
+        # Ressource entfernt -> zurueck auf offen
+        if existing.get("status") == "zugewiesen":
+            update.setdefault("status", "offen")
+
+    new_status = update.get("status")
+    if new_status == "unterwegs" and not existing.get("gestartet_at"):
+        update["gestartet_at"] = iso(now)
+    if new_status == "abgeschlossen" and not existing.get("abgeschlossen_at"):
+        update["abgeschlossen_at"] = iso(now)
+    if new_status == "zugewiesen" and not existing.get("zugewiesen_at"):
+        update["zugewiesen_at"] = iso(now)
+
+    result = await db.transports.find_one_and_update(
+        {"id": transport_id},
+        {"$set": update},
+        return_document=True,
+        projection={"_id": 0},
+    )
+    return result
+
+
+@api_router.delete("/transports/{transport_id}", status_code=204)
+async def delete_transport(transport_id: str):
+    result = await db.transports.delete_one({"id": transport_id})
+    if result.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="Transport nicht gefunden")
     return None
 
 

@@ -1,0 +1,80 @@
+{
+  "summary": "Completed comprehensive testing of ELS MHD Step 05 - Transportuebersicht. All 19 backend API tests passed (100%). Frontend UI tests passed for all core functionality including Transport list, KPI tiles, intern/extern columns, status buckets, ResourceAssignDialog, NewTransportDialog, status transitions (Abfahrt/Abschliessen), ResourceBar with drop targets, and Auto-Create transport on patient.transport_typ. Fixed cascade delete bug for transports when incident is deleted.",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_step05_transport_api.py",
+    "/app/test_reports/pytest/pytest_step05_results.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [],
+  "updated_files": [
+    "/app/backend/tests/test_step05_transport_api.py",
+    "/app/backend/server.py"
+  ],
+  "success_rate": {
+    "backend": "100% (19/19 tests passed)",
+    "frontend": "100% (all features working correctly)"
+  },
+  "test_credentials": "No authentication required",
+  "seed_data_creation": "Created test transports during testing. Test incident TEST_Step05_Transport_Incident was created and cleaned up by pytest. P-0002 transport was created via Patient-Detail Transport-Anforderung flow.",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Step 05 fully tested. Backend: Transport CRUD endpoints work correctly, Auto-Create on patient.transport_typ verified, Auto-Complete on patient status (entlassen/uebergeben) verified, Cascade delete on incident verified (fixed bug - added db.transports.delete_many), filtering by typ and status works. Frontend: TransportList page (/transport) works with all data-testid attributes: transport-list-title, transport-no-incident, kpi-tr-total, kpi-tr-offen, kpi-tr-zugewiesen, kpi-tr-unterwegs, kpi-tr-intern, kpi-tr-extern, transport-col-intern, transport-col-extern, bucket-offen, bucket-zugewiesen, bucket-unterwegs, bucket-abgeschlossen, resource-bar, resource-bar-new-transport, resource-drop-* (9 targets), resource-assign-dialog, resource-assign-opt-*, new-transport-dialog, nt-typ, nt-ziel, nt-res, nt-submit, nt-cancel, transport-card-*, transport-refresh, transport-new. QuickEntryBar positioning fix verified (S0 button has >180px margin from right edge). Existing demo incident MANV-Uebung Sued (712ca18e) has 3 transports: P-0001 (intern, abgeschlossen), P-0002 (extern, offen), and one without patient (extern, offen).",
+  "features_tested": {
+    "backend": [
+      "GET /api/meta returns version 0.5.0 and step '05 – Transportuebersicht'",
+      "GET /api/incidents/{id}/transports returns array",
+      "GET /api/incidents/{nonexistent}/transports returns 404",
+      "POST /api/incidents/{id}/transports without ressource -> status=offen",
+      "POST /api/incidents/{id}/transports with ressource -> status=zugewiesen, zugewiesen_at set",
+      "POST with patient_id copies patient_kennung and patient_sichtung",
+      "PATCH /api/transports/{id} with ressource='RTW 1' sets status=zugewiesen (if offen)",
+      "PATCH with ressource='' removes assignment (status=offen)",
+      "PATCH with status=unterwegs sets gestartet_at",
+      "PATCH with status=abgeschlossen sets abgeschlossen_at",
+      "DELETE /api/transports/{id} returns 204",
+      "DELETE /api/transports/{nonexistent} returns 404",
+      "Auto-Create: PATCH patient with transport_typ=intern creates Transport (status=offen, patient_kennung+patient_sichtung copied)",
+      "Auto-Create: PATCH patient with transport_typ=extern creates Transport with ziel=rd",
+      "Auto-Complete: PATCH patient with status=entlassen sets transports to abgeschlossen",
+      "Auto-Complete: PATCH patient with status=uebergeben sets transports to abgeschlossen",
+      "Cascade: DELETE incident removes associated transports (BUG FIXED)",
+      "GET with ?typ=intern filters correctly",
+      "GET with ?status=offen filters correctly"
+    ],
+    "frontend": [
+      "Navigation to /transport WITHOUT active incident shows 'Kein Incident aktiv' (transport-no-incident)",
+      "With active incident shows TransportList (transport-list-title='Transportuebersicht')",
+      "6 KPI tiles: kpi-tr-total, kpi-tr-offen, kpi-tr-zugewiesen, kpi-tr-unterwegs, kpi-tr-intern, kpi-tr-extern",
+      "2 columns: transport-col-intern (Intern UHS), transport-col-extern (Extern RD/KH)",
+      "4 buckets per column: bucket-offen, bucket-zugewiesen, bucket-unterwegs, bucket-abgeschlossen",
+      "Transport-Card shows Kennung, Sichtung-Badge, Ziel, Ressource (or '— fehlt'), Dauer",
+      "Card-Action 'Ressource ...' opens ResourceAssignDialog with options per typ (5 extern options)",
+      "After assignment, Card moves to 'Zugewiesen' bucket",
+      "'Abfahrt' button sets status=unterwegs (Card moves to 'Unterwegs' bucket)",
+      "'Abschliessen' button sets status=abgeschlossen (Card moves to 'Abgeschlossen' bucket)",
+      "ResourceBar (resource-bar) sticky at bottom with 9 drop targets (4 intern + 5 extern)",
+      "ResourceBar shows count badge on occupied resources",
+      "Button resource-bar-new-transport opens NewTransportDialog",
+      "NewTransportDialog (new-transport-dialog) with typ/ziel/res selects and Anlegen button",
+      "Sidebar 'Transport' active when incident selected",
+      "Patient-Detail Transport-Anforderung creates Transport entry (verified with P-0002)",
+      "QuickEntryBar-Fix: S1/S2/S3/S0 + Detail-Erfassung centered; S0 button has >180px margin from right edge (724px verified)"
+    ]
+  },
+  "bugs_fixed": [
+    {
+      "file": "/app/backend/server.py",
+      "issue": "Cascade delete for transports missing when incident is deleted",
+      "fix": "Added 'await db.transports.delete_many({\"incident_id\": incident_id})' to delete_incident endpoint"
+    }
+  ]
+}

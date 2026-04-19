@@ -38,7 +38,7 @@ export default function LagePlaceholder() {
 
     const modules = [
         { step: "03", label: "Patienten", icon: Users, description: "Erfassung, Sichtung, Status, Verbleib", to: "/patienten" },
-        { step: "05", label: "Transport", icon: Truck, description: "Intern / extern, Zuteilung, Zeitstempel" },
+        { step: "05", label: "Transport", icon: Truck, description: "Intern / extern, Zuteilung, Zeitstempel", to: "/transport" },
         { step: "06", label: "Ressourcen", icon: Boxes, description: "Fahrzeuge, Personal, Material" },
         { step: "06", label: "Kommunikation", icon: Radio, description: "Meldungen, Quittierung" },
         { step: "06", label: "Konflikte", icon: AlertOctagon, description: "Blocker & Warnungen" },

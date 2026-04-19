@@ -88,7 +88,7 @@ export function QuickEntryBar({
                 </span>
             </div>
 
-            <div className="ml-auto flex items-center gap-2">
+            <div className="flex flex-1 items-center justify-center gap-2">
                 {SICHTUNG.map((s) => (
                     <button
                         key={s.key}
@@ -134,6 +134,9 @@ export function QuickEntryBar({
                     </kbd>
                 </Button>
             </div>
+
+            {/* Reservierter Platz rechts (Made-with-Emergent Badge) */}
+            <div aria-hidden className="hidden md:block w-44 shrink-0" />
         </div>
     );
 }
