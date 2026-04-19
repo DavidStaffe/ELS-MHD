@@ -111,9 +111,10 @@ Einsatzabschnitte, UHS-Betten, Abschlussbericht mit PDF-Export.
 - Bestehende Features (Dark-Cockpit, Command-Palette, DnD, Konflikte, A4-Print, Rollen, Versionen) unveraendert
 
 ## Changelog
-- **2026-04-19 (Backend-Refactor + DB-Cleanup)**: server.py von 2162 -> 70 Zeilen (Bootstrap only). Neue Struktur: `core/` (db/time/types), `models.py`, `routes/` (8 Domain-Router), `services/` (seeds/demo/analytics). API + Verhalten identisch. pytest: 130/135 gruen (5 Fails pre-existing Versions-Asserts). Frontend-Regression: 100% (alle 9 Routen + PatientDetail fehlerfrei). Alle Nicht-Demo-Incidents geloescht, nur 1 frischer Demo-Incident in DB.
-- **2026-04-19 (Schritte 10-12)**: Abschnitte + Betten-Modul komplett. Backend: 8 neue Endpunkte, Demo-Seed erweitert, Auswertung/Check/Report integriert, Auto-Release-Logik. Frontend: 2 neue Seiten, Nav-Links, Dashboard-KPIs, PatientDetail-Section, ResourceRow-Erweiterung, Hybrid-Wizard-Redirect. Tests: 15/15 pytest + Frontend-Playwright gruen.
-- **2026-04-19 (Schritte 07-09)**: Rollen, Demo, Abschluss-Dashboard mit A4-Bericht.
+- **2026-04-19 (Schritt 13 – Funktagebuch + Ressourcen-CRUD)**: Module Kommunikation zu **Funktagebuch** erweitert. Backend: 7 Funk-Typen (funk_ein/funk_aus/lage/auftrag/rueckmeldung/vorkommnis/system), Confirm/Finalize-Endpoints, unveraenderliche System-Eintraege, Auto-Logs bei Patient-Create/Fallabschluss/Transport-Status. PATCH/DELETE gesperrt fuer system+finalisierte Eintraege (409). Frontend: neue Seite mit KPIs, 4 Filter-Achsen (Typ/Prio/Quelle/Abschnitt), Volltextsuche, Detail-Dialog, @media print. Ressourcen: CRUD-UI (Create/Edit/Delete) mit Dialog. 2 neue Rollen (fuehrungsassistenz, abschnittleitung). Testing: 9/9 neue pytest-Tests gruen, 100% Frontend.
+- **2026-04-19 (Backend-Refactor + DB-Cleanup)**: server.py 2162 -> 70 Zeilen. Neue Struktur: core/, models.py, routes/ (8 Domain-Router), services/.
+- **2026-04-19 (Schritte 10-12)**: Abschnitte + Betten-Modul.
+- **2026-04-19 (Schritte 07-09)**: Rollen, Demo, Abschluss-Dashboard.
 - Fruehere Sessions: Schritte 01-06 + Backend fuer 08/09.
 
 ## Roadmap / Backlog
