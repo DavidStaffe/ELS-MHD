@@ -48,19 +48,13 @@ export function QuickEntryBar({
             if (e.metaKey || e.ctrlKey || e.altKey) return;
 
             const k = e.key.toLowerCase();
-            if (k === "1") {
+            const match = SICHTUNG.find((s) => s.shortcut === k);
+            if (match) {
                 e.preventDefault();
-                handleQuick("S1");
-            } else if (k === "2") {
-                e.preventDefault();
-                handleQuick("S2");
-            } else if (k === "3") {
-                e.preventDefault();
-                handleQuick("S3");
-            } else if (k === "4") {
-                e.preventDefault();
-                handleQuick("S4");
-            } else if (k === "n") {
+                handleQuick(match.key);
+                return;
+            }
+            if (k === "n") {
                 e.preventDefault();
                 onOpenDialog?.();
             }
@@ -102,7 +96,7 @@ export function QuickEntryBar({
                         disabled={disabled || busyKey !== null}
                         onClick={() => handleQuick(s.key)}
                         data-testid={`quick-sichtung-${s.key}`}
-                        title={`${s.label} – ${s.hint} (Taste ${s.key[1]})`}
+                        title={`${s.label} – ${s.hint} (Taste ${s.shortcut})`}
                         className={cn(
                             "relative inline-flex h-12 w-16 flex-col items-center justify-center rounded-md font-semibold shadow-sm transition-all active:scale-[0.97] disabled:opacity-60",
                             "els-focus-ring",
@@ -116,7 +110,7 @@ export function QuickEntryBar({
                             {s.hint.split(" ")[0]}
                         </span>
                         <kbd className="absolute -top-1.5 -right-1.5 inline-flex h-4 w-4 items-center justify-center rounded-sm border border-border bg-background text-[0.6rem] font-mono text-foreground">
-                            {s.key[1]}
+                            {s.shortcut}
                         </kbd>
                         {busyKey === s.key && (
                             <span className="absolute inset-0 rounded-md bg-black/20 animate-pulse" />

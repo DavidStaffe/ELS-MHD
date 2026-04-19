@@ -76,7 +76,7 @@ export function PatientProvider({ children }) {
 
     // Abgeleitete KPIs
     const kpis = React.useMemo(() => {
-        const buckets = { total: patients.length, S1: 0, S2: 0, S3: 0, S4: 0, wartend: 0, behandlung: 0, transport: 0, abgeschlossen: 0 };
+        const buckets = { total: patients.length, S1: 0, S2: 0, S3: 0, S0: 0, wartend: 0, behandlung: 0, transport: 0, abgeschlossen: 0 };
         for (const p of patients) {
             if (p.sichtung && buckets[p.sichtung] !== undefined) buckets[p.sichtung]++;
             if (p.status === "wartend") buckets.wartend++;

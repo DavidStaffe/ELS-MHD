@@ -40,13 +40,13 @@ const toneStyles = {
 };
 
 /**
- * Sichtungsstufen-Badge (S1–S4).
+ * Sichtungsstufen-Badge (S0/S1/S2/S3).
  */
 export const SichtungToneMap = {
     S1: "red",
     S2: "yellow",
     S3: "green",
-    S4: "gray"
+    S0: "gray"
 };
 
 export const StatusBadge = React.forwardRef(function StatusBadge(

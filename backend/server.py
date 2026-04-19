@@ -75,7 +75,7 @@ IncidentStatus = Literal[
     "archiviert",
 ]
 
-SichtungStufe = Literal["S1", "S2", "S3", "S4"]
+SichtungStufe = Literal["S0", "S1", "S2", "S3"]
 PatientStatus = Literal[
     "wartend",
     "in_behandlung",
@@ -92,6 +92,9 @@ PatientVerbleib = Literal[
     "heim",
     "sonstiges",
 ]
+
+TransportTyp = Literal["intern", "extern"]
+FallabschlussTyp = Literal["rd_uebergabe", "entlassung", "manuell"]
 
 
 class IncidentBase(BaseModel):
@@ -143,8 +146,8 @@ async def meta():
     return {
         "app": "ELS MHD",
         "name": "Einsatzleitsystem Malteser Hilfsdienst",
-        "version": "0.3.0",
-        "step": "03 – Patientenliste",
+        "version": "0.4.0",
+        "step": "04 – Patientendetail",
     }
 
 
@@ -291,6 +294,8 @@ class PatientBase(BaseModel):
     status: PatientStatus = "wartend"
     verbleib: PatientVerbleib = "unbekannt"
     notiz: str = Field(default="", max_length=4000)
+    transport_typ: Optional[TransportTyp] = None
+    fallabschluss_typ: Optional[FallabschlussTyp] = None
 
 
 class PatientCreate(PatientBase):
@@ -304,6 +309,8 @@ class PatientUpdate(BaseModel):
     status: Optional[PatientStatus] = None
     verbleib: Optional[PatientVerbleib] = None
     notiz: Optional[str] = None
+    transport_typ: Optional[TransportTyp] = None
+    fallabschluss_typ: Optional[FallabschlussTyp] = None
 
 
 class Patient(PatientBase):
@@ -316,6 +323,8 @@ class Patient(PatientBase):
     behandlung_start_at: Optional[datetime] = None
     transport_angefordert_at: Optional[datetime] = None
     fallabschluss_at: Optional[datetime] = None
+    transport_typ: Optional[TransportTyp] = None
+    fallabschluss_typ: Optional[FallabschlussTyp] = None
 
 
 def _serialize_patient(doc: dict) -> dict:
@@ -439,11 +448,34 @@ async def update_patient(patient_id: str, payload: PatientUpdate):
     now = now_utc()
     update["updated_at"] = iso(now)
 
-    # Automatische Zeitstempel
+    # Sichtung neu gesetzt -> Behandlungsstart
     if "sichtung" in update and not existing.get("sichtung_at"):
         update["sichtung_at"] = iso(now)
         if not existing.get("behandlung_start_at"):
             update["behandlung_start_at"] = iso(now)
+
+    # Transport-Typ gesetzt -> automatisch status=transportbereit + Zeitstempel
+    if "transport_typ" in update and update["transport_typ"]:
+        if existing.get("status") not in ("transportbereit", "uebergeben", "entlassen"):
+            update.setdefault("status", "transportbereit")
+        if not existing.get("transport_angefordert_at"):
+            update["transport_angefordert_at"] = iso(now)
+
+    # Fallabschluss-Typ gesetzt -> status entsprechend + Zeitstempel + Default-Verbleib
+    if "fallabschluss_typ" in update and update["fallabschluss_typ"]:
+        typ = update["fallabschluss_typ"]
+        if typ == "rd_uebergabe":
+            update.setdefault("status", "uebergeben")
+            if not existing.get("verbleib") or existing.get("verbleib") == "unbekannt":
+                update.setdefault("verbleib", "rd")
+        elif typ == "entlassung":
+            update.setdefault("status", "entlassen")
+            if not existing.get("verbleib") or existing.get("verbleib") == "unbekannt":
+                update.setdefault("verbleib", "event")
+        elif typ == "manuell":
+            update.setdefault("status", "entlassen")
+        if not existing.get("fallabschluss_at"):
+            update["fallabschluss_at"] = iso(now)
 
     new_status = update.get("status")
     if new_status == "transportbereit" and not existing.get("transport_angefordert_at"):
@@ -487,6 +519,23 @@ logging.basicConfig(
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
 )
 logger = logging.getLogger(__name__)
+
+
+@app.on_event("startup")
+async def run_migrations():
+    """
+    One-time Migrationen. Idempotent gestaltet.
+    - S4 -> S0 (Sichtungsstufen-Umbenennung)
+    """
+    try:
+        result = await db.patients.update_many(
+            {"sichtung": "S4"},
+            {"$set": {"sichtung": "S0"}},
+        )
+        if result.modified_count:
+            logger.info("Migration: %d Patient(en) von S4 nach S0 umbenannt", result.modified_count)
+    except Exception as exc:  # pragma: no cover
+        logger.exception("Migration fehlgeschlagen: %s", exc)
 
 
 @app.on_event("shutdown")

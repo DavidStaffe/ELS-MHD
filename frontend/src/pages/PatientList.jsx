@@ -101,7 +101,7 @@ export default function PatientList() {
         S1: true,
         S2: true,
         S3: true,
-        S4: true
+        S0: true
     }));
     const [statusFilter, setStatusFilter] = React.useState("alle");
     const [query, setQuery] = React.useState("");
@@ -151,29 +151,12 @@ export default function PatientList() {
                         p.notiz || "",
                         p.verbleib || ""
                     ],
-                    run: () => {
-                        const el = document.querySelector(
-                            `[data-testid="patient-row-${p.id}"]`
-                        );
-                        if (el) {
-                            el.scrollIntoView({ block: "center", behavior: "smooth" });
-                            el.classList.add("ring-2", "ring-primary", "ring-offset-2");
-                            setTimeout(
-                                () =>
-                                    el.classList.remove(
-                                        "ring-2",
-                                        "ring-primary",
-                                        "ring-offset-2"
-                                    ),
-                                2000
-                            );
-                        }
-                    }
+                    run: () => navigate(`/patienten/${p.id}`)
                 })
             );
         }
         return () => unregs.forEach((u) => u && u());
-    }, [patients, registerCommand]);
+    }, [patients, registerCommand, navigate]);
 
     // Kein aktiver Incident
     if (!activeIncident) {
@@ -390,10 +373,10 @@ export default function PatientList() {
                             testId="kpi-s3"
                         />
                         <KpiTile
-                            label="S4"
-                            value={kpis.S4}
+                            label="S0"
+                            value={kpis.S0}
                             tone="gray"
-                            testId="kpi-s4"
+                            testId="kpi-s0"
                         />
                         <KpiTile
                             label="Wartend"
@@ -496,7 +479,7 @@ export default function PatientList() {
                             columns={columns}
                             rows={filtered}
                             rowTestId={(p) => `patient-row-${p.id}`}
-                            onRowClick={(p) => openEdit(p)}
+                            onRowClick={(p) => navigate(`/patienten/${p.id}`)}
                             dense
                             testId="patient-table"
                         />

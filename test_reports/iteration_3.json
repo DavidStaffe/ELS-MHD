@@ -1,0 +1,68 @@
+{
+  "summary": "Completed comprehensive testing of ELS MHD Step 04 - Patientendetail + S4->S0 Migration. All 18 backend API tests passed (100%). Frontend UI tests passed for all core functionality including S4->S0 migration, PatientDetail page, Transport/Fallabschluss dialogs, Timeline, KPI tiles, and Smart Enhancement (Ein-Klick-Status-Progression).",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_step04_api.py",
+    "/app/test_reports/pytest/pytest_step04_results.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [],
+  "updated_files": [
+    "/app/backend/tests/test_step04_api.py"
+  ],
+  "success_rate": {
+    "backend": "100% (18/18 tests passed)",
+    "frontend": "100% (all features working correctly)"
+  },
+  "test_credentials": "No authentication required",
+  "seed_data_creation": "Created test patients P-0006 through P-0009 during testing, cleaned up after tests. Test incident TEST_Step04_Incident was created and cleaned up by pytest.",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Step 04 fully tested. Backend: S4->S0 migration verified (S4 returns 422, S0 works), transport_typ and fallabschluss_typ PATCH endpoints work with automatic status progression. Frontend: S4->S0 migration complete (KPI kpi-s0, QuickEntryBar quick-sichtung-S0, Filter filter-sichtung-S0 all present, S4 variants removed). PatientDetail page (/patienten/:patientId) works with deep links. All data-testid attributes properly implemented: pd-kennung, pd-status, pd-back, pd-delete, pd-notiz, pd-verbleib, pd-next-step, pd-done, kpi-seit-sichtung, kpi-behandlung, kpi-transport, patient-timeline, timeline-created_at, timeline-sichtung_at, timeline-behandlung_start_at, timeline-transport_angefordert_at, timeline-fallabschluss_at, transport-dialog, transport-dialog-opt-intern, transport-dialog-opt-extern, fallabschluss-dialog, fallabschluss-dialog-opt-rd_uebergabe, fallabschluss-dialog-opt-entlassung, fallabschluss-dialog-opt-manuell.",
+  "features_tested": {
+    "backend": [
+      "GET /api/meta returns version 0.4.0 and step '04 – Patientendetail'",
+      "POST with sichtung='S4' returns 422 (no longer allowed after migration)",
+      "POST with sichtung='S0' succeeds and creates patient",
+      "No S4 patients exist in database after migration",
+      "PATCH with transport_typ='intern' sets status=transportbereit AND transport_angefordert_at",
+      "PATCH with transport_typ='extern' sets status=transportbereit AND transport_angefordert_at",
+      "GET /api/patients/{id} includes transport_typ field",
+      "PATCH with fallabschluss_typ='rd_uebergabe' sets status=uebergeben, verbleib=rd, fallabschluss_at",
+      "PATCH with fallabschluss_typ='entlassung' sets status=entlassen, verbleib=event, fallabschluss_at",
+      "PATCH with fallabschluss_typ='manuell' sets status=entlassen, fallabschluss_at (verbleib unchanged)",
+      "GET /api/patients/{id} includes fallabschluss_typ field",
+      "Fallabschluss preserves existing verbleib if not 'unbekannt'",
+      "Full progression flow: in_behandlung -> transportbereit -> uebergeben",
+      "PATCH with sichtung sets timestamps but not status (by design)",
+      "All valid sichtung levels (S0, S1, S2, S3) work correctly"
+    ],
+    "frontend": [
+      "KPI tile 'S0' (kpi-s0) present, S4 (kpi-s4) removed",
+      "QuickEntryBar button 'S0' (quick-sichtung-S0) present, S4 removed",
+      "Filter chip 'S0' (filter-sichtung-S0) present, S4 removed",
+      "Keyboard shortcut '0' creates S0 patient",
+      "Click on patient row navigates to /patienten/{id}",
+      "PatientDetail shows Kennung (pd-kennung), Sichtung, Status, DEMO badge",
+      "3 KPI tiles: kpi-seit-sichtung, kpi-behandlung, kpi-transport",
+      "Timeline (patient-timeline) with 5 events",
+      "Smart Enhancement: pd-next-step adapts to status",
+      "Transport dialog (transport-dialog) with intern/extern options",
+      "Fallabschluss dialog (fallabschluss-dialog) with rd_uebergabe/entlassung/manuell",
+      "After completion: pd-done shown instead of pd-next-step",
+      "Notiz (pd-notiz) auto-save (debounced)",
+      "Verbleib select (pd-verbleib) updates immediately",
+      "Back button (pd-back) navigates to /patienten",
+      "Delete button (pd-delete) opens ConfirmModal",
+      "Deep link /patienten/{id} works without activeIncident"
+    ]
+  }
+}

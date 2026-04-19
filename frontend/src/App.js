@@ -7,6 +7,7 @@ import { PatientProvider } from "@/context/PatientContext";
 import IncidentList from "@/pages/IncidentList";
 import LagePlaceholder from "@/pages/LagePlaceholder";
 import PatientList from "@/pages/PatientList";
+import PatientDetail from "@/pages/PatientDetail";
 
 function App() {
     return (
@@ -18,6 +19,7 @@ function App() {
                             <Route path="/" element={<IncidentList />} />
                             <Route path="/lage" element={<LagePlaceholder />} />
                             <Route path="/patienten" element={<PatientList />} />
+                            <Route path="/patienten/:patientId" element={<PatientDetail />} />
                             <Route path="*" element={<Navigate to="/" replace />} />
                         </Routes>
                     </AppShell>
