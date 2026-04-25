@@ -109,6 +109,7 @@ class Patient(PatientBase):
     kennung: str
     behandlung_ressource_name: Optional[str] = None
     behandlung_ressource_events: List[dict] = Field(default_factory=list)
+    sichtung_events: List[dict] = Field(default_factory=list)
     created_at: datetime = Field(default_factory=now_utc)
     updated_at: datetime = Field(default_factory=now_utc)
     sichtung_at: Optional[datetime] = None

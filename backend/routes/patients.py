@@ -109,6 +109,7 @@ async def create_patient(incident_id: str, payload: PatientCreate):
                 detail="Behandlungsressource nicht gefunden",
             )
         patient.behandlung_ressource_name = resource.get("name")
+        patient.behandlung_start_at = now
         patient.behandlung_ressource_events = [
             {
                 "ts": resource_change_ts,
@@ -121,7 +122,6 @@ async def create_patient(incident_id: str, payload: PatientCreate):
         ]
     if patient.sichtung:
         patient.sichtung_at = now
-        patient.behandlung_start_at = now
         if payload.status == "wartend":
             patient.status = "in_behandlung"
     doc = patient.model_dump()
@@ -179,8 +179,17 @@ async def update_patient(patient_id: str, payload: PatientUpdate):
 
     if "sichtung" in update and not existing.get("sichtung_at"):
         update["sichtung_at"] = iso(now)
-        if not existing.get("behandlung_start_at"):
-            update["behandlung_start_at"] = iso(now)
+
+    if "sichtung" in update and existing.get("sichtung") != update["sichtung"]:
+        sichtung_history = list(existing.get("sichtung_events") or [])
+        sichtung_history.append(
+            {
+                "ts": iso(now),
+                "from_sichtung": existing.get("sichtung"),
+                "to_sichtung": update["sichtung"],
+            }
+        )
+        update["sichtung_events"] = sichtung_history
 
     if "behandlung_ressource_id" in update:
         old_resource_id = existing.get("behandlung_ressource_id")

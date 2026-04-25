@@ -448,7 +448,7 @@ class TestSmartStatusProgression:
         assert p["status"] == "in_behandlung"
         assert p["sichtung"] == "S2"
         assert p["sichtung_at"] is not None
-        assert p["behandlung_start_at"] is not None
+        assert p["behandlung_start_at"] is None  # only set when resource is assigned
 
         # 2. Set transport_typ -> status=transportbereit
         response = api_client.patch(
@@ -489,8 +489,8 @@ class TestSmartStatusProgression:
         assert data["sichtung"] == "S2"
         assert data["sichtung_at"] is not None, "sichtung_at should be set"
         assert (
-            data["behandlung_start_at"] is not None
-        ), "behandlung_start_at should be set"
+            data["behandlung_start_at"] is None
+        ), "behandlung_start_at should NOT be set until a resource is assigned"
         # Note: status does NOT automatically change to in_behandlung on PATCH
         # This is by design - status change only happens on CREATE with sichtung
 

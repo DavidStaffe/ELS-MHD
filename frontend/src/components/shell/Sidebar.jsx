@@ -3,6 +3,7 @@ import { NavLink } from 'react-router-dom';
 import { cn } from '@/lib/utils';
 import { useIncidents } from '@/context/IncidentContext';
 import { isPatientClosed, usePatients } from '@/context/PatientContext';
+import { useTransports } from '@/context/TransportContext';
 import {
   LayoutGrid,
   Activity,
@@ -24,7 +25,12 @@ import {
  * - Lage + Module nur verfuegbar wenn aktiver Incident existiert.
  * - Bei archiviertem Incident: operative Module gesperrt (Lese-Modus).
  */
-const NAV_GROUPS = (hasIncident, isArchived, unassignedPatientCount) => [
+const NAV_GROUPS = (
+  hasIncident,
+  isArchived,
+  unassignedPatientCount,
+  transportBadges,
+) => [
   {
     label: 'Start',
     items: [
@@ -68,6 +74,7 @@ const NAV_GROUPS = (hasIncident, isArchived, unassignedPatientCount) => [
         icon: Truck,
         label: 'Transport',
         testId: 'nav-transport',
+        badges: transportBadges,
         disabled: !hasIncident || isArchived,
         hint: !hasIncident ? 'inaktiv' : isArchived ? 'gesperrt' : null,
       },
@@ -131,6 +138,7 @@ const NAV_GROUPS = (hasIncident, isArchived, unassignedPatientCount) => [
 export function Sidebar({ className }) {
   const { activeIncident } = useIncidents();
   const { patients } = usePatients();
+  const { transports } = useTransports();
   const hasIncident = Boolean(activeIncident);
   const isArchived = activeIncident?.status === 'abgeschlossen';
   const unassignedPatientCount = React.useMemo(
@@ -139,7 +147,58 @@ export function Sidebar({ className }) {
         .length,
     [patients],
   );
-  const groups = NAV_GROUPS(hasIncident, isArchived, unassignedPatientCount);
+
+  const transportBadges = React.useMemo(() => {
+    // Priority order: S1 > S2 > S3 > S0 > null
+    const SICHTUNG_PRIORITY = { S1: 4, S2: 3, S3: 2, S0: 1 };
+
+    // Build a live patient sichtung lookup so recategorisation is reflected instantly
+    const patientSichtungMap = new Map(patients.map((p) => [p.id, p.sichtung]));
+
+    const sichtungClass = (group) => {
+      let highest = 0;
+      for (const t of group) {
+        const liveSichtung = t.patient_id
+          ? patientSichtungMap.get(t.patient_id)
+          : t.patient_sichtung;
+        const p = SICHTUNG_PRIORITY[liveSichtung] ?? 0;
+        if (p > highest) highest = p;
+      }
+      if (highest === 4) return 'bg-red-600 text-white';
+      if (highest === 3) return 'bg-amber-500 text-white';
+      if (highest === 2) return 'bg-emerald-600 text-white';
+      if (highest === 1) return 'bg-slate-500 text-white';
+      return 'bg-slate-500 text-white';
+    };
+
+    const offeneInternList = transports.filter(
+      (t) => t.status === 'offen' && t.typ === 'intern',
+    );
+    const offeneExternList = transports.filter(
+      (t) => t.status === 'offen' && t.typ === 'extern',
+    );
+    return [
+      {
+        key: 'intern',
+        label: 'Int',
+        value: offeneInternList.length,
+        className: sichtungClass(offeneInternList),
+      },
+      {
+        key: 'extern',
+        label: 'Ext',
+        value: offeneExternList.length,
+        className: sichtungClass(offeneExternList),
+      },
+    ];
+  }, [transports, patients]);
+
+  const groups = NAV_GROUPS(
+    hasIncident,
+    isArchived,
+    unassignedPatientCount,
+    transportBadges,
+  );
 
   const patientBadgeClassName = React.useMemo(() => {
     if (unassignedPatientCount > 3) {
@@ -202,6 +261,24 @@ export function Sidebar({ className }) {
                             {item.badge}
                           </span>
                         )}
+                        {Array.isArray(item.badges) &&
+                          item.badges.length > 0 && (
+                            <span className="ml-auto flex items-center gap-1">
+                              {item.badges.map((badge) => (
+                                <span
+                                  key={badge.key}
+                                  data-testid={`${item.testId}-badge-${badge.key}`}
+                                  title={`${badge.key}: ${badge.value}`}
+                                  className={cn(
+                                    'rounded-full px-1.5 py-0.5 text-[0.6rem] font-bold shadow-sm',
+                                    badge.className,
+                                  )}
+                                >
+                                  {badge.label}:{badge.value}
+                                </span>
+                              ))}
+                            </span>
+                          )}
                         {item.hint && (
                           <span className="text-[0.65rem] uppercase tracking-wider text-muted-foreground/60">
                             {item.hint}
@@ -242,6 +319,23 @@ export function Sidebar({ className }) {
                           )}
                         >
                           {item.badge}
+                        </span>
+                      )}
+                      {Array.isArray(item.badges) && item.badges.length > 0 && (
+                        <span className="ml-auto flex items-center gap-1">
+                          {item.badges.map((badge) => (
+                            <span
+                              key={badge.key}
+                              data-testid={`${item.testId}-badge-${badge.key}`}
+                              title={`${badge.key}: ${badge.value}`}
+                              className={cn(
+                                'rounded-full px-1.5 py-0.5 text-[0.6rem] font-bold shadow-sm',
+                                badge.className,
+                              )}
+                            >
+                              {badge.label}:{badge.value}
+                            </span>
+                          ))}
                         </span>
                       )}
                     </NavLink>

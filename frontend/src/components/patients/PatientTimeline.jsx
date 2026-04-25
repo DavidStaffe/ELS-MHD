@@ -40,6 +40,18 @@ export function PatientTimeline({ patient, events = DEFAULT_EVENTS }) {
     .slice()
     .sort((a, b) => new Date(a.ts).getTime() - new Date(b.ts).getTime());
 
+  const sichtungEvents = (patient.sichtung_events || [])
+    .filter((e) => e?.ts)
+    .slice()
+    .sort((a, b) => new Date(a.ts).getTime() - new Date(b.ts).getTime());
+
+  const SICHTUNG_LABEL = {
+    S1: 'S1 (Rot)',
+    S2: 'S2 (Gelb)',
+    S3: 'S3 (Grün)',
+    S0: 'S0 (Schwarz)',
+  };
+
   const formatResourceLabel = (entry) => {
     if (entry.action === 'assigned') {
       return `Ressource zugewiesen: ${entry.to_name || 'unbekannt'}`;
@@ -100,6 +112,24 @@ export function PatientTimeline({ patient, events = DEFAULT_EVENTS }) {
     });
   }
 
+  for (let idx = 0; idx < sichtungEvents.length; idx += 1) {
+    const entry = sichtungEvents[idx];
+    const ts = entry?.ts ? new Date(entry.ts).getTime() : null;
+    if (!ts) continue;
+    const fromLabel =
+      SICHTUNG_LABEL[entry.from_sichtung] || entry.from_sichtung || '–';
+    const toLabel =
+      SICHTUNG_LABEL[entry.to_sichtung] || entry.to_sichtung || '–';
+    timelineEntries.push({
+      kind: 'sichtung',
+      key: `sichtung-event-${idx}-${entry.ts}`,
+      label: `Sichtung geändert: ${fromLabel} → ${toLabel}`,
+      sichtungIndex: idx,
+      ts,
+      seq: seq++,
+    });
+  }
+
   timelineEntries.sort((a, b) => a.ts - b.ts || a.seq - b.seq);
 
   const entriesWithDelta = timelineEntries.map((entry, idx) => ({
@@ -119,16 +149,24 @@ export function PatientTimeline({ patient, events = DEFAULT_EVENTS }) {
             ? 'bg-status-yellow'
             : it.kind === 'resource'
               ? 'bg-primary/70'
-              : 'bg-primary';
+              : it.kind === 'sichtung'
+                ? 'bg-orange-400'
+                : 'bg-primary';
         const toneText =
-          it.kind === 'reopen' ? 'text-status-yellow' : 'text-foreground';
+          it.kind === 'reopen'
+            ? 'text-status-yellow'
+            : it.kind === 'sichtung'
+              ? 'text-orange-400'
+              : 'text-foreground';
         return (
           <li
             key={it.key}
             data-testid={
               it.kind === 'resource'
                 ? `timeline-resource-${it.resourceIndex}`
-                : `timeline-${it.key}`
+                : it.kind === 'sichtung'
+                  ? `timeline-sichtung-${it.sichtungIndex}`
+                  : `timeline-${it.key}`
             }
             className="flex items-start gap-3"
           >
