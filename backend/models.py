@@ -1,4 +1,5 @@
 """All Pydantic models for the ELS-MHD API."""
+
 from datetime import datetime
 from typing import List, Optional
 import uuid
@@ -29,6 +30,7 @@ from core.types import (
 
 # --- Incidents --------------------------------------------------------------
 
+
 class IncidentBase(BaseModel):
     model_config = ConfigDict(extra="ignore")
     name: str = Field(min_length=2, max_length=120)
@@ -58,7 +60,7 @@ class Incident(IncidentBase):
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     status: IncidentStatus = "operativ"
     demo: bool = False
-    start_at: datetime = Field(default_factory=now_utc)
+    start_at: Optional[datetime] = None
     end_at: Optional[datetime] = None
     created_at: datetime = Field(default_factory=now_utc)
     updated_at: datetime = Field(default_factory=now_utc)
@@ -72,11 +74,13 @@ class IncidentMetaPatch(BaseModel):
 
 # --- Patients ---------------------------------------------------------------
 
+
 class PatientBase(BaseModel):
     model_config = ConfigDict(extra="ignore")
     sichtung: Optional[SichtungStufe] = None
     status: PatientStatus = "wartend"
     verbleib: PatientVerbleib = "unbekannt"
+    behandlung_ressource_id: Optional[str] = None
     notiz: str = Field(default="", max_length=4000)
     transport_typ: Optional[TransportTyp] = None
     fallabschluss_typ: Optional[FallabschlussTyp] = None
@@ -92,6 +96,7 @@ class PatientUpdate(BaseModel):
     sichtung: Optional[SichtungStufe] = None
     status: Optional[PatientStatus] = None
     verbleib: Optional[PatientVerbleib] = None
+    behandlung_ressource_id: Optional[str] = None
     notiz: Optional[str] = None
     transport_typ: Optional[TransportTyp] = None
     fallabschluss_typ: Optional[FallabschlussTyp] = None
@@ -102,6 +107,9 @@ class Patient(PatientBase):
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     incident_id: str
     kennung: str
+    behandlung_ressource_name: Optional[str] = None
+    behandlung_ressource_events: List[dict] = Field(default_factory=list)
+    sichtung_events: List[dict] = Field(default_factory=list)
     created_at: datetime = Field(default_factory=now_utc)
     updated_at: datetime = Field(default_factory=now_utc)
     sichtung_at: Optional[datetime] = None
@@ -112,6 +120,7 @@ class Patient(PatientBase):
 
 
 # --- Transports -------------------------------------------------------------
+
 
 class TransportBase(BaseModel):
     model_config = ConfigDict(extra="ignore")
@@ -150,6 +159,7 @@ class Transport(TransportBase):
 
 # --- Resources --------------------------------------------------------------
 
+
 class ResourceBase(BaseModel):
     model_config = ConfigDict(extra="ignore")
     name: str = Field(min_length=1, max_length=80)
@@ -175,6 +185,7 @@ class ResourceUpdate(BaseModel):
 
 
 # --- Messages / Funktagebuch ------------------------------------------------
+
 
 class MessageBase(BaseModel):
     model_config = ConfigDict(extra="ignore")
@@ -224,6 +235,7 @@ class MessageConfirm(BaseModel):
 
 # --- Abschnitte (Schritt 10) ------------------------------------------------
 
+
 class AbschnittBase(BaseModel):
     model_config = ConfigDict(extra="ignore")
     name: str = Field(min_length=1, max_length=80)
@@ -251,6 +263,7 @@ class Abschnitt(AbschnittBase):
 
 
 # --- Betten (Schritt 11) ----------------------------------------------------
+
 
 class BettBase(BaseModel):
     model_config = ConfigDict(extra="ignore")
@@ -297,6 +310,7 @@ class Bett(BettBase):
 
 
 # --- Report -----------------------------------------------------------------
+
 
 class ReportVersionCreate(BaseModel):
     model_config = ConfigDict(extra="ignore")
