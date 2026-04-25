@@ -1,4 +1,5 @@
 """Transports routes."""
+
 from datetime import datetime
 from typing import List, Optional
 
@@ -18,7 +19,9 @@ router = APIRouter(prefix="/api", tags=["transports"])
 
 
 @router.get("/incidents/{incident_id}/transports", response_model=List[dict])
-async def list_transports(incident_id: str, typ: Optional[str] = None, status: Optional[str] = None):
+async def list_transports(
+    incident_id: str, typ: Optional[str] = None, status: Optional[str] = None
+):
     inc = await db.incidents.find_one({"id": incident_id}, {"_id": 0})
     if not inc:
         raise HTTPException(status_code=404, detail="Incident nicht gefunden")
@@ -27,14 +30,23 @@ async def list_transports(incident_id: str, typ: Optional[str] = None, status: O
         query["typ"] = {"$in": [v.strip() for v in typ.split(",") if v.strip()]}
     if status:
         query["status"] = {"$in": [v.strip() for v in status.split(",") if v.strip()]}
-    return await db.transports.find(query, {"_id": 0}).sort("created_at", 1).to_list(2000)
+    return (
+        await db.transports.find(query, {"_id": 0}).sort("created_at", 1).to_list(2000)
+    )
 
 
-@router.post("/incidents/{incident_id}/transports", response_model=dict, status_code=201)
+@router.post(
+    "/incidents/{incident_id}/transports", response_model=dict, status_code=201
+)
 async def create_transport(incident_id: str, payload: TransportCreate):
     inc = await db.incidents.find_one({"id": incident_id}, {"_id": 0})
     if not inc:
         raise HTTPException(status_code=404, detail="Incident nicht gefunden")
+    if inc.get("status") == "geplant":
+        raise HTTPException(
+            status_code=409,
+            detail="Incident ist geplant. Transporte koennen erst im operativen Status angelegt werden",
+        )
     p_kennung = None
     p_sichtung = None
     if payload.patient_id:
@@ -42,7 +54,9 @@ async def create_transport(incident_id: str, payload: TransportCreate):
         if not p:
             raise HTTPException(status_code=404, detail="Patient nicht gefunden")
         if p.get("incident_id") != incident_id:
-            raise HTTPException(status_code=400, detail="Patient gehoert nicht zu diesem Incident")
+            raise HTTPException(
+                status_code=400, detail="Patient gehoert nicht zu diesem Incident"
+            )
         p_kennung = p.get("kennung")
         p_sichtung = p.get("sichtung")
 
@@ -60,12 +74,20 @@ async def create_transport(incident_id: str, payload: TransportCreate):
     if payload.ressource:
         transport.zugewiesen_at = now_utc()
     doc = transport.model_dump()
-    for k in ("created_at", "updated_at", "zugewiesen_at", "gestartet_at", "abgeschlossen_at"):
+    for k in (
+        "created_at",
+        "updated_at",
+        "zugewiesen_at",
+        "gestartet_at",
+        "abgeschlossen_at",
+    ):
         if isinstance(doc.get(k), datetime):
             doc[k] = iso(doc[k])
     await db.transports.insert_one(doc)
     if payload.ressource:
-        await update_resource_status_by_name(incident_id, payload.ressource, "im_einsatz")
+        await update_resource_status_by_name(
+            incident_id, payload.ressource, "im_einsatz"
+        )
     return {k: v for k, v in doc.items() if k != "_id"}
 
 
@@ -82,9 +104,19 @@ async def update_transport(transport_id: str, payload: TransportUpdate):
     existing = await db.transports.find_one({"id": transport_id}, {"_id": 0})
     if not existing:
         raise HTTPException(status_code=404, detail="Transport nicht gefunden")
+    inc = await db.incidents.find_one(
+        {"id": existing["incident_id"]}, {"_id": 0, "status": 1}
+    )
+    if not inc:
+        raise HTTPException(status_code=404, detail="Incident nicht gefunden")
     update = payload.model_dump(exclude_none=True)
     if not update:
         raise HTTPException(status_code=400, detail="Keine Aenderungen angegeben")
+    if inc.get("status") == "geplant":
+        raise HTTPException(
+            status_code=409,
+            detail="Incident ist geplant. Transportzuweisungen sind erst im operativen Status erlaubt",
+        )
     now = now_utc()
     update["updated_at"] = iso(now)
 
@@ -106,8 +138,10 @@ async def update_transport(transport_id: str, payload: TransportUpdate):
         update["zugewiesen_at"] = iso(now)
 
     result = await db.transports.find_one_and_update(
-        {"id": transport_id}, {"$set": update},
-        return_document=True, projection={"_id": 0},
+        {"id": transport_id},
+        {"$set": update},
+        return_document=True,
+        projection={"_id": 0},
     )
 
     existing_ressource = existing.get("ressource")
@@ -127,12 +161,16 @@ async def update_transport(transport_id: str, payload: TransportUpdate):
             {"_id": 0},
         )
         if not other:
-            await update_resource_status_by_name(result["incident_id"], ressource_name, "verfuegbar")
+            await update_resource_status_by_name(
+                result["incident_id"], ressource_name, "verfuegbar"
+            )
 
     if existing_ressource and existing_ressource != new_ressource:
         await _release_if_free(existing_ressource)
     if new_ressource and new_status in ("zugewiesen", "unterwegs"):
-        await update_resource_status_by_name(result["incident_id"], new_ressource, "im_einsatz")
+        await update_resource_status_by_name(
+            result["incident_id"], new_ressource, "im_einsatz"
+        )
     if new_status == "abgeschlossen" and new_ressource:
         await _release_if_free(new_ressource)
 

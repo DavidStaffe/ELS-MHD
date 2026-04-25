@@ -90,6 +90,11 @@ async def create_patient(incident_id: str, payload: PatientCreate):
     inc = await db.incidents.find_one({"id": incident_id}, {"_id": 0})
     if not inc:
         raise HTTPException(status_code=404, detail="Incident nicht gefunden")
+    if inc.get("status") == "geplant":
+        raise HTTPException(
+            status_code=409,
+            detail="Incident ist geplant. Patienten koennen erst im operativen Status angelegt werden",
+        )
     kennung = await next_kennung(incident_id)
     now = now_utc()
     patient = Patient(
@@ -171,9 +176,20 @@ async def update_patient(patient_id: str, payload: PatientUpdate):
     existing = await db.patients.find_one({"id": patient_id}, {"_id": 0})
     if not existing:
         raise HTTPException(status_code=404, detail="Patient nicht gefunden")
+    incident = await db.incidents.find_one(
+        {"id": existing["incident_id"]}, {"_id": 0, "status": 1}
+    )
+    if not incident:
+        raise HTTPException(status_code=404, detail="Incident nicht gefunden")
     update = payload.model_dump(exclude_none=True)
     if not update:
         raise HTTPException(status_code=400, detail="Keine Aenderungen angegeben")
+
+    if incident.get("status") == "geplant" and update.get("transport_typ"):
+        raise HTTPException(
+            status_code=409,
+            detail="Incident ist geplant. Transportanforderungen sind erst im operativen Status erlaubt",
+        )
     now = now_utc()
     update["updated_at"] = iso(now)
 

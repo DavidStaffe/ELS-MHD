@@ -91,7 +91,9 @@ async def stream_incidents(request: Request):
 @router.post("/incidents", response_model=dict, status_code=201)
 async def create_incident(payload: IncidentCreate):
     obj = Incident(**payload.model_dump(exclude_none=True))
-    if payload.start_at is None:
+    if obj.status == "geplant":
+        obj.start_at = None
+    elif payload.start_at is None:
         obj.start_at = now_utc()
     doc = obj.model_dump()
     for k in _INC_DATES:
@@ -135,6 +137,10 @@ async def get_incident(incident_id: str):
 
 @router.patch("/incidents/{incident_id}", response_model=dict)
 async def update_incident(incident_id: str, payload: IncidentUpdate):
+    existing = await db.incidents.find_one({"id": incident_id}, {"_id": 0})
+    if not existing:
+        raise HTTPException(status_code=404, detail="Incident nicht gefunden")
+
     update = payload.model_dump(exclude_none=True)
     if not update:
         raise HTTPException(status_code=400, detail="Keine Aenderungen angegeben")
@@ -143,9 +149,12 @@ async def update_incident(incident_id: str, payload: IncidentUpdate):
             update[k] = iso(update[k])
     update["updated_at"] = iso(now_utc())
 
+    if update.get("status") == "operativ" and existing.get("status") == "geplant":
+        if "start_at" not in update:
+            update["start_at"] = iso(now_utc())
+
     if update.get("status") == "abgeschlossen":
-        existing = await db.incidents.find_one({"id": incident_id}, {"_id": 0})
-        if existing and not existing.get("end_at"):
+        if not existing.get("end_at"):
             update["end_at"] = iso(now_utc())
 
     result = await db.incidents.find_one_and_update(
@@ -154,8 +163,6 @@ async def update_incident(incident_id: str, payload: IncidentUpdate):
         return_document=True,
         projection={"_id": 0},
     )
-    if not result:
-        raise HTTPException(status_code=404, detail="Incident nicht gefunden")
     await publish_incident_event(
         {
             "kind": "incident",

@@ -190,6 +190,31 @@ export default function PatientList() {
     );
   }
 
+  if (activeIncident.status === 'geplant') {
+    return (
+      <div className="mx-auto max-w-xl p-6">
+        <div
+          className="els-surface p-6 text-center"
+          data-testid="patients-planned-incident"
+        >
+          <h2 className="text-display">Incident ist geplant</h2>
+          <p className="mt-2 text-muted-foreground">
+            Patienten koennen erst erfasst werden, wenn der Incident auf
+            Operativ gestellt wurde.
+          </p>
+          <Button
+            className="mt-4"
+            onClick={() => navigate('/')}
+            data-testid="patients-goto-incidents-planned"
+          >
+            <ArrowLeft className="h-4 w-4" />
+            Incident-Uebersicht
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
   const handleQuickCreate = async ({ sichtung }) => {
     await create({ sichtung });
   };

@@ -265,6 +265,63 @@ class TestTransportUpdate:
         # Cleanup
         api_client.delete(f"{BASE_URL}/api/transports/{transport['id']}")
 
+    def test_create_transport_on_planned_incident_returns_409(self, api_client):
+        """POST transport on planned incident should be blocked."""
+        incident_resp = api_client.post(
+            f"{BASE_URL}/api/incidents",
+            json={
+                "name": "TEST_Planned_For_Transport_Block",
+                "typ": "einsatz",
+                "status": "geplant",
+                "demo": False,
+            },
+        )
+        assert incident_resp.status_code == 201
+        incident_id = incident_resp.json()["id"]
+        try:
+            response = api_client.post(
+                f"{BASE_URL}/api/incidents/{incident_id}/transports",
+                json={"typ": "extern", "ziel": "krankenhaus"},
+            )
+            assert response.status_code == 409
+        finally:
+            api_client.delete(f"{BASE_URL}/api/incidents/{incident_id}")
+
+    def test_patch_transport_on_planned_incident_returns_409(self, api_client):
+        """PATCH transport should be blocked after incident switched to geplant."""
+        incident_resp = api_client.post(
+            f"{BASE_URL}/api/incidents",
+            json={
+                "name": "TEST_Planned_For_Transport_Update_Block",
+                "typ": "einsatz",
+                "status": "operativ",
+                "demo": False,
+            },
+        )
+        assert incident_resp.status_code == 201
+        incident_id = incident_resp.json()["id"]
+        try:
+            create_resp = api_client.post(
+                f"{BASE_URL}/api/incidents/{incident_id}/transports",
+                json={"typ": "extern", "ziel": "krankenhaus"},
+            )
+            assert create_resp.status_code == 201
+            transport_id = create_resp.json()["id"]
+
+            patch_inc_resp = api_client.patch(
+                f"{BASE_URL}/api/incidents/{incident_id}",
+                json={"status": "geplant"},
+            )
+            assert patch_inc_resp.status_code == 200
+
+            response = api_client.patch(
+                f"{BASE_URL}/api/transports/{transport_id}",
+                json={"ressource": "RTW 1"},
+            )
+            assert response.status_code == 409
+        finally:
+            api_client.delete(f"{BASE_URL}/api/incidents/{incident_id}")
+
 
 class TestTransportDelete:
     """Tests for DELETE /api/transports/{id}"""

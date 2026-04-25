@@ -60,7 +60,7 @@ class Incident(IncidentBase):
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     status: IncidentStatus = "operativ"
     demo: bool = False
-    start_at: datetime = Field(default_factory=now_utc)
+    start_at: Optional[datetime] = None
     end_at: Optional[datetime] = None
     created_at: datetime = Field(default_factory=now_utc)
     updated_at: datetime = Field(default_factory=now_utc)

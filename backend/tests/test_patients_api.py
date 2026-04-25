@@ -164,6 +164,27 @@ class TestPatientCreation:
         )
         assert response.status_code == 404
 
+    def test_create_patient_on_planned_incident_returns_409(self, api_client):
+        """POST on planned incident should be blocked until status=operativ."""
+        incident_resp = api_client.post(
+            f"{BASE_URL}/api/incidents",
+            json={
+                "name": "TEST_Planned_For_Patient_Block",
+                "typ": "einsatz",
+                "status": "geplant",
+                "demo": False,
+            },
+        )
+        assert incident_resp.status_code == 201
+        incident_id = incident_resp.json()["id"]
+        try:
+            response = api_client.post(
+                f"{BASE_URL}/api/incidents/{incident_id}/patients", json={}
+            )
+            assert response.status_code == 409
+        finally:
+            api_client.delete(f"{BASE_URL}/api/incidents/{incident_id}")
+
 
 class TestPatientAutoKennung:
     """Tests for auto-generated kennung (P-0001, P-0002, ...)"""

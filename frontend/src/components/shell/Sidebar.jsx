@@ -28,6 +28,7 @@ import {
 const NAV_GROUPS = (
   hasIncident,
   isArchived,
+  isPlanned,
   unassignedPatientCount,
   transportBadges,
 ) => [
@@ -66,8 +67,14 @@ const NAV_GROUPS = (
         label: 'Patienten',
         testId: 'nav-patienten',
         badge: unassignedPatientCount,
-        disabled: !hasIncident || isArchived,
-        hint: !hasIncident ? 'inaktiv' : isArchived ? 'gesperrt' : null,
+        disabled: !hasIncident || isArchived || isPlanned,
+        hint: !hasIncident
+          ? 'inaktiv'
+          : isArchived
+            ? 'gesperrt'
+            : isPlanned
+              ? 'geplant'
+              : null,
       },
       {
         to: '/transport',
@@ -75,8 +82,14 @@ const NAV_GROUPS = (
         label: 'Transport',
         testId: 'nav-transport',
         badges: transportBadges,
-        disabled: !hasIncident || isArchived,
-        hint: !hasIncident ? 'inaktiv' : isArchived ? 'gesperrt' : null,
+        disabled: !hasIncident || isArchived || isPlanned,
+        hint: !hasIncident
+          ? 'inaktiv'
+          : isArchived
+            ? 'gesperrt'
+            : isPlanned
+              ? 'geplant'
+              : null,
       },
       {
         to: '/ressourcen',
@@ -141,6 +154,7 @@ export function Sidebar({ className }) {
   const { transports } = useTransports();
   const hasIncident = Boolean(activeIncident);
   const isArchived = activeIncident?.status === 'abgeschlossen';
+  const isPlanned = activeIncident?.status === 'geplant';
   const unassignedPatientCount = React.useMemo(
     () =>
       patients.filter((p) => !isPatientClosed(p) && !p.behandlung_ressource_id)
@@ -196,6 +210,7 @@ export function Sidebar({ className }) {
   const groups = NAV_GROUPS(
     hasIncident,
     isArchived,
+    isPlanned,
     unassignedPatientCount,
     transportBadges,
   );

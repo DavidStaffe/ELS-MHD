@@ -190,8 +190,10 @@ async function main() {
   );
 
   startProcess('frontend', npmCmd, ['start'], frontendDir, {
-    REACT_APP_BACKEND_URL:
-      process.env.REACT_APP_BACKEND_URL || `http://localhost:${backendPort}`,
+    ...(process.env.REACT_APP_BACKEND_URL
+      ? { REACT_APP_BACKEND_URL: process.env.REACT_APP_BACKEND_URL }
+      : {}),
+    REACT_APP_BACKEND_PORT: String(backendPort),
     PORT: String(frontendPort),
   });
 }
