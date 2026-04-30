@@ -1,7 +1,7 @@
 # ELS MHD
 
 ELS MHD ist ein Einsatzleitsystem fuer sanitaetsdienstliche Lagen bei Veranstaltungen.
-
+Lauffähig auf Raspberry Pi 5
 Die Anwendung bildet den operativen Einsatzablauf ab:
 
 - Incident-Steuerung
