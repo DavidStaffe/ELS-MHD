@@ -126,8 +126,6 @@ export function ResourceBar({
                 {renderGroup("intern")}
                 <div className="h-12 w-px bg-border" aria-hidden />
                 {renderGroup("extern")}
-                {/* Spacer fuer Made-with-Emergent Badge */}
-                <div aria-hidden className="hidden md:block w-44 shrink-0" />
             </div>
             <div className="mt-2 flex items-center justify-between gap-2 text-[0.7rem] text-muted-foreground">
                 <span>

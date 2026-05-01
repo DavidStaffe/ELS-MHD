@@ -134,9 +134,6 @@ export function QuickEntryBar({
                     </kbd>
                 </Button>
             </div>
-
-            {/* Reservierter Platz rechts (Made-with-Emergent Badge) */}
-            <div aria-hidden className="hidden md:block w-44 shrink-0" />
         </div>
     );
 }
