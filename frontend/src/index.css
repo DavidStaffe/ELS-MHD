@@ -328,7 +328,7 @@
 .report-a4 .pill-red { background: #fee2e2; color: #991b1b; }
 .report-a4 .pill-yellow { background: #fef3c7; color: #92400e; }
 .report-a4 .pill-green { background: #dcfce7; color: #166534; }
-.report-a4 .pill-gray { background: #e2e8f0; color: #334155; }
+.report-a4 .pill-gray { background: #64748b; color: #ffffff; }
 
 @media print {
     @page {
