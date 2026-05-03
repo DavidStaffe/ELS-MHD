@@ -49,7 +49,7 @@ export function PatientTimeline({ patient, events = DEFAULT_EVENTS }) {
     S1: 'S1 (Rot)',
     S2: 'S2 (Gelb)',
     S3: 'S3 (Grün)',
-    S0: 'S0 (Schwarz)',
+    S0: 'S0 (Weiß)',
   };
 
   const formatResourceLabel = (entry) => {
