@@ -1,44 +1,44 @@
-"""Transports routes."""
-
+"""Transports routes – secured with RBAC."""
 from datetime import datetime
 from typing import List, Optional
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 
 from core.db import db
+from core.permissions import IncidentAuth
 from core.time import iso, now_utc
 from models import Transport, TransportCreate, TransportUpdate
+from services.funk import log_system_entry
 from services.seeds import (
     DEFAULT_ZIEL_BY_TYP,
-    update_resource_status_by_name,
     release_bett_for_patient,
+    update_resource_status_by_name,
 )
-from services.funk import log_system_entry
 
 router = APIRouter(prefix="/api", tags=["transports"])
 
 
 @router.get("/incidents/{incident_id}/transports", response_model=List[dict])
 async def list_transports(
-    incident_id: str, typ: Optional[str] = None, status: Optional[str] = None
+    incident_id: str,
+    typ: Optional[str] = None,
+    status: Optional[str] = None,
+    auth=Depends(IncidentAuth().require("read")),
 ):
-    inc = await db.incidents.find_one({"id": incident_id}, {"_id": 0})
-    if not inc:
-        raise HTTPException(status_code=404, detail="Incident nicht gefunden")
     query: dict = {"incident_id": incident_id}
     if typ:
         query["typ"] = {"$in": [v.strip() for v in typ.split(",") if v.strip()]}
     if status:
         query["status"] = {"$in": [v.strip() for v in status.split(",") if v.strip()]}
-    return (
-        await db.transports.find(query, {"_id": 0}).sort("created_at", 1).to_list(2000)
-    )
+    return await db.transports.find(query, {"_id": 0}).sort("created_at", 1).to_list(2000)
 
 
-@router.post(
-    "/incidents/{incident_id}/transports", response_model=dict, status_code=201
-)
-async def create_transport(incident_id: str, payload: TransportCreate):
+@router.post("/incidents/{incident_id}/transports", response_model=dict, status_code=201)
+async def create_transport(
+    incident_id: str,
+    payload: TransportCreate,
+    auth=Depends(IncidentAuth().require("write")),
+):
     inc = await db.incidents.find_one({"id": incident_id}, {"_id": 0})
     if not inc:
         raise HTTPException(status_code=404, detail="Incident nicht gefunden")
@@ -47,8 +47,8 @@ async def create_transport(incident_id: str, payload: TransportCreate):
             status_code=409,
             detail="Incident ist geplant. Transporte koennen erst im operativen Status angelegt werden",
         )
-    p_kennung = None
-    p_sichtung = None
+
+    p_kennung = p_sichtung = None
     if payload.patient_id:
         p = await db.patients.find_one({"id": payload.patient_id}, {"_id": 0})
         if not p:
@@ -73,26 +73,23 @@ async def create_transport(incident_id: str, payload: TransportCreate):
     )
     if payload.ressource:
         transport.zugewiesen_at = now_utc()
+
     doc = transport.model_dump()
-    for k in (
-        "created_at",
-        "updated_at",
-        "zugewiesen_at",
-        "gestartet_at",
-        "abgeschlossen_at",
-    ):
+    for k in ("created_at", "updated_at", "zugewiesen_at", "gestartet_at", "abgeschlossen_at"):
         if isinstance(doc.get(k), datetime):
             doc[k] = iso(doc[k])
+
     await db.transports.insert_one(doc)
     if payload.ressource:
-        await update_resource_status_by_name(
-            incident_id, payload.ressource, "im_einsatz"
-        )
+        await update_resource_status_by_name(incident_id, payload.ressource, "im_einsatz")
     return {k: v for k, v in doc.items() if k != "_id"}
 
 
 @router.get("/transports/{transport_id}", response_model=dict)
-async def get_transport(transport_id: str):
+async def get_transport(
+    transport_id: str,
+    auth=Depends(IncidentAuth(id_source="transport").require("read")),
+):
     d = await db.transports.find_one({"id": transport_id}, {"_id": 0})
     if not d:
         raise HTTPException(status_code=404, detail="Transport nicht gefunden")
@@ -100,23 +97,30 @@ async def get_transport(transport_id: str):
 
 
 @router.patch("/transports/{transport_id}", response_model=dict)
-async def update_transport(transport_id: str, payload: TransportUpdate):
+async def update_transport(
+    transport_id: str,
+    payload: TransportUpdate,
+    auth=Depends(IncidentAuth(id_source="transport").require("write")),
+):
     existing = await db.transports.find_one({"id": transport_id}, {"_id": 0})
     if not existing:
         raise HTTPException(status_code=404, detail="Transport nicht gefunden")
+
     inc = await db.incidents.find_one(
         {"id": existing["incident_id"]}, {"_id": 0, "status": 1}
     )
     if not inc:
         raise HTTPException(status_code=404, detail="Incident nicht gefunden")
-    update = payload.model_dump(exclude_none=True)
-    if not update:
-        raise HTTPException(status_code=400, detail="Keine Aenderungen angegeben")
     if inc.get("status") == "geplant":
         raise HTTPException(
             status_code=409,
             detail="Incident ist geplant. Transportzuweisungen sind erst im operativen Status erlaubt",
         )
+
+    update = payload.model_dump(exclude_none=True)
+    if not update:
+        raise HTTPException(status_code=400, detail="Keine Aenderungen angegeben")
+
     now = now_utc()
     update["updated_at"] = iso(now)
 
@@ -168,16 +172,12 @@ async def update_transport(transport_id: str, payload: TransportUpdate):
     if existing_ressource and existing_ressource != new_ressource:
         await _release_if_free(existing_ressource)
     if new_ressource and new_status in ("zugewiesen", "unterwegs"):
-        await update_resource_status_by_name(
-            result["incident_id"], new_ressource, "im_einsatz"
-        )
+        await update_resource_status_by_name(result["incident_id"], new_ressource, "im_einsatz")
     if new_status == "abgeschlossen" and new_ressource:
         await _release_if_free(new_ressource)
-
     if new_status == "abgeschlossen" and result.get("patient_id"):
         await release_bett_for_patient(result["patient_id"])
 
-    # Funktagebuch-Systemeintrag bei Status-Aenderung
     if "status" in update and update["status"] != existing.get("status"):
         kennung = result.get("patient_kennung") or "?"
         ress = result.get("ressource") or "-"
@@ -188,12 +188,14 @@ async def update_transport(transport_id: str, payload: TransportUpdate):
             transport_id=transport_id,
             patient_id=result.get("patient_id"),
         )
-
     return result
 
 
 @router.delete("/transports/{transport_id}", status_code=204)
-async def delete_transport(transport_id: str):
+async def delete_transport(
+    transport_id: str,
+    auth=Depends(IncidentAuth(id_source="transport").require("write")),
+):
     r = await db.transports.delete_one({"id": transport_id})
     if r.deleted_count == 0:
         raise HTTPException(status_code=404, detail="Transport nicht gefunden")

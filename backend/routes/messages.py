@@ -1,18 +1,18 @@
-"""Messages / Funktagebuch routes (Schritt 13)."""
+"""Messages / Funktagebuch routes – secured with RBAC."""
 import uuid
 from typing import List, Optional
 
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 
 from core.db import db
+from core.permissions import IncidentAuth
 from core.time import iso, now_utc
-from models import MessageCreate, MessageUpdate, MessageConfirm
+from models import MessageConfirm, MessageCreate, MessageUpdate
 
 router = APIRouter(prefix="/api", tags=["messages"])
 
 
 def _doc_defaults() -> dict:
-    """Felder, die Funktagebuch-Eintraege initial haben."""
     return {
         "quittiert_at": None,
         "quittiert_von": None,
@@ -29,8 +29,7 @@ def _doc_defaults() -> dict:
 async def list_messages(
     incident_id: str,
     open_only: bool = False,
-    funk_typ: Optional[str] = Query(default=None,
-        description="Kommaseparierte Liste: funk_ein,funk_aus,lage,..."),
+    funk_typ: Optional[str] = Query(default=None),
     prioritaet: Optional[str] = None,
     quelle: Optional[str] = None,
     abschnitt_id: Optional[str] = None,
@@ -39,10 +38,8 @@ async def list_messages(
     q: Optional[str] = None,
     since: Optional[str] = None,
     until: Optional[str] = None,
+    auth=Depends(IncidentAuth().require("read")),
 ):
-    inc = await db.incidents.find_one({"id": incident_id}, {"_id": 0})
-    if not inc:
-        raise HTTPException(status_code=404, detail="Incident nicht gefunden")
     query: dict = {"incident_id": incident_id}
     if open_only:
         query["quittiert_at"] = None
@@ -72,10 +69,15 @@ async def list_messages(
 
 
 @router.post("/incidents/{incident_id}/messages", response_model=dict, status_code=201)
-async def create_message(incident_id: str, payload: MessageCreate):
+async def create_message(
+    incident_id: str,
+    payload: MessageCreate,
+    auth=Depends(IncidentAuth().require("write")),
+):
     inc = await db.incidents.find_one({"id": incident_id}, {"_id": 0})
     if not inc:
         raise HTTPException(status_code=404, detail="Incident nicht gefunden")
+
     doc = {
         "id": str(uuid.uuid4()),
         "incident_id": incident_id,
@@ -83,7 +85,6 @@ async def create_message(incident_id: str, payload: MessageCreate):
         **_doc_defaults(),
         "created_at": iso(now_utc()),
     }
-    # Pflicht-Fallbacks
     doc.setdefault("funk_typ", "lage")
     doc.setdefault("absender", payload.von or "")
     doc.setdefault("empfaenger", "")
@@ -92,7 +93,10 @@ async def create_message(incident_id: str, payload: MessageCreate):
 
 
 @router.get("/messages/{message_id}", response_model=dict)
-async def get_message(message_id: str):
+async def get_message(
+    message_id: str,
+    auth=Depends(IncidentAuth(id_source="message").require("read")),
+):
     d = await db.messages.find_one({"id": message_id}, {"_id": 0})
     if not d:
         raise HTTPException(status_code=404, detail="Meldung nicht gefunden")
@@ -100,31 +104,45 @@ async def get_message(message_id: str):
 
 
 @router.patch("/messages/{message_id}", response_model=dict)
-async def update_message(message_id: str, payload: MessageUpdate):
+async def update_message(
+    message_id: str,
+    payload: MessageUpdate,
+    auth=Depends(IncidentAuth(id_source="message").require("write")),
+):
     existing = await db.messages.find_one({"id": message_id}, {"_id": 0})
     if not existing:
         raise HTTPException(status_code=404, detail="Meldung nicht gefunden")
     if existing.get("finalisiert"):
-        raise HTTPException(status_code=409, detail="Finalisierte Eintraege koennen nicht geaendert werden")
+        raise HTTPException(
+            status_code=409, detail="Finalisierte Eintraege koennen nicht geaendert werden"
+        )
     if existing.get("quelle") == "system":
         raise HTTPException(status_code=409, detail="Systemeintraege sind unveraenderlich")
+
     upd = payload.model_dump(exclude_none=True)
     if not upd:
         raise HTTPException(status_code=400, detail="Keine Aenderungen")
     upd["updated_at"] = iso(now_utc())
-    result = await db.messages.find_one_and_update(
-        {"id": message_id}, {"$set": upd},
-        return_document=True, projection={"_id": 0},
+
+    return await db.messages.find_one_and_update(
+        {"id": message_id},
+        {"$set": upd},
+        return_document=True,
+        projection={"_id": 0},
     )
-    return result
 
 
 @router.post("/messages/{message_id}/ack", response_model=dict)
-async def ack_message(message_id: str, by: Optional[str] = None):
+async def ack_message(
+    message_id: str,
+    by: Optional[str] = None,
+    auth=Depends(IncidentAuth(id_source="message").require("write")),
+):
     result = await db.messages.find_one_and_update(
         {"id": message_id},
         {"$set": {"quittiert_at": iso(now_utc()), "quittiert_von": by or "Einsatzleiter"}},
-        return_document=True, projection={"_id": 0},
+        return_document=True,
+        projection={"_id": 0},
     )
     if not result:
         raise HTTPException(status_code=404, detail="Meldung nicht gefunden")
@@ -132,24 +150,34 @@ async def ack_message(message_id: str, by: Optional[str] = None):
 
 
 @router.post("/messages/{message_id}/confirm", response_model=dict)
-async def confirm_message(message_id: str, payload: MessageConfirm):
-    """Einsatzleitung bestaetigt wichtigen Eintrag (z.B. Lagemeldung gelesen)."""
+async def confirm_message(
+    message_id: str,
+    payload: MessageConfirm,
+    auth=Depends(IncidentAuth(id_source="message").require("write")),
+):
     existing = await db.messages.find_one({"id": message_id}, {"_id": 0})
     if not existing:
         raise HTTPException(status_code=404, detail="Meldung nicht gefunden")
     return await db.messages.find_one_and_update(
         {"id": message_id},
-        {"$set": {
-            "bestaetigt_at": iso(now_utc()),
-            "bestaetigt_von": payload.bestaetigt_von or "Einsatzleiter",
-        }},
-        return_document=True, projection={"_id": 0},
+        {
+            "$set": {
+                "bestaetigt_at": iso(now_utc()),
+                "bestaetigt_von": payload.bestaetigt_von or "Einsatzleiter",
+            }
+        },
+        return_document=True,
+        projection={"_id": 0},
     )
 
 
 @router.post("/messages/{message_id}/finalize", response_model=dict)
-async def finalize_message(message_id: str, by: Optional[str] = None):
-    """Sperrt Eintrag gegen weitere Aenderungen."""
+async def finalize_message(
+    message_id: str,
+    by: Optional[str] = None,
+    auth=Depends(IncidentAuth(id_source="message").require("assign_roles")),
+):
+    """Sperrt Eintrag gegen weitere Aenderungen – nur EL oder Admin."""
     existing = await db.messages.find_one({"id": message_id}, {"_id": 0})
     if not existing:
         raise HTTPException(status_code=404, detail="Meldung nicht gefunden")
@@ -157,23 +185,33 @@ async def finalize_message(message_id: str, by: Optional[str] = None):
         return existing
     return await db.messages.find_one_and_update(
         {"id": message_id},
-        {"$set": {
-            "finalisiert": True,
-            "finalisiert_at": iso(now_utc()),
-            "finalisiert_von": by or existing.get("erfasst_von", "System"),
-        }},
-        return_document=True, projection={"_id": 0},
+        {
+            "$set": {
+                "finalisiert": True,
+                "finalisiert_at": iso(now_utc()),
+                "finalisiert_von": by or existing.get("erfasst_von", "System"),
+            }
+        },
+        return_document=True,
+        projection={"_id": 0},
     )
 
 
 @router.delete("/messages/{message_id}", status_code=204)
-async def delete_message(message_id: str):
+async def delete_message(
+    message_id: str,
+    auth=Depends(IncidentAuth(id_source="message").require("write")),
+):
     existing = await db.messages.find_one({"id": message_id}, {"_id": 0})
     if not existing:
         raise HTTPException(status_code=404, detail="Meldung nicht gefunden")
     if existing.get("finalisiert"):
-        raise HTTPException(status_code=409, detail="Finalisierte Eintraege koennen nicht geloescht werden")
+        raise HTTPException(
+            status_code=409, detail="Finalisierte Eintraege koennen nicht geloescht werden"
+        )
     if existing.get("quelle") == "system":
-        raise HTTPException(status_code=409, detail="Systemeintraege koennen nicht geloescht werden")
+        raise HTTPException(
+            status_code=409, detail="Systemeintraege koennen nicht geloescht werden"
+        )
     await db.messages.delete_one({"id": message_id})
     return None
