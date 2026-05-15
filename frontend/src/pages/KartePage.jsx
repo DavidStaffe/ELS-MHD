@@ -1,0 +1,553 @@
+import * as React from 'react';
+import { useNavigate } from 'react-router-dom';
+import { useIncidents } from '@/context/IncidentContext';
+import { useOps } from '@/context/OpsContext';
+import { useRole } from '@/context/RoleContext';
+import { IncidentMap } from '@/components/map/IncidentMap';
+import { MapPicker } from '@/components/map/MapPicker';
+import { Button } from '@/components/ui/button';
+import { StatusBadge, KpiTile } from '@/components/primitives';
+import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import { FMS_STATUS, fmsMeta } from '@/lib/fms-status';
+import { toast } from 'sonner';
+import {
+  ArrowLeft,
+  MapPin,
+  MapPinned,
+  Plus,
+  Move,
+  Lock,
+  Save,
+  Trash2,
+  Settings2,
+} from 'lucide-react';
+
+const RESOURCE_KAT_LABEL = {
+  uhs: 'UHS-Team',
+  evt: 'EVT',
+  rtw: 'RTW',
+  ktw: 'KTW',
+  nef: 'NEF',
+  sonstiges: 'Sonstiges',
+};
+
+function ResourceLegend() {
+  return (
+    <div className="els-surface p-3 text-caption" data-testid="map-fms-legend">
+      <div className="font-medium text-foreground mb-2">FMS-Legende</div>
+      <ul className="space-y-1">
+        {Object.entries(FMS_STATUS).map(([key, m]) => (
+          <li key={key} className="flex items-center gap-2">
+            <span
+              className="inline-block w-3 h-3 rounded-full"
+              style={{ background: m.color }}
+            />
+            <span className="font-mono text-foreground w-4">{key}</span>
+            <span className="text-muted-foreground">{m.label}</span>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
+function EditIncidentLocationDialog({
+  open,
+  onOpenChange,
+  incident,
+  onSave,
+}) {
+  const [location, setLocation] = React.useState(null);
+  const [busy, setBusy] = React.useState(false);
+
+  React.useEffect(() => {
+    if (open && incident) {
+      setLocation(
+        incident.ort_lat != null
+          ? { lat: incident.ort_lat, lng: incident.ort_lng }
+          : null,
+      );
+    }
+  }, [open, incident]);
+
+  const handleSave = async () => {
+    setBusy(true);
+    try {
+      await onSave(
+        location
+          ? { ort_lat: location.lat, ort_lng: location.lng, ort_zoom: 15 }
+          : { ort_lat: null, ort_lng: null, ort_zoom: null },
+      );
+      onOpenChange(false);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent
+        className="sm:max-w-xl bg-card border-border max-h-[90vh] overflow-y-auto"
+        data-testid="map-edit-location-dialog"
+      >
+        <DialogHeader>
+          <DialogTitle>Einsatz-Ort bearbeiten</DialogTitle>
+          <DialogDescription>
+            Suche eine Adresse oder klicke auf die Karte. Aenderungen werden
+            sofort gespeichert und an alle verbundenen Clients ausgespielt.
+          </DialogDescription>
+        </DialogHeader>
+        <MapPicker
+          value={location}
+          onChange={setLocation}
+          height="300px"
+        />
+        <DialogFooter>
+          <Button
+            variant="outline"
+            onClick={() => onOpenChange(false)}
+            disabled={busy}
+            data-testid="map-edit-cancel"
+          >
+            Abbrechen
+          </Button>
+          <Button onClick={handleSave} disabled={busy} data-testid="map-edit-save">
+            <Save className="h-3.5 w-3.5" />
+            {busy ? 'Speichere…' : 'Speichern'}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function EditResourceDialog({ open, onOpenChange, resource, onSave, onRemove }) {
+  const [fmsStatus, setFmsStatus] = React.useState('none');
+  const [diveraId, setDiveraId] = React.useState('');
+  const [busy, setBusy] = React.useState(false);
+
+  React.useEffect(() => {
+    if (open && resource) {
+      setFmsStatus(
+        resource.fms_status !== null && resource.fms_status !== undefined
+          ? String(resource.fms_status)
+          : 'none',
+      );
+      setDiveraId(resource.divera_id || '');
+    }
+  }, [open, resource]);
+
+  if (!resource) return null;
+
+  const handleSave = async () => {
+    setBusy(true);
+    try {
+      await onSave({
+        fms_status: fmsStatus === 'none' ? null : Number(fmsStatus),
+        divera_id: diveraId.trim() || null,
+      });
+      onOpenChange(false);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const handleRemoveFromMap = async () => {
+    setBusy(true);
+    try {
+      await onRemove();
+      onOpenChange(false);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent
+        className="sm:max-w-md bg-card border-border"
+        data-testid="map-edit-resource-dialog"
+      >
+        <DialogHeader>
+          <DialogTitle>{resource.name}</DialogTitle>
+          <DialogDescription>
+            Kategorie: {RESOURCE_KAT_LABEL[resource.kategorie] || resource.kategorie} ·
+            Position{' '}
+            <span className="font-mono">
+              {resource.lat?.toFixed(5)}, {resource.lng?.toFixed(5)}
+            </span>
+          </DialogDescription>
+        </DialogHeader>
+        <div className="space-y-3">
+          <div className="space-y-1.5">
+            <Label htmlFor="rd-fms">FMS-Status (manuell)</Label>
+            <Select value={fmsStatus} onValueChange={setFmsStatus}>
+              <SelectTrigger id="rd-fms" data-testid="map-resource-fms">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="none">— kein FMS gesetzt —</SelectItem>
+                {Object.entries(FMS_STATUS).map(([key, m]) => (
+                  <SelectItem key={key} value={key}>
+                    <span className="font-mono mr-2">{key}</span>
+                    {m.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <p className="text-caption text-muted-foreground">
+              Wird vom Divera-Polling ueberschrieben, sobald eine Divera-ID
+              gesetzt ist (Phase 3).
+            </p>
+          </div>
+
+          <div className="space-y-1.5">
+            <Label htmlFor="rd-divera">Divera-Fahrzeug-ID (optional)</Label>
+            <Input
+              id="rd-divera"
+              value={diveraId}
+              onChange={(e) => setDiveraId(e.target.value)}
+              placeholder="z.B. 1234"
+              data-testid="map-resource-divera"
+            />
+          </div>
+        </div>
+
+        <DialogFooter className="flex-row justify-between gap-2">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={handleRemoveFromMap}
+            disabled={busy}
+            className="text-muted-foreground hover:text-destructive"
+            data-testid="map-resource-unplace"
+          >
+            <Trash2 className="h-3.5 w-3.5" />
+            Von Karte entfernen
+          </Button>
+          <div className="flex gap-2">
+            <Button
+              variant="outline"
+              onClick={() => onOpenChange(false)}
+              disabled={busy}
+            >
+              Abbrechen
+            </Button>
+            <Button
+              onClick={handleSave}
+              disabled={busy}
+              data-testid="map-resource-save"
+            >
+              {busy ? 'Speichere…' : 'Speichern'}
+            </Button>
+          </div>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+export default function KartePage() {
+  const { activeIncident, update: updateIncident } = useIncidents();
+  const { resources, updResource } = useOps();
+  const { can } = useRole();
+  const navigate = useNavigate();
+
+  const [editLocation, setEditLocation] = React.useState(false);
+  const [editResource, setEditResource] = React.useState(null);
+  const [placeMode, setPlaceMode] = React.useState(null); // resource id or null
+
+  const canEdit = can('incident.update');
+  const canEditResource = can('resource.update');
+  const isArchived = activeIncident?.status === 'abgeschlossen';
+
+  const unplacedResources = React.useMemo(
+    () => resources.filter((r) => r.lat == null || r.lng == null),
+    [resources],
+  );
+
+  const activeOnMap = resources.filter(
+    (r) => r.lat != null && r.lng != null,
+  ).length;
+  const fmsCounts = React.useMemo(() => {
+    const c = { verfuegbar: 0, einsatz: 0, sprechwunsch: 0, offline: 0, wartung: 0 };
+    for (const r of resources) {
+      const m = fmsMeta(r.fms_status);
+      if (m && c[m.group] !== undefined) c[m.group]++;
+    }
+    return c;
+  }, [resources]);
+
+  if (!activeIncident) {
+    return (
+      <div className="mx-auto max-w-2xl p-6">
+        <div className="els-surface p-6 text-center" data-testid="karte-no-incident">
+          <h2 className="text-display">Kein Incident aktiv</h2>
+          <p className="mt-2 text-muted-foreground">
+            Waehle zunaechst einen Incident aus der Uebersicht.
+          </p>
+          <Button className="mt-4" onClick={() => navigate('/')}>
+            <ArrowLeft className="h-4 w-4" />
+            Zur Incident-Uebersicht
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
+  const handleSaveIncidentLocation = async (patch) => {
+    try {
+      await updateIncident(activeIncident.id, patch);
+      toast.success('Lage-Ort aktualisiert');
+    } catch (e) {
+      toast.error('Speichern fehlgeschlagen');
+    }
+  };
+
+  const handleIncidentDrag = async ([lat, lng]) => {
+    if (!canEdit || isArchived) return;
+    try {
+      await updateIncident(activeIncident.id, {
+        ort_lat: lat,
+        ort_lng: lng,
+      });
+      toast.success('Lage-Ort verschoben');
+    } catch {
+      toast.error('Verschieben fehlgeschlagen');
+    }
+  };
+
+  const handleResourceMove = async (id, [lat, lng]) => {
+    if (!canEditResource || isArchived) return;
+    try {
+      await updResource(id, { lat, lng });
+    } catch {
+      toast.error('Ressource konnte nicht verschoben werden');
+    }
+  };
+
+  const handleMapClickPlace = async ([lat, lng]) => {
+    if (!placeMode) return;
+    try {
+      await updResource(placeMode, { lat, lng });
+      toast.success('Ressource platziert');
+      setPlaceMode(null);
+    } catch {
+      toast.error('Platzieren fehlgeschlagen');
+    }
+  };
+
+  const handleResourceClick = (r) => {
+    if (placeMode) return;
+    setEditResource(r);
+  };
+
+  return (
+    <div className="flex flex-col h-[calc(100vh-3.5rem)]">
+      {/* Header */}
+      <div className="flex flex-wrap items-center justify-between gap-3 px-6 py-3 border-b border-border bg-surface-sunken">
+        <div className="min-w-0">
+          <div className="text-caption uppercase tracking-wider text-muted-foreground flex items-center gap-2">
+            <MapPinned className="h-3 w-3" />
+            Lagekarte
+            {isArchived && (
+              <StatusBadge tone="gray" variant="soft" size="sm">
+                <Lock className="h-3 w-3" />
+                archiviert
+              </StatusBadge>
+            )}
+          </div>
+          <h1 className="text-heading truncate" data-testid="karte-title">
+            {activeIncident.name}
+          </h1>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setEditLocation(true)}
+            disabled={!canEdit || isArchived}
+            data-testid="btn-edit-location"
+            title="Einsatz-Ort bearbeiten"
+          >
+            <Settings2 className="h-4 w-4" />
+            Ort bearbeiten
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => navigate('/lage')}
+            data-testid="btn-back-lage"
+          >
+            <ArrowLeft className="h-4 w-4" />
+            Zur Lage
+          </Button>
+        </div>
+      </div>
+
+      {/* KPI strip */}
+      <div className="grid grid-cols-2 md:grid-cols-5 gap-2 px-6 py-2 border-b border-border bg-surface-sunken/40">
+        <KpiTile
+          label="Auf Karte"
+          value={activeOnMap}
+          unit={`/${resources.length}`}
+          tone="default"
+          testId="kpi-on-map"
+        />
+        <KpiTile
+          label="Verfügbar"
+          value={fmsCounts.verfuegbar}
+          tone="green"
+          testId="kpi-fms-verfuegbar"
+        />
+        <KpiTile
+          label="Im Einsatz"
+          value={fmsCounts.einsatz}
+          tone="yellow"
+          testId="kpi-fms-einsatz"
+        />
+        <KpiTile
+          label="Sprechw."
+          value={fmsCounts.sprechwunsch}
+          tone="red"
+          testId="kpi-fms-sprechwunsch"
+        />
+        <KpiTile
+          label="Offline/Wartung"
+          value={fmsCounts.offline + fmsCounts.wartung}
+          tone="gray"
+          testId="kpi-fms-offline"
+        />
+      </div>
+
+      {/* Map + Sidebar */}
+      <div className="flex-1 grid grid-cols-1 lg:grid-cols-[1fr_320px] overflow-hidden">
+        <div className="relative">
+          {placeMode && (
+            <div
+              className="absolute top-3 left-1/2 -translate-x-1/2 z-[400] rounded-md bg-primary px-3 py-2 text-sm font-medium text-primary-foreground shadow-lg flex items-center gap-2"
+              data-testid="place-mode-banner"
+            >
+              <MapPin className="h-4 w-4" />
+              Klicke auf die Karte, um die Ressource zu platzieren
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={() => setPlaceMode(null)}
+                className="h-6 ml-2 hover:bg-primary-foreground/20"
+              >
+                Abbrechen
+              </Button>
+            </div>
+          )}
+          <IncidentMap
+            incident={activeIncident}
+            resources={resources}
+            draggableIncident={canEdit && !isArchived}
+            draggableResources={canEditResource && !isArchived && !placeMode}
+            clickToPlace={Boolean(placeMode)}
+            onMapClick={handleMapClickPlace}
+            onIncidentMove={handleIncidentDrag}
+            onResourceMove={handleResourceMove}
+            onResourceClick={handleResourceClick}
+            height="100%"
+            showAttribution
+          />
+        </div>
+
+        <aside
+          className="border-t lg:border-t-0 lg:border-l border-border bg-surface-sunken/60 overflow-y-auto p-3 space-y-3"
+          data-testid="map-sidebar"
+        >
+          <div className="els-surface p-3" data-testid="map-resources-unplaced">
+            <div className="text-caption uppercase tracking-wider text-muted-foreground mb-2">
+              Nicht platziert ({unplacedResources.length})
+            </div>
+            {unplacedResources.length === 0 ? (
+              <div className="text-caption text-muted-foreground italic">
+                Alle Ressourcen sind auf der Karte.
+              </div>
+            ) : (
+              <ul className="space-y-1.5">
+                {unplacedResources.map((r) => (
+                  <li
+                    key={r.id}
+                    className="flex items-center gap-2 rounded-md bg-surface-raised px-2.5 py-1.5"
+                  >
+                    <div className="flex-1 min-w-0">
+                      <div className="text-sm font-medium truncate">{r.name}</div>
+                      <div className="text-caption text-muted-foreground">
+                        {RESOURCE_KAT_LABEL[r.kategorie] || r.kategorie}
+                      </div>
+                    </div>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setPlaceMode(r.id)}
+                      disabled={!canEditResource || isArchived || placeMode === r.id}
+                      data-testid={`btn-place-${r.id}`}
+                      title="Auf Karte platzieren"
+                    >
+                      <Plus className="h-3.5 w-3.5" />
+                      Platzieren
+                    </Button>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+
+          <ResourceLegend />
+
+          <div className="els-surface p-3" data-testid="map-hints">
+            <div className="text-caption uppercase tracking-wider text-muted-foreground mb-1">
+              Tipps
+            </div>
+            <ul className="text-caption text-muted-foreground space-y-1 list-disc list-inside">
+              <li>Marker draggen, um Position zu aendern</li>
+              <li>Auf Pin klicken fuer FMS-Status</li>
+              <li>Incident-Pin verschiebt Karten-Zentrum</li>
+            </ul>
+          </div>
+        </aside>
+      </div>
+
+      <EditIncidentLocationDialog
+        open={editLocation}
+        onOpenChange={setEditLocation}
+        incident={activeIncident}
+        onSave={handleSaveIncidentLocation}
+      />
+      <EditResourceDialog
+        open={editResource !== null}
+        onOpenChange={(v) => !v && setEditResource(null)}
+        resource={editResource}
+        onSave={async (patch) => {
+          await updResource(editResource.id, patch);
+          toast.success('Ressource aktualisiert');
+        }}
+        onRemove={async () => {
+          await updResource(editResource.id, { lat: null, lng: null });
+          toast.success('Von Karte entfernt');
+        }}
+      />
+    </div>
+  );
+}

@@ -54,6 +54,7 @@ export const ROLE_KEYS = Object.keys(ROLES);
 const PERMS = {
     // Incidents
     "incident.create": ["einsatzleiter"],
+    "incident.update": ["einsatzleiter", "fuehrungsassistenz"],
     "incident.delete": ["einsatzleiter"],
     "incident.close": ["einsatzleiter"],
     "incident.demo_start": ["einsatzleiter", "fuehrungsassistenz", "abschnittleitung", "helfer", "dokumentar"],

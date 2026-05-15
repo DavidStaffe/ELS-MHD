@@ -9,6 +9,7 @@ import { OpsProvider } from "@/context/OpsContext";
 import { RoleProvider } from "@/context/RoleContext";
 import IncidentList from "@/pages/IncidentList";
 import LagePage from "@/pages/LagePage";
+import KartePage from "@/pages/KartePage";
 import ArchivPage from "@/pages/ArchivPage";
 import PatientList from "@/pages/PatientList";
 import PatientDetail from "@/pages/PatientDetail";
@@ -34,6 +35,7 @@ function App() {
                                         <Route path="/" element={<IncidentList />} />
                                         <Route path="/archiv" element={<ArchivPage />} />
                                         <Route path="/lage" element={<LagePage />} />
+                                        <Route path="/karte" element={<KartePage />} />
                                         <Route path="/patienten" element={<PatientList />} />
                                         <Route path="/patienten/:patientId" element={<PatientDetail />} />
                                         <Route path="/transport" element={<TransportList />} />

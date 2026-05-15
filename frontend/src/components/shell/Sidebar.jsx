@@ -17,6 +17,7 @@ import {
   Layers,
   Bed,
   Archive,
+  MapPinned,
 } from 'lucide-react';
 
 /**
@@ -58,6 +59,14 @@ const NAV_GROUPS = (
         icon: Activity,
         label: 'Lage',
         testId: 'nav-lage',
+        disabled: !hasIncident,
+        hint: hasIncident ? (isArchived ? 'lesen' : null) : 'inaktiv',
+      },
+      {
+        to: '/karte',
+        icon: MapPinned,
+        label: 'Karte',
+        testId: 'nav-karte',
         disabled: !hasIncident,
         hint: hasIncident ? (isArchived ? 'lesen' : null) : 'inaktiv',
       },

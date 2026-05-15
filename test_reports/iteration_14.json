@@ -1,0 +1,48 @@
+{
+  "summary": "Tested Phase 1 OSM map feature end-to-end. Backend: 14/17 new pytest cases pass. 2 real backend bugs confirmed (POST /incidents/{id}/resources drops new fields; PATCH /resources/{id} cannot null-clear lat/lng). Validation on ort_lat/ort_lng/ort_zoom and fms_status/lat/lng/divera_id works correctly. Regression suite still 156/163 (same 7 pre-existing baseline failures). Frontend: KartePage fully functional — sidebar nav-karte present, KartePage shows karte-title, all 5 KPIs (kpi-on-map, kpi-fms-verfuegbar, kpi-fms-einsatz, kpi-fms-sprechwunsch, kpi-fms-offline), map-sidebar with map-resources-unplaced (9 unplaced KTWs/RTWs etc.), map-fms-legend listing all 10 FMS statuses with German BOS labels. NewIncidentDialog shows MapPicker + map-picker-search. Click 'Platzieren' → place-mode-banner appears; clicking empty map area places resource (PATCH /api/resources/{id} with lat/lng), pin appears, KPI 'on-map' goes 0→1. Clicking placed pin opens map-edit-resource-dialog with map-resource-fms (shadcn Select), map-resource-divera input, and map-resource-unplace button. 'Ort bearbeiten' opens map-edit-location-dialog. LagePage with operational incident having ort_lat shows embedded incident-map and lage-open-karte button.",
+  "backend_issues": {
+    "critical": [
+      {"endpoint": "POST /api/incidents/{id}/resources", "issue": "Route builds doc dict manually and OMITS new fields lat, lng, divera_id, fms_status — even though the Pydantic model ResourceCreate accepts them. Creating a resource with these fields succeeds (201) but the persisted document does not contain them. Verified via subsequent GET. File: /app/backend/routes/resources.py lines 35-46 (doc dict).", "priority": "HIGH"},
+      {"endpoint": "PATCH /api/resources/{id}", "issue": "Uses payload.model_dump(exclude_none=True). Passing {lat: null, lng: null} results in upd={} → returns 400 'Keine Aenderungen'. Cannot unset lat/lng → 'Von Karte entfernen' (map-resource-unplace) flow will be broken at the backend layer. Frontend either needs different signaling (e.g., explicit unplace endpoint) or backend should treat explicit nulls as $unset. Same risk applies to incident PATCH for ort_lat/ort_lng.", "priority": "HIGH"}
+    ],
+    "minor": [
+      {"endpoint": "various /api/meta + test_step04/05/06 + patients S4", "issue": "Pre-existing 7 failures (hardcoded version asserts 0.2.0/0.4.0/0.5.0/0.6.0 vs current 1.0.0; S4 sichtung not in Literal). Same baseline as iter13 — unrelated to map feature."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "KartePage place-mode", "issue": "When user clicks on the map while in place-mode, clicks that land on the incident center pin open the incident popup INSTEAD of placing the resource. Resource never gets lat/lng. User must click an empty area away from the marker. Recommend stopPropagation/onClick on marker should be disabled in place-mode, or place-mode should swallow marker clicks.", "selector": ".leaflet-marker-icon (incident pin)", "priority": "MEDIUM"}
+    ],
+    "integration_issues": [
+      {"flow": "Resource unplace from map (map-resource-unplace)", "issue": "Will fail end-to-end because PATCH /api/resources/{id} cannot clear lat/lng with null body (exclude_none drops it). Frontend likely needs a backend change. UI test was not able to verify successful unplace because of this backend bug.", "affected_selectors": ["[data-testid=map-resource-unplace]"]}
+    ],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_map_geocoding.py",
+    "/app/test_reports/pytest/pytest_iter14_map.xml"
+  ],
+  "action_items": [
+    "Fix POST /api/incidents/{id}/resources to include lat/lng/divera_id/fms_status in inserted doc. Easiest: build doc from data.dict() pass-through instead of cherry-picking keys.",
+    "Fix PATCH /api/resources/{id} to support clearing lat/lng. Options: (a) use exclude_unset=True instead of exclude_none, OR (b) detect explicit nulls and translate to $unset, OR (c) add dedicated POST /api/resources/{id}/unplace endpoint. Apply same logic to incident PATCH if Ort needs clearing.",
+    "KartePage: in place-mode, prevent the incident center marker (and resource pins) from intercepting clicks so the map click handler fires reliably. e.g., set marker interactive=false while placeMode is active, OR catch marker click and forward to placement."
+  ],
+  "critical_code_review_comments": [
+    "models.py: Incident.ort_lat/ort_lng/ort_zoom and Resource.lat/lng/divera_id/fms_status correctly typed with ge/le bounds and max_length. Validation rejects out-of-range values (422). Good.",
+    "routes/resources.py create_resource: hand-rolled doc dict is fragile — easy to forget new fields (which is exactly what happened). Recommend `doc = {**data, 'id': str(uuid4()), 'incident_id': incident_id, 'created_at': iso(now), 'updated_at': iso(now)}`.",
+    "routes/resources.py update_resource: exclude_none=True is too aggressive for optional fields that need to be explicitly nullable (lat/lng/divera_id/fms_status). Same comment applies to incidents PATCH for ort_lat/ort_lng/ort_zoom.",
+    "Frontend KartePage: clean separation of concerns — incident-map, sidebar, KPIs, FMS legend, place-mode banner all wired. All required data-testid attributes present and discoverable. FMS_STATUS mapping in /lib/fms-status.js correctly covers BOS 0-9 with German labels and proper color hex values.",
+    "Frontend MapPicker: data-testid=map-picker-coords and map-picker-clear are conditional on a pin existing (verified — only render when marker is set). That is correct behavior, but tests asserting their presence on empty dialog open will fail unless a pin is first placed via search/click.",
+    "leaflet-setup.js + tile URL: tile.openstreetmap.org loaded successfully (24 tiles); icon fix works (no 404s in console)."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_map_geocoding.py (new — 17 cases for incidents/resources location + FMS validation + persistence + unplace flow)"
+  ],
+  "success_rate": {"backend": "82% (14/17 new tests pass; 156/163 regression unchanged)", "frontend": "85% (place flow works, all selectors present; unplace blocked by backend bug; minor place-mode UX issue)"},
+  "test_credentials": "N/A — local role via localStorage.setItem('els-role','einsatzleiter')",
+  "seed_data_creation": "Created 2 TEST_LOC_PERSIST incidents via test fixtures (Berlin 52.52,13.405). Cleaned up after testing via direct mongo delete on name regex ^TEST_. Placed 1 KTW 1 resource on KartePage at ~52.53,13.36 during UI test — left in DB for next agent.",
+  "retest_needed": true,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Active incident with ort_lat is required for /karte page (else placeholder). Use existing TEST_LOC_PERSIST or 'Berlin' incidents that have ort_lat set. localStorage keys: 'els-role' and 'els-active-incident' (id string, not object). MapPicker conditional testids: map-picker-coords and map-picker-clear only render after a pin is placed. To place a resource: click [data-testid=btn-place-{id}] then click on EMPTY area of map far from the incident center marker — clicking through the incident pin will not work. EditResourceDialog opens by clicking the .els-resource-pin DOM element (use force=True). Unplace flow currently broken at backend (see action items).",
+  "rca of the issue": "Bug 1 (resource create drops fields): routes/resources.py create_resource constructs the insert doc by manually listing keys; new fields (lat/lng/divera_id/fms_status) were added to the Pydantic model but never added to the doc dict. Reproduction: POST /api/incidents/{id}/resources with body containing lat=53.55 → 201 OK but GET shows no lat. Fix: spread `data` into the doc. Bug 2 (PATCH cannot null fields): exclude_none=True strips explicit nulls. Reproduction: PATCH /api/resources/{id} body {lat: null} → 400 'Keine Aenderungen'. Fix: switch to exclude_unset=True; semantics: if client omits key, don't touch; if client sends null, $unset or $set null."
+}

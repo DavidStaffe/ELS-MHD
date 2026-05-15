@@ -1,9 +1,11 @@
 import * as React from "react";
 import { useNavigate } from "react-router-dom";
 import { useIncidents } from "@/context/IncidentContext";
+import { useOps } from "@/context/OpsContext";
 import { Button } from "@/components/ui/button";
 import { StatusBadge } from "@/components/primitives";
 import { Dashboard } from "@/components/lage/Dashboard";
+import { IncidentMap } from "@/components/map/IncidentMap";
 import { cn } from "@/lib/utils";
 import {
     ArrowLeft,
@@ -15,7 +17,9 @@ import {
     FileCheck2,
     Layers,
     Bed,
-    Lock
+    Lock,
+    MapPinned,
+    Maximize2
 } from "lucide-react";
 
 /**
@@ -64,6 +68,18 @@ export default function LagePage() {
         { label: "Auswertung & Abschluss", icon: FileCheck2, description: "Check, Bericht, Versionen", to: "/abschluss" }
     ];
 
+    return <LagePageBody
+        activeIncident={activeIncident}
+        isArchived={isArchived}
+        modules={modules}
+        navigate={navigate}
+    />;
+}
+
+function LagePageBody({ activeIncident, isArchived, modules, navigate }) {
+    const { resources } = useOps();
+    const hasLocation = activeIncident.ort_lat != null && activeIncident.ort_lng != null;
+
     return (
         <div className="mx-auto w-full max-w-[1400px] px-6 py-6 space-y-6">
             {/* Kopf */}
@@ -98,6 +114,47 @@ export default function LagePage() {
 
             {/* Dashboard (schnelle Lage-Uebersicht) */}
             <Dashboard />
+
+            {/* Mini-Lagekarte */}
+            <div>
+                <div className="mb-3 flex items-center justify-between gap-2">
+                    <div>
+                        <div className="text-caption uppercase tracking-wider text-muted-foreground flex items-center gap-2">
+                            <MapPinned className="h-3 w-3" />
+                            Lagekarte
+                        </div>
+                        {!hasLocation && (
+                            <p className="mt-1 text-caption text-muted-foreground">
+                                Noch kein Einsatz-Ort hinterlegt. Oeffne die Karte zum Setzen.
+                            </p>
+                        )}
+                    </div>
+                    <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => navigate("/karte")}
+                        data-testid="lage-open-karte"
+                    >
+                        <Maximize2 className="h-4 w-4" />
+                        Vollkarte oeffnen
+                    </Button>
+                </div>
+                {hasLocation ? (
+                    <IncidentMap
+                        incident={activeIncident}
+                        resources={resources}
+                        height="320px"
+                        showAttribution={false}
+                    />
+                ) : (
+                    <div
+                        className="els-surface flex h-[200px] items-center justify-center text-caption text-muted-foreground"
+                        data-testid="lage-map-empty"
+                    >
+                        Kein Ort gesetzt – Karte oeffnen, um eine Adresse zu hinterlegen.
+                    </div>
+                )}
+            </div>
 
             {/* Modul-Schnellzugriff */}
             <div>

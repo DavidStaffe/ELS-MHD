@@ -37,6 +37,9 @@ class IncidentBase(BaseModel):
     typ: IncidentTyp = "veranstaltung"
     ort: str = Field(min_length=0, max_length=180, default="")
     beschreibung: str = Field(default="", max_length=2000)
+    ort_lat: Optional[float] = Field(default=None, ge=-90, le=90)
+    ort_lng: Optional[float] = Field(default=None, ge=-180, le=180)
+    ort_zoom: Optional[int] = Field(default=None, ge=1, le=22)
 
 
 class IncidentCreate(IncidentBase):
@@ -54,6 +57,9 @@ class IncidentUpdate(BaseModel):
     status: Optional[IncidentStatus] = None
     start_at: Optional[datetime] = None
     end_at: Optional[datetime] = None
+    ort_lat: Optional[float] = Field(default=None, ge=-90, le=90)
+    ort_lng: Optional[float] = Field(default=None, ge=-180, le=180)
+    ort_zoom: Optional[int] = Field(default=None, ge=1, le=22)
 
 
 class Incident(IncidentBase):
@@ -168,6 +174,10 @@ class ResourceBase(BaseModel):
     status: ResourceStatus = "verfuegbar"
     notiz: str = Field(default="", max_length=1000)
     abschnitt_id: Optional[str] = None
+    lat: Optional[float] = Field(default=None, ge=-90, le=90)
+    lng: Optional[float] = Field(default=None, ge=-180, le=180)
+    divera_id: Optional[str] = Field(default=None, max_length=64)
+    fms_status: Optional[int] = Field(default=None, ge=0, le=9)
 
 
 class ResourceCreate(ResourceBase):
@@ -182,6 +192,10 @@ class ResourceUpdate(BaseModel):
     status: Optional[ResourceStatus] = None
     notiz: Optional[str] = None
     abschnitt_id: Optional[str] = None
+    lat: Optional[float] = Field(default=None, ge=-90, le=90)
+    lng: Optional[float] = Field(default=None, ge=-180, le=180)
+    divera_id: Optional[str] = Field(default=None, max_length=64)
+    fms_status: Optional[int] = Field(default=None, ge=0, le=9)
 
 
 # --- Messages / Funktagebuch ------------------------------------------------

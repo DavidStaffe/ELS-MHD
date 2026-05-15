@@ -402,3 +402,90 @@
     page-break-after: always;
   }
 }
+
+/* =====================================================================
+   Map / Leaflet pins
+   ===================================================================== */
+.els-map-wrap .leaflet-container {
+  background: hsl(var(--surface-sunken));
+  font-family: inherit;
+}
+.els-map-wrap .leaflet-popup-content-wrapper,
+.els-map-wrap .leaflet-popup-tip {
+  background: hsl(var(--card));
+  color: hsl(var(--foreground));
+  border-radius: 6px;
+  border: 1px solid hsl(var(--border));
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.35);
+}
+.els-map-wrap .leaflet-control-attribution {
+  background: rgba(0, 0, 0, 0.6) !important;
+  color: hsl(var(--muted-foreground)) !important;
+}
+.els-map-wrap .leaflet-control-attribution a {
+  color: hsl(var(--primary)) !important;
+}
+
+.els-incident-pin-wrap {
+  background: transparent !important;
+  border: none !important;
+}
+.els-incident-pin {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: hsl(var(--primary) / 0.35);
+  border: 2px solid hsl(var(--primary));
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 0 0 4px hsl(var(--primary) / 0.15);
+  animation: els-pulse 2.4s infinite ease-out;
+}
+.els-incident-pin-inner {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: hsl(var(--primary));
+}
+@keyframes els-pulse {
+  0% {
+    box-shadow: 0 0 0 0 hsl(var(--primary) / 0.4);
+  }
+  70% {
+    box-shadow: 0 0 0 12px hsl(var(--primary) / 0);
+  }
+  100% {
+    box-shadow: 0 0 0 0 hsl(var(--primary) / 0);
+  }
+}
+
+.els-resource-pin-wrap {
+  background: transparent !important;
+  border: none !important;
+}
+.els-resource-pin {
+  position: relative;
+  width: 40px;
+  height: 40px;
+  background: var(--pin-color, #22c55e);
+  border-radius: 50% 50% 50% 0;
+  transform: rotate(-45deg);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 2px solid rgba(255, 255, 255, 0.9);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.4);
+}
+.els-resource-pin-label {
+  transform: rotate(45deg);
+  color: white;
+  font-weight: 700;
+  font-size: 11px;
+  font-family: 'IBM Plex Mono', monospace;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
+  max-width: 26px;
+  text-align: center;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
