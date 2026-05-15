@@ -115,7 +115,8 @@ export function IncidentMap({
           <Marker
             position={[incident.ort_lat, incident.ort_lng]}
             icon={incidentIcon}
-            draggable={draggableIncident}
+            draggable={draggableIncident && !clickToPlace}
+            interactive={!clickToPlace}
             eventHandlers={{
               dragend: (e) => {
                 const ll = e.target.getLatLng();
@@ -150,6 +151,7 @@ export function IncidentMap({
                 position={[r.lat, r.lng]}
                 icon={icon}
                 draggable={draggableResources}
+                interactive={!clickToPlace}
                 eventHandlers={{
                   click: () => onResourceClick?.(r),
                   dragend: (e) => {

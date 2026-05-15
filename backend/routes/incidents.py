@@ -141,7 +141,8 @@ async def update_incident(incident_id: str, payload: IncidentUpdate):
     if not existing:
         raise HTTPException(status_code=404, detail="Incident nicht gefunden")
 
-    update = payload.model_dump(exclude_none=True)
+    # exclude_unset preserves explicit nulls (e.g. clearing ort_lat/ort_lng)
+    update = payload.model_dump(exclude_unset=True)
     if not update:
         raise HTTPException(status_code=400, detail="Keine Aenderungen angegeben")
     for k in ("start_at", "end_at"):

@@ -31,7 +31,7 @@ async def create_resource(incident_id: str, payload: ResourceCreate):
     if not inc:
         raise HTTPException(status_code=404, detail="Incident nicht gefunden")
     now = now_utc()
-    data = payload.model_dump(exclude_none=True)
+    data = payload.model_dump(exclude_unset=True)
     doc = {
         "id": str(uuid.uuid4()),
         "incident_id": incident_id,
@@ -41,6 +41,10 @@ async def create_resource(incident_id: str, payload: ResourceCreate):
         "status": data.get("status", "verfuegbar"),
         "notiz": data.get("notiz", ""),
         "abschnitt_id": data.get("abschnitt_id"),
+        "lat": data.get("lat"),
+        "lng": data.get("lng"),
+        "divera_id": data.get("divera_id"),
+        "fms_status": data.get("fms_status"),
         "created_at": iso(now),
         "updated_at": iso(now),
     }
@@ -50,7 +54,8 @@ async def create_resource(incident_id: str, payload: ResourceCreate):
 
 @router.patch("/resources/{resource_id}", response_model=dict)
 async def update_resource(resource_id: str, payload: ResourceUpdate):
-    upd = payload.model_dump(exclude_none=True)
+    # exclude_unset preserves explicit nulls so clients can clear lat/lng etc.
+    upd = payload.model_dump(exclude_unset=True)
     if not upd:
         raise HTTPException(status_code=400, detail="Keine Aenderungen")
     upd["updated_at"] = iso(now_utc())
