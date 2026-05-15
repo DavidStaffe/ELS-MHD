@@ -27,7 +27,7 @@ async def create_abschnitt(incident_id: str, payload: AbschnittCreate):
     inc = await db.incidents.find_one({"id": incident_id}, {"_id": 0})
     if not inc:
         raise HTTPException(status_code=404, detail="Incident nicht gefunden")
-    a = Abschnitt(incident_id=incident_id, **payload.model_dump(exclude_none=True))
+    a = Abschnitt(incident_id=incident_id, **payload.model_dump(exclude_unset=True))
     d = a.model_dump()
     if isinstance(d.get("erstellt_um"), datetime):
         d["erstellt_um"] = iso(d["erstellt_um"])
@@ -45,7 +45,8 @@ async def get_abschnitt(abschnitt_id: str):
 
 @router.patch("/abschnitte/{abschnitt_id}", response_model=dict)
 async def update_abschnitt(abschnitt_id: str, payload: AbschnittUpdate):
-    upd = payload.model_dump(exclude_none=True)
+    # exclude_unset to allow clearing polygon via explicit null
+    upd = payload.model_dump(exclude_unset=True)
     if not upd:
         raise HTTPException(status_code=400, detail="Keine Aenderungen")
     res = await db.abschnitte.find_one_and_update(

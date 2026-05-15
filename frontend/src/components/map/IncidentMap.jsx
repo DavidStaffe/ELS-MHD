@@ -4,10 +4,15 @@ import {
   TileLayer,
   Marker,
   Popup,
+  Polygon,
+  Tooltip,
   useMap,
   useMapEvents,
 } from 'react-leaflet';
+import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
+import '@geoman-io/leaflet-geoman-free';
+import '@geoman-io/leaflet-geoman-free/dist/leaflet-geoman.css';
 import {
   OSM_TILE_URL,
   OSM_ATTRIBUTION,
@@ -17,6 +22,7 @@ import {
   makeResourceIcon,
 } from '@/lib/leaflet-setup';
 import { fmsMeta } from '@/lib/fms-status';
+import { getFarbe } from '@/lib/abschnitt-meta';
 
 /** Internal: re-centers the map when external center changes. */
 function CenterUpdater({ center, zoom }) {
@@ -37,6 +43,127 @@ function MapClickHandler({ onClick, disabled }) {
     },
   });
   return null;
+}
+
+/**
+ * Internal: Geoman drawing/edit controller.
+ * Props:
+ *   mode: null | "draw" | "edit"
+ *   color: hex string used for drawing
+ *   onDrawComplete(latlngs): polygon drawn, returns [[lat,lng]...]
+ *   onCancel(): user cancels drawing
+ */
+function GeomanController({ mode, color, onDrawComplete, onCancel }) {
+  const map = useMap();
+
+  React.useEffect(() => {
+    if (!map?.pm) return;
+    // Disable any active mode first
+    map.pm.disableDraw();
+    map.pm.disableGlobalEditMode();
+    map.pm.disableGlobalRemovalMode();
+
+    if (mode === 'draw') {
+      map.pm.setPathOptions({
+        color,
+        fillColor: color,
+        fillOpacity: 0.2,
+        weight: 2,
+      });
+      map.pm.enableDraw('Polygon', {
+        snappable: true,
+        finishOn: 'dblclick',
+        allowSelfIntersection: false,
+      });
+    }
+  }, [mode, color, map]);
+
+  React.useEffect(() => {
+    if (!map?.pm) return;
+    const handler = (e) => {
+      const layer = e.layer;
+      const latlngs = layer.getLatLngs()[0].map((p) => [p.lat, p.lng]);
+      // Remove the drawn ghost layer; we re-render via state.
+      try { map.removeLayer(layer); } catch { /* noop */ }
+      onDrawComplete?.(latlngs);
+    };
+    map.on('pm:create', handler);
+    return () => map.off('pm:create', handler);
+  }, [map, onDrawComplete]);
+
+  // Escape key cancels
+  React.useEffect(() => {
+    if (mode !== 'draw') return undefined;
+    const onKey = (e) => {
+      if (e.key === 'Escape') {
+        map.pm.disableDraw();
+        onCancel?.();
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [mode, map, onCancel]);
+
+  return null;
+}
+
+/**
+ * Internal: editable polygon. Renders a react-leaflet <Polygon>, and when
+ * `editable=true` enables Geoman edit on the underlying layer (vertex drag,
+ * delete vertex on right-click etc.). Emits onChange(latlngs) after edit.
+ */
+function EditablePolygon({ abschnitt, editable, onClick, onChange }) {
+  const ref = React.useRef(null);
+  const farbe = getFarbe(abschnitt.farbe);
+
+  React.useEffect(() => {
+    const layer = ref.current;
+    if (!layer || !layer.pm) return undefined;
+    if (editable) {
+      layer.pm.enable({ snappable: true, allowSelfIntersection: false });
+      const handler = () => {
+        const latlngs = layer.getLatLngs()[0].map((p) => [p.lat, p.lng]);
+        onChange?.(latlngs);
+      };
+      layer.on('pm:edit', handler);
+      layer.on('pm:dragend', handler);
+      return () => {
+        try { layer.pm.disable(); } catch { /* noop */ }
+        layer.off('pm:edit', handler);
+        layer.off('pm:dragend', handler);
+      };
+    }
+    try { layer.pm.disable(); } catch { /* noop */ }
+    return undefined;
+  }, [editable, onChange]);
+
+  if (!abschnitt.polygon || abschnitt.polygon.length < 3) return null;
+
+  return (
+    <Polygon
+      ref={ref}
+      positions={abschnitt.polygon}
+      pathOptions={{
+        color: farbe.hex,
+        fillColor: farbe.hex,
+        fillOpacity: editable ? 0.25 : 0.15,
+        weight: editable ? 3 : 2,
+        opacity: abschnitt.aktiv === false ? 0.4 : 1,
+        dashArray: abschnitt.aktiv === false ? '6 4' : null,
+      }}
+      eventHandlers={{
+        click: (e) => {
+          // Stop click from bubbling to map (prevents place-mode misfires)
+          L.DomEvent.stopPropagation(e);
+          onClick?.(abschnitt);
+        },
+      }}
+    >
+      <Tooltip permanent direction="center" className="els-abschnitt-tooltip">
+        {abschnitt.name}
+      </Tooltip>
+    </Polygon>
+  );
 }
 
 const RESOURCE_FALLBACK_COLOR = '#64748b';
@@ -71,10 +198,17 @@ function resourceColor(resource) {
 export function IncidentMap({
   incident,
   resources = [],
+  abschnitte = [],
   onMapClick,
   onResourceMove,
   onResourceClick,
   onIncidentMove,
+  onAbschnittClick,
+  onAbschnittPolygonChange,
+  onAbschnittPolygonDrawn,
+  onCancelDrawing,
+  drawingForAbschnitt = null, // abschnitt object currently being drawn
+  editingAbschnitte = false,
   draggableIncident = false,
   draggableResources = false,
   clickToPlace = false,
@@ -110,6 +244,29 @@ export function IncidentMap({
         <TileLayer attribution={OSM_ATTRIBUTION} url={OSM_TILE_URL} />
         <CenterUpdater center={center} zoom={zoom} />
         <MapClickHandler onClick={onMapClick} disabled={!clickToPlace} />
+
+        <GeomanController
+          mode={drawingForAbschnitt ? 'draw' : null}
+          color={drawingForAbschnitt ? getFarbe(drawingForAbschnitt.farbe).hex : '#3388ff'}
+          onDrawComplete={(latlngs) =>
+            onAbschnittPolygonDrawn?.(drawingForAbschnitt, latlngs)
+          }
+          onCancel={onCancelDrawing}
+        />
+
+        {abschnitte
+          .filter((a) => Array.isArray(a.polygon) && a.polygon.length >= 3)
+          .map((a) => (
+            <EditablePolygon
+              key={a.id}
+              abschnitt={a}
+              editable={editingAbschnitte && !clickToPlace && !drawingForAbschnitt}
+              onClick={onAbschnittClick}
+              onChange={(latlngs) =>
+                onAbschnittPolygonChange?.(a.id, latlngs)
+              }
+            />
+          ))}
 
         {incident?.ort_lat != null && incident?.ort_lng != null && (
           <Marker

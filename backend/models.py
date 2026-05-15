@@ -256,6 +256,9 @@ class AbschnittBase(BaseModel):
     farbe: str = Field(default="blue", max_length=20)
     beschreibung: str = Field(default="", max_length=1000)
     aktiv: bool = True
+    # Polygon: Liste von [lat, lng]-Paaren (Leaflet-Konvention).
+    # Ein Polygon hat >= 3 Punkte; None = kein Polygon gezeichnet.
+    polygon: Optional[List[List[float]]] = None
 
 
 class AbschnittCreate(AbschnittBase):
@@ -268,6 +271,7 @@ class AbschnittUpdate(BaseModel):
     farbe: Optional[str] = None
     beschreibung: Optional[str] = None
     aktiv: Optional[bool] = None
+    polygon: Optional[List[List[float]]] = None
 
 
 class Abschnitt(AbschnittBase):

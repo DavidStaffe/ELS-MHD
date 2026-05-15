@@ -76,9 +76,23 @@ export default function LagePage() {
     />;
 }
 
+import { listAbschnitte } from "@/lib/api";
+
 function LagePageBody({ activeIncident, isArchived, modules, navigate }) {
     const { resources } = useOps();
+    const [abschnitte, setAbschnitte] = React.useState([]);
     const hasLocation = activeIncident.ort_lat != null && activeIncident.ort_lng != null;
+
+    React.useEffect(() => {
+        let alive = true;
+        (async () => {
+            try {
+                const list = await listAbschnitte(activeIncident.id);
+                if (alive) setAbschnitte(list);
+            } catch { /* ignore */ }
+        })();
+        return () => { alive = false; };
+    }, [activeIncident.id]);
 
     return (
         <div className="mx-auto w-full max-w-[1400px] px-6 py-6 space-y-6">
@@ -143,6 +157,7 @@ function LagePageBody({ activeIncident, isArchived, modules, navigate }) {
                     <IncidentMap
                         incident={activeIncident}
                         resources={resources}
+                        abschnitte={abschnitte}
                         height="320px"
                         showAttribution={false}
                     />
