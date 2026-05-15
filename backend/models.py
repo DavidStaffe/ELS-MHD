@@ -70,6 +70,11 @@ class Incident(IncidentBase):
     end_at: Optional[datetime] = None
     created_at: datetime = Field(default_factory=now_utc)
     updated_at: datetime = Field(default_factory=now_utc)
+    # Divera-Polling-Status (Phase 3)
+    divera_enabled: bool = False
+    divera_last_poll_at: Optional[datetime] = None
+    divera_last_poll_status: Optional[str] = None
+    divera_last_match_count: Optional[int] = None
 
 
 class IncidentMetaPatch(BaseModel):

@@ -28,9 +28,11 @@ import {
   listAbschnitte,
   createAbschnitt,
   updateAbschnitt,
+  listDiveraVehicles,
 } from '@/lib/api';
 import { ABSCHNITT_FARBEN, getFarbe } from '@/lib/abschnitt-meta';
 import { FMS_STATUS, fmsMeta } from '@/lib/fms-status';
+import { DiveraPanel } from '@/components/map/DiveraPanel';
 import { toast } from 'sonner';
 import {
   ArrowLeft,
@@ -150,6 +152,7 @@ function EditIncidentLocationDialog({
 function EditResourceDialog({ open, onOpenChange, resource, onSave, onRemove }) {
   const [fmsStatus, setFmsStatus] = React.useState('none');
   const [diveraId, setDiveraId] = React.useState('');
+  const [vehicles, setVehicles] = React.useState([]);
   const [busy, setBusy] = React.useState(false);
 
   React.useEffect(() => {
@@ -163,7 +166,23 @@ function EditResourceDialog({ open, onOpenChange, resource, onSave, onRemove }) 
     }
   }, [open, resource]);
 
+  React.useEffect(() => {
+    if (!open) return;
+    (async () => {
+      try {
+        const v = await listDiveraVehicles();
+        setVehicles(v);
+      } catch {
+        setVehicles([]);
+      }
+    })();
+  }, [open]);
+
   if (!resource) return null;
+
+  const linkedVehicle = diveraId
+    ? vehicles.find((v) => String(v.id) === String(diveraId))
+    : null;
 
   const handleSave = async () => {
     setBusy(true);
@@ -191,7 +210,7 @@ function EditResourceDialog({ open, onOpenChange, resource, onSave, onRemove }) 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
-        className="sm:max-w-md bg-card border-border"
+        className="sm:max-w-md bg-card border-border max-h-[90vh] overflow-y-auto"
         data-testid="map-edit-resource-dialog"
       >
         <DialogHeader>
@@ -206,8 +225,60 @@ function EditResourceDialog({ open, onOpenChange, resource, onSave, onRemove }) 
         </DialogHeader>
         <div className="space-y-3">
           <div className="space-y-1.5">
+            <Label htmlFor="rd-divera">Divera-Fahrzeug verknuepfen</Label>
+            <Select
+              value={diveraId || 'none'}
+              onValueChange={(v) => setDiveraId(v === 'none' ? '' : v)}
+              disabled={vehicles.length === 0}
+            >
+              <SelectTrigger id="rd-divera" data-testid="map-resource-divera">
+                <SelectValue placeholder="— nicht verknuepft —" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="none">— nicht verknuepft —</SelectItem>
+                {vehicles.map((v) => (
+                  <SelectItem key={v.id} value={String(v.id)}>
+                    <span className="font-medium">{v.name}</span>
+                    <span className="ml-2 text-muted-foreground text-xs">
+                      ({v.shortname || v.fullname})
+                    </span>
+                    {v.fmsstatus !== null && v.fmsstatus !== undefined && (
+                      <span className="ml-2 font-mono text-xs">FMS {v.fmsstatus}</span>
+                    )}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            {vehicles.length === 0 ? (
+              <p className="text-caption text-muted-foreground">
+                Keine Divera-Fahrzeuge verfuegbar (API-Key fehlt oder kein Zugriff).
+              </p>
+            ) : linkedVehicle ? (
+              <p className="text-caption text-muted-foreground">
+                Verknuepft mit{' '}
+                <span className="font-mono text-foreground">{linkedVehicle.name}</span>
+                {linkedVehicle.fmsstatus !== null && (
+                  <>
+                    {' · aktueller FMS '}
+                    <span
+                      className="font-mono font-semibold"
+                      style={{ color: fmsMeta(linkedVehicle.fmsstatus)?.color }}
+                    >
+                      {linkedVehicle.fmsstatus}
+                    </span>
+                  </>
+                )}
+              </p>
+            ) : (
+              <p className="text-caption text-muted-foreground">
+                Wenn verknuepft, ueberschreibt das Divera-Polling den FMS-Status.
+              </p>
+            )}
+          </div>
+
+          <div className="space-y-1.5">
             <Label htmlFor="rd-fms">FMS-Status (manuell)</Label>
-            <Select value={fmsStatus} onValueChange={setFmsStatus}>
+            <Select value={fmsStatus} onValueChange={setFmsStatus} disabled={Boolean(diveraId)}>
               <SelectTrigger id="rd-fms" data-testid="map-resource-fms">
                 <SelectValue />
               </SelectTrigger>
@@ -222,20 +293,10 @@ function EditResourceDialog({ open, onOpenChange, resource, onSave, onRemove }) 
               </SelectContent>
             </Select>
             <p className="text-caption text-muted-foreground">
-              Wird vom Divera-Polling ueberschrieben, sobald eine Divera-ID
-              gesetzt ist (Phase 3).
+              {diveraId
+                ? 'Manuell deaktiviert, da Divera-Verknuepfung gesetzt ist.'
+                : 'Wird vom Divera-Polling ueberschrieben, sobald eine Verknuepfung gesetzt ist.'}
             </p>
-          </div>
-
-          <div className="space-y-1.5">
-            <Label htmlFor="rd-divera">Divera-Fahrzeug-ID (optional)</Label>
-            <Input
-              id="rd-divera"
-              value={diveraId}
-              onChange={(e) => setDiveraId(e.target.value)}
-              placeholder="z.B. 1234"
-              data-testid="map-resource-divera"
-            />
           </div>
         </div>
 
@@ -606,6 +667,15 @@ export default function KartePage() {
           className="border-t lg:border-t-0 lg:border-l border-border bg-surface-sunken/60 overflow-y-auto p-3 space-y-3"
           data-testid="map-sidebar"
         >
+          {/* Divera --------------------------------------------------- */}
+          <DiveraPanel
+            incidentId={activeIncident.id}
+            disabled={isArchived}
+            onChange={() => {
+              // refresh resources via OpsContext (already via SSE, but trigger manual reload)
+            }}
+          />
+
           {/* Abschnitte ---------------------------------------------- */}
           <div className="els-surface p-3" data-testid="map-abschnitte-panel">
             <div className="flex items-center justify-between mb-2">

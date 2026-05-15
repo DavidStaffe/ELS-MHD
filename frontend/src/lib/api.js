@@ -76,6 +76,39 @@ export async function reopenPatient(id) {
 }
 
 /* =====================================================================
+   Divera 24/7
+   ===================================================================== */
+export async function getDiveraConfigured() {
+  const { data } = await api.get('/divera/configured');
+  return data;
+}
+
+export async function listDiveraVehicles() {
+  const { data } = await api.get('/divera/vehicles');
+  return data;
+}
+
+export async function getDiveraStatus(incidentId) {
+  const { data } = await api.get(`/incidents/${incidentId}/divera/status`);
+  return data;
+}
+
+export async function startDiveraPolling(incidentId) {
+  const { data } = await api.post(`/incidents/${incidentId}/divera/start`);
+  return data;
+}
+
+export async function stopDiveraPolling(incidentId) {
+  const { data } = await api.post(`/incidents/${incidentId}/divera/stop`);
+  return data;
+}
+
+export async function diveraSyncNow(incidentId) {
+  const { data } = await api.post(`/incidents/${incidentId}/divera/sync`);
+  return data;
+}
+
+/* =====================================================================
    Transports
    ===================================================================== */
 export async function listTransports(incidentId, params = {}) {

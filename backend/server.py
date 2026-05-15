@@ -18,6 +18,8 @@ from routes.messages import router as messages_router
 from routes.abschnitte import router as abschnitte_router
 from routes.betten import router as betten_router
 from routes.analytics import router as analytics_router
+from routes.divera import router as divera_router
+from services import divera as divera_service
 
 
 logging.basicConfig(
@@ -45,6 +47,7 @@ for r in (
     abschnitte_router,
     betten_router,
     analytics_router,
+    divera_router,
 ):
     app.include_router(r)
 
@@ -83,6 +86,15 @@ async def run_migrations():
             )
     except Exception as exc:  # pragma: no cover
         logger.exception("Migration fehlgeschlagen: %s", exc)
+
+
+@app.on_event("startup")
+async def resume_divera_polling():
+    """Re-attach Divera-Polling tasks for incidents that had it enabled."""
+    try:
+        await divera_service.resume_active_pollings()
+    except Exception as exc:  # pragma: no cover
+        logger.warning("Divera-Resume fehlgeschlagen: %s", exc)
 
 
 @app.on_event("shutdown")
