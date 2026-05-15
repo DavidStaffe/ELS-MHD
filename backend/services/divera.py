@@ -23,6 +23,7 @@ import httpx
 from core.db import db
 from core.time import iso, now_utc
 from services.realtime import publish_incident_event
+from services.fms_audit import record_fms_change
 
 logger = logging.getLogger(__name__)
 
@@ -108,17 +109,35 @@ async def sync_incident(incident_id: str) -> Dict[str, Any]:
         if not v:
             continue
         fms = v.get("fmsstatus") if v.get("fmsstatus") is not None else v.get("fmsstatus_id")
+        old_fms = resource.get("fms_status")
+        old_status = resource.get("status")
+        new_status = old_status
         update: Dict[str, Any] = {
             "fms_status": fms,
             "updated_at": iso(now),
         }
         if fms in _FMS_TO_RESOURCE_STATUS and _FMS_TO_RESOURCE_STATUS[fms]:
-            update["status"] = _FMS_TO_RESOURCE_STATUS[fms]
+            new_status = _FMS_TO_RESOURCE_STATUS[fms]
+            update["status"] = new_status
         # only set lat/lng if Divera has them AND resource has no manual placement
         if v.get("lat") and v.get("lng") and (resource.get("lat") is None or resource.get("lng") is None):
             update["lat"] = float(v["lat"])
             update["lng"] = float(v["lng"])
         await db.resources.update_one({"id": resource["id"]}, {"$set": update})
+        # FMS-Audit nur bei tatsaechlicher Aenderung
+        if old_fms != fms:
+            await record_fms_change(
+                incident_id=incident_id,
+                resource_id=resource["id"],
+                resource_name=resource.get("name", ""),
+                vehicle_name=v.get("name"),
+                divera_id=str(v.get("id")),
+                from_fms=old_fms,
+                to_fms=fms,
+                from_status=old_status,
+                to_status=new_status,
+                source="divera",
+            )
         matched += 1
 
     await _record_poll_result(incident_id, "ok", None, matched)

@@ -8,6 +8,7 @@ from fastapi import APIRouter, HTTPException
 from core.db import db
 from core.time import iso, now_utc
 from models import ResourceCreate, ResourceUpdate
+from services.fms_audit import record_fms_change
 
 router = APIRouter(prefix="/api", tags=["resources"])
 
@@ -59,12 +60,28 @@ async def update_resource(resource_id: str, payload: ResourceUpdate):
     if not upd:
         raise HTTPException(status_code=400, detail="Keine Aenderungen")
     upd["updated_at"] = iso(now_utc())
+    # Read existing for audit comparison
+    before = await db.resources.find_one({"id": resource_id}, {"_id": 0})
+    if not before:
+        raise HTTPException(status_code=404, detail="Ressource nicht gefunden")
     res = await db.resources.find_one_and_update(
         {"id": resource_id}, {"$set": upd},
         return_document=True, projection={"_id": 0},
     )
-    if not res:
-        raise HTTPException(status_code=404, detail="Ressource nicht gefunden")
+    # Manual FMS change → audit (skip if divera_id linked – Divera-sync logs separately)
+    if "fms_status" in upd and not before.get("divera_id"):
+        await record_fms_change(
+            incident_id=before["incident_id"],
+            resource_id=resource_id,
+            resource_name=before.get("name", ""),
+            vehicle_name=None,
+            divera_id=None,
+            from_fms=before.get("fms_status"),
+            to_fms=upd.get("fms_status"),
+            from_status=before.get("status"),
+            to_status=res.get("status"),
+            source="manual",
+        )
     return res
 
 
@@ -74,3 +91,18 @@ async def delete_resource(resource_id: str):
     if r.deleted_count == 0:
         raise HTTPException(status_code=404, detail="Ressource nicht gefunden")
     return None
+
+
+@router.get("/incidents/{incident_id}/fms-events")
+async def list_fms_events(
+    incident_id: str,
+    resource_id: Optional[str] = None,
+    limit: int = 200,
+):
+    """FMS-Audit-Trail: alle Status-Aenderungen pro Incident (neuste zuerst)."""
+    query = {"incident_id": incident_id}
+    if resource_id:
+        query["resource_id"] = resource_id
+    limit = max(1, min(limit, 1000))
+    events = await db.fms_events.find(query, {"_id": 0}).sort("ts", -1).to_list(limit)
+    return events
