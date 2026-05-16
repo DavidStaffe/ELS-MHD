@@ -310,42 +310,17 @@ export function IncidentMap({
                 draggable={draggableResources}
                 interactive={!clickToPlace}
                 eventHandlers={{
-                  click: () => onResourceClick?.(r),
+                  click: (e) => {
+                    // Suppress Leaflet popup, route to our dialog
+                    L.DomEvent.stopPropagation(e);
+                    onResourceClick?.(r);
+                  },
                   dragend: (e) => {
                     const ll = e.target.getLatLng();
                     onResourceMove?.(r.id, [ll.lat, ll.lng]);
                   },
                 }}
-              >
-                <Popup>
-                  <div className="text-sm min-w-[140px]">
-                    <div className="font-semibold">{r.name}</div>
-                    <div className="text-xs mt-1 space-y-0.5">
-                      <div className="text-muted-foreground">
-                        Kategorie: <span className="text-foreground">{r.kategorie}</span>
-                      </div>
-                      {r.fms_status !== null && r.fms_status !== undefined ? (
-                        <div className="text-muted-foreground">
-                          FMS{' '}
-                          <span style={{ color }} className="font-mono font-semibold">
-                            {r.fms_status}
-                          </span>{' '}
-                          {fmsMeta(r.fms_status)?.label}
-                        </div>
-                      ) : (
-                        <div className="text-muted-foreground">
-                          Status: <span className="text-foreground">{r.status}</span>
-                        </div>
-                      )}
-                      {r.divera_id && (
-                        <div className="text-[10px] text-muted-foreground">
-                          Divera: {r.divera_id}
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                </Popup>
-              </Marker>
+              />
             );
           })}
       </MapContainer>

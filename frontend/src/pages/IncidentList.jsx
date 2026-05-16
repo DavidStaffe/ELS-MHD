@@ -5,6 +5,7 @@ import { Input } from '@/components/ui/input';
 import { FilterChip, StatusBadge, ConfirmModal } from '@/components/primitives';
 import { IncidentCard } from '@/components/incidents/IncidentCard';
 import { NewIncidentDialog } from '@/components/incidents/NewIncidentDialog';
+import { EditIncidentDialog } from '@/components/incidents/EditIncidentDialog';
 import { useIncidents } from '@/context/IncidentContext';
 import { useCommandPalette } from '@/components/command/CommandPalette';
 import { useRole } from '@/context/RoleContext';
@@ -94,6 +95,7 @@ export default function IncidentList() {
     closeIncident,
     reopenIncident,
     remove,
+    update,
   } = useIncidents();
   const navigate = useNavigate();
   const { registerCommand } = useCommandPalette();
@@ -104,6 +106,7 @@ export default function IncidentList() {
   const [newOpen, setNewOpen] = React.useState(false);
   const [demoBusy, setDemoBusy] = React.useState(false);
   const [confirmDelete, setConfirmDelete] = React.useState(null);
+  const [editTarget, setEditTarget] = React.useState(null);
 
   // Abgeschlossene Incidents gehoeren ins Archiv – hier ausgeblendet
   const activeIncidents = React.useMemo(
@@ -321,6 +324,7 @@ export default function IncidentList() {
               onReopen={(x) => reopenIncident(x.id)}
               onSetOperativ={(x) => reopenIncident(x.id)}
               onDelete={(x) => setConfirmDelete(x)}
+              onEdit={can('incident.update') ? (x) => setEditTarget(x) : undefined}
             />
           ))}
         </div>
