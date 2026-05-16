@@ -8,61 +8,9 @@ import {
   PopoverTrigger,
 } from '@/components/ui/popover';
 import { StatusBadge } from '@/components/primitives';
-import { useIncidents } from '@/context/IncidentContext';
-import { useRole, ROLES } from '@/context/RoleContext';
 import { fmsMeta } from '@/lib/fms-status';
-import { listFmsEvents, acknowledgeFmsEvent } from '@/lib/api';
+import { useFmsAlerts } from '@/components/fms/useFmsAlerts';
 import { toast } from 'sonner';
-
-const POLL_INTERVAL_MS = 10000;
-const BEEP_INTERVAL_MS = 5000;
-const SOUND_KEY = 'els-fms-alert-sound';
-const SEEN_KEY = 'els-fms-alert-seen';
-
-/**
- * Spielt einen kurzen FMS-Alert-Beep ueber die Web Audio API ab.
- * Zwei aufeinanderfolgende Toene (kurz-kurz) damit es als "Alarm" wahrgenommen wird.
- */
-function playBeep() {
-  try {
-    const Ctx = window.AudioContext || window.webkitAudioContext;
-    if (!Ctx) return;
-    const ctx = new Ctx();
-    const now = ctx.currentTime;
-
-    const beep = (start, freq) => {
-      const osc = ctx.createOscillator();
-      const gain = ctx.createGain();
-      osc.type = 'sine';
-      osc.frequency.value = freq;
-      gain.gain.setValueAtTime(0.0001, now + start);
-      gain.gain.exponentialRampToValueAtTime(0.35, now + start + 0.02);
-      gain.gain.exponentialRampToValueAtTime(0.0001, now + start + 0.18);
-      osc.connect(gain).connect(ctx.destination);
-      osc.start(now + start);
-      osc.stop(now + start + 0.2);
-    };
-    beep(0, 880);
-    beep(0.22, 1175);
-    // Auto-close context after the second tone played out.
-    setTimeout(() => ctx.close().catch(() => {}), 600);
-  } catch {
-    /* noop – browser tab without user gesture etc. */
-  }
-}
-
-function fmtTime(iso) {
-  if (!iso) return '–';
-  try {
-    return new Date(iso).toLocaleTimeString('de-DE', {
-      hour: '2-digit',
-      minute: '2-digit',
-      second: '2-digit',
-    });
-  } catch {
-    return iso;
-  }
-}
 
 function fmtFullTime(iso) {
   if (!iso) return '–';
@@ -80,151 +28,32 @@ function fmtFullTime(iso) {
 
 /**
  * FmsAlertCenter – Glocke im Header.
- * - Polled FMS-Events alle 10s
- * - Filtert unquittierte Events mit to_fms in {0,5}
- * - Beep alle 5s solange Alarme offen (toggle via Lautsprecher-Icon)
- * - Popover-Liste mit "Quittieren" (nur EL/FA)
- * - Bei archiviertem Incident: gar nicht sichtbar
- * - Ohne aktiven Incident: gar nicht sichtbar
+ * Konsumiert useFmsAlerts (Polling+SSE+Beep zentral).
+ * Bei archiviertem/keinem Incident: gar nicht sichtbar.
  */
 export function FmsAlertCenter() {
-  const { activeIncident } = useIncidents();
-  const { role, can } = useRole();
-  const incidentId = activeIncident?.id || null;
-  const isArchived = activeIncident?.status === 'abgeschlossen';
-  const active = Boolean(incidentId) && !isArchived;
-
-  const [events, setEvents] = React.useState([]);
   const [open, setOpen] = React.useState(false);
-  const [busyId, setBusyId] = React.useState(null);
-  const [soundOn, setSoundOn] = React.useState(() => {
-    if (typeof window === 'undefined') return true;
-    return localStorage.getItem(SOUND_KEY) !== '0';
-  });
+  const {
+    active,
+    unackAlerts,
+    busyId,
+    soundOn,
+    toggleSound,
+    acknowledge,
+    canAcknowledge,
+  } = useFmsAlerts();
 
-  // Set fuer bereits "gesehene" Alert-IDs (verhindert Spam-Beep beim ersten Load).
-  const seenRef = React.useRef(new Set());
-  React.useEffect(() => {
-    if (typeof window === 'undefined') return;
-    try {
-      const raw = localStorage.getItem(SEEN_KEY);
-      if (raw) seenRef.current = new Set(JSON.parse(raw));
-    } catch {
-      /* noop */
-    }
-  }, []);
-
-  const persistSeen = React.useCallback(() => {
-    try {
-      localStorage.setItem(
-        SEEN_KEY,
-        JSON.stringify(Array.from(seenRef.current).slice(-500)),
-      );
-    } catch {
-      /* noop */
-    }
-  }, []);
-
-  const fetchEvents = React.useCallback(async () => {
-    if (!incidentId) return;
-    try {
-      const list = await listFmsEvents(incidentId, { limit: 100 });
-      setEvents(list);
-    } catch {
-      // Silenced – polling continues
-    }
-  }, [incidentId]);
-
-  // Polling
-  React.useEffect(() => {
-    if (!active) {
-      setEvents([]);
-      return undefined;
-    }
-    fetchEvents();
-    const id = setInterval(fetchEvents, POLL_INTERVAL_MS);
-    return () => clearInterval(id);
-  }, [active, fetchEvents]);
-
-  // Unquittierte Alerts (to_fms in {0,5})
-  const unackAlerts = React.useMemo(() => {
-    return events.filter((e) => {
-      const to = e.to_fms;
-      if (to !== 0 && to !== 5) return false;
-      return !e.acknowledged_at;
-    });
-  }, [events]);
-
-  // Erst-Load-Detection: alle bereits existierenden Alerts als "gesehen" markieren
-  // damit beim Page-Refresh kein Beep ausgeloest wird. Nur das initiale Set.
-  const firstLoadRef = React.useRef(true);
-  React.useEffect(() => {
-    if (!active) return;
-    if (firstLoadRef.current && events.length > 0) {
-      for (const e of unackAlerts) seenRef.current.add(e.id);
-      persistSeen();
-      firstLoadRef.current = false;
-    }
-  }, [active, events, unackAlerts, persistSeen]);
-
-  // Beep beim Eintreffen eines neuen (ungesehenen) Alerts + periodisch alle 5s
-  React.useEffect(() => {
-    if (!active || !soundOn) return undefined;
-    const newAlerts = unackAlerts.filter((e) => !seenRef.current.has(e.id));
-    if (newAlerts.length > 0) {
-      playBeep();
-      for (const e of newAlerts) seenRef.current.add(e.id);
-      persistSeen();
-    }
-    if (unackAlerts.length === 0) return undefined;
-    // periodischer Beep alle 5s solange unquittiert
-    const id = setInterval(() => {
-      if (!soundOn) return;
-      playBeep();
-    }, BEEP_INTERVAL_MS);
-    return () => clearInterval(id);
-  }, [active, soundOn, unackAlerts, persistSeen]);
-
-  const toggleSound = React.useCallback(() => {
-    setSoundOn((v) => {
-      const next = !v;
-      try {
-        localStorage.setItem(SOUND_KEY, next ? '1' : '0');
-      } catch {
-        /* noop */
-      }
-      return next;
-    });
-  }, []);
-
-  const handleAck = React.useCallback(
-    async (event) => {
-      if (!role || !can('fms.acknowledge')) {
-        toast.error('Nur EL/FA duerfen quittieren.');
-        return;
-      }
-      setBusyId(event.id);
-      try {
-        const updated = await acknowledgeFmsEvent(event.id, role);
-        setEvents((prev) =>
-          prev.map((e) => (e.id === event.id ? { ...e, ...updated } : e)),
-        );
-        toast.success('FMS-Alarm quittiert');
-      } catch (err) {
-        const detail = err?.response?.data?.detail || err?.message || 'Quittieren fehlgeschlagen';
-        toast.error(detail);
-      } finally {
-        setBusyId(null);
-      }
-    },
-    [role, can],
-  );
+  const handleAck = React.useCallback(async (event) => {
+    const res = await acknowledge(event);
+    if (res.ok) toast.success('FMS-Alarm quittiert');
+    else if (res.error === 'permission') toast.error('Nur EL/FA duerfen quittieren.');
+    else toast.error(res.error);
+  }, [acknowledge]);
 
   if (!active) return null;
 
   const hasAlerts = unackAlerts.length > 0;
   const BellIcon = hasAlerts ? BellRing : Bell;
-  const canAck = can('fms.acknowledge');
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
@@ -335,10 +164,10 @@ export function FmsAlertCenter() {
                       size="sm"
                       variant="default"
                       onClick={() => handleAck(e)}
-                      disabled={!canAck || busyId === e.id}
+                      disabled={!canAcknowledge || busyId === e.id}
                       data-testid={`fms-alert-ack-${e.id}`}
                       title={
-                        canAck
+                        canAcknowledge
                           ? 'Sprechwunsch quittieren'
                           : 'Nur EL/FA duerfen quittieren'
                       }
@@ -354,7 +183,7 @@ export function FmsAlertCenter() {
           </ul>
         )}
 
-        {!canAck && hasAlerts && (
+        {!canAcknowledge && hasAlerts && (
           <div className="border-t border-border bg-amber-500/10 px-3 py-1.5 text-[11px] text-amber-300">
             Nur Einsatzleiter & Fuehrungsassistenz koennen Alarme quittieren.
           </div>

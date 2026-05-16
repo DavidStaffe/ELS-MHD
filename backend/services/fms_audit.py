@@ -16,6 +16,7 @@ from typing import Any, Dict, Optional
 
 from core.db import db
 from core.time import iso, now_utc
+from services.realtime import publish_incident_event
 
 logger = logging.getLogger(__name__)
 
@@ -65,7 +66,20 @@ async def record_fms_change(
     except Exception as exc:  # pragma: no cover
         logger.exception("FMS-Event konnte nicht gespeichert werden: %s", exc)
         return None
-    return {k: v for k, v in doc.items() if k != "_id"}
+    payload = {k: v for k, v in doc.items() if k != "_id"}
+    # SSE-Push: Echtzeit-Benachrichtigung an alle verbundenen Clients (besonders
+    # wichtig fuer FMS-5/0-Sprechwunsch-Alarme, damit die Glocke sofort reagiert).
+    try:
+        await publish_incident_event({
+            "kind": "fms_event",
+            "action": "created",
+            "incident_id": incident_id,
+            "is_alert": payload.get("is_alert", False),
+            "event": payload,
+        })
+    except Exception:  # pragma: no cover
+        pass
+    return payload
 
 
 async def acknowledge_fms_event(

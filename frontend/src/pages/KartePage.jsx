@@ -34,6 +34,7 @@ import { ABSCHNITT_FARBEN, getFarbe } from '@/lib/abschnitt-meta';
 import { FMS_STATUS, fmsMeta } from '@/lib/fms-status';
 import { DiveraPanel } from '@/components/map/DiveraPanel';
 import { FmsHistory } from '@/components/map/FmsHistory';
+import { FmsAlertSidebarPanel } from '@/components/fms/FmsAlertSidebarPanel';
 import { toast } from 'sonner';
 import {
   ArrowLeft,
@@ -679,6 +680,9 @@ export default function KartePage() {
           className="border-t lg:border-t-0 lg:border-l border-border bg-surface-sunken/60 overflow-y-auto p-3 space-y-3"
           data-testid="map-sidebar"
         >
+          {/* Sprechwunsch-Alarm-Panel (nur sichtbar wenn offene FMS-5/0-Alarme) */}
+          <FmsAlertSidebarPanel />
+
           {/* Divera --------------------------------------------------- */}
           <DiveraPanel
             incidentId={activeIncident.id}

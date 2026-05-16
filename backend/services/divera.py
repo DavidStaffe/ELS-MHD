@@ -119,10 +119,21 @@ async def sync_incident(incident_id: str) -> Dict[str, Any]:
         if fms in _FMS_TO_RESOURCE_STATUS and _FMS_TO_RESOURCE_STATUS[fms]:
             new_status = _FMS_TO_RESOURCE_STATUS[fms]
             update["status"] = new_status
-        # only set lat/lng if Divera has them AND resource has no manual placement
-        if v.get("lat") and v.get("lng") and (resource.get("lat") is None or resource.get("lng") is None):
-            update["lat"] = float(v["lat"])
-            update["lng"] = float(v["lng"])
+        # Live-Tracking: wenn Divera lat/lng liefert, IMMER auf Resource synchronisieren
+        # (sonst wuerde der Standort eines Fahrzeugs niemals automatisch updaten).
+        try:
+            d_lat = v.get("lat")
+            d_lng = v.get("lng")
+            if d_lat is not None and d_lng is not None:
+                d_lat = float(d_lat)
+                d_lng = float(d_lng)
+                # Plausibilitaetscheck: 0/0 ist meist "kein Fix"
+                if abs(d_lat) > 0.01 or abs(d_lng) > 0.01:
+                    if d_lat != resource.get("lat") or d_lng != resource.get("lng"):
+                        update["lat"] = d_lat
+                        update["lng"] = d_lng
+        except (TypeError, ValueError):
+            pass
         await db.resources.update_one({"id": resource["id"]}, {"$set": update})
         # FMS-Audit nur bei tatsaechlicher Aenderung
         if old_fms != fms:

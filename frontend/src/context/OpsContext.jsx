@@ -1,5 +1,6 @@
 import * as React from "react";
 import {
+    API_BASE,
     listResources, updateResource, createResource, deleteResource,
     listMessages, createMessage, ackMessage, deleteMessage,
     listKonflikte
@@ -84,6 +85,67 @@ export function OpsProvider({ children }) {
         const id = setInterval(refreshKonflikte, 30000);
         return () => clearInterval(id);
     }, [incidentId, refreshKonflikte]);
+
+    // Realtime: bei resource-bezogenen Events (Divera-Sync, manuelle PATCHs anderer
+    // Clients) automatisch die Ressourcen-Liste refreshen. Wichtig fuer die
+    // Lagekarte: neue Positionen + FMS-Aenderungen erscheinen ohne Reload.
+    React.useEffect(() => {
+        if (typeof window === "undefined") return undefined;
+        if (!incidentId) return undefined;
+
+        let disposed = false;
+        let es = null;
+        let reconnectTimer = null;
+        let refreshTimer = null;
+
+        const scheduleRefresh = () => {
+            if (refreshTimer) window.clearTimeout(refreshTimer);
+            refreshTimer = window.setTimeout(() => {
+                refreshResources();
+            }, 250);
+        };
+
+        const connect = () => {
+            if (disposed) return;
+            try {
+                es = new EventSource(`${API_BASE}/incidents/stream`);
+            } catch {
+                reconnectTimer = window.setTimeout(connect, 2000);
+                return;
+            }
+            es.addEventListener("incident", (e) => {
+                try {
+                    const data = JSON.parse(e.data || "{}");
+                    if (data?.kind === "resource") {
+                        scheduleRefresh();
+                    } else if (data?.kind === "fms_event") {
+                        // FMS-Aenderung impliziert dass die Resource-Liste auch
+                        // updaten muss (fms_status/lat/lng auf Resource selbst).
+                        if (data?.incident_id === incidentId) {
+                            scheduleRefresh();
+                        }
+                    }
+                } catch {
+                    /* noop */
+                }
+            });
+            es.onerror = () => {
+                try { es?.close(); } catch { /* noop */ }
+                es = null;
+                if (!disposed) {
+                    reconnectTimer = window.setTimeout(connect, 2000);
+                }
+            };
+        };
+
+        connect();
+        return () => {
+            disposed = true;
+            if (refreshTimer) window.clearTimeout(refreshTimer);
+            if (reconnectTimer) window.clearTimeout(reconnectTimer);
+            try { es?.close(); } catch { /* noop */ }
+        };
+    }, [incidentId, refreshResources]);
 
     // ---- Resource mutations ----
     const updResource = React.useCallback(async (id, payload) => {
