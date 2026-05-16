@@ -1,0 +1,35 @@
+{
+  "summary": "Iteration 21 verifies the new FMS-Quittierung Revert feature (set_vehicle_status + acknowledge_fms_event revert-to-previous-FMS + 'SPRECHEN SIE' status_note). 14/14 new pytest tests in test_fms_revert.py PASS. Regression: existing 15 tests in test_fms_acknowledge.py + test_fms_audit.py still GREEN. Frontend FmsHistory verified live: after ack, list-item renders 'quittiert von EL ... · FMS 4 wiederhergestellt'. SPRECHEN SIE-badge correctly hidden when revert_sent_to_divera=false (Divera unreachable in preview env). Code review confirms the conditional badge + amber 'Divera-Push fehlgeschlagen' renders correctly per FmsHistory.jsx lines 212-228.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "POST /api/fms-events/{id}/acknowledge", "issue": "When revert_sent_to_divera=false but revert_divera_error is also null (e.g. divera_id=None case), response includes revert_divera_error=null (omitted from $set) — fine for FE which uses truthy check, but inconsistent vs. error-case where field is set. Minor only."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_fms_revert.py",
+    "/app/test_reports/pytest/pytest_iter21_revert.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "services/fms_audit.py uses 'from services import divera as divera_service' INSIDE acknowledge_fms_event() to break the circular import — this is the conventional fix; works correctly and is tested.",
+    "fms_audit.py:148 references private attr 'divera_service._FMS_TO_RESOURCE_STATUS' (leading underscore is a Python convention for 'internal'). Verified by tests; consider exporting a public helper get_resource_status_for_fms(code) to make the dependency explicit and refactor-safe.",
+    "fms_audit.py:165 only writes 'revert_divera_error' key when divera_error is truthy. Consider always writing the field (possibly None) so the FE/DB schema is uniform. Cosmetic.",
+    "services/divera.py.set_vehicle_status uses GET (per Divera spec) but sends sensitive accesskey in query string — that's how the upstream API works, fine. status_note 'SPRECHEN SIE' goes through httpx params encoding (-> 'SPRECHEN+SIE') — verified.",
+    "Existing pattern: PATCH /api/resources/{id} skips audit if resource has divera_id. After ack-revert, the local resource fms_status is updated WITHOUT producing a new fms_event — correct (no audit-noise), but next Divera poll could re-create an event if FMS is still 5 upstream. Behavior acceptable per spec ('next polling corrects').",
+    "FmsHistory.jsx correctly checks 'typeof e.reverted_to_fms === number' (line 209) so reverted_to_fms=0 would also render — but ack into FMS 0 is blocked by ALERT_FMS_CODES check, so unreachable in practice. Defensive coding OK."
+  ],
+  "updated_files": ["/app/backend/tests/test_fms_revert.py"],
+  "success_rate": {"backend": "100% (14/14 new + 15/15 regression)", "frontend": "100% (revert text rendered, conditional badge logic verified)"},
+  "test_credentials": "N/A — role bypass via localStorage 'els-role' + 'els-active-incident' (set via add_init_script).",
+  "seed_data_creation": "Transient: each test creates TEST_FMS_REVERT_* incident + TEST_REV_* resources + injected fms_events via pymongo, cleaned up in teardown. Live UI smoke-test also created UI_REV_* incident and cleaned up via DELETE.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Tests at /app/backend/tests/test_fms_revert.py — 14 tests, pytest 100%. Direct-Mongo seeding of fms_events used to inject from_fms+divera_id combos that the manual-PATCH path cannot produce (because PATCH skips audit on divera-linked resources). Pattern: monkeypatch services.divera.httpx.AsyncClient with a _FakeAsyncClient capturing url+params — works because divera_module.httpx is imported at module top. SSE-test consumes /api/incidents/stream in a background thread for ~4s and asserts kind='resource' + action='fms_reverted' present. Frontend FmsHistory: revert text + badges rendered conditionally based on backend fields reverted_to_fms / revert_sent_to_divera / revert_divera_error. SPRECHEN SIE-badge only shows when sent=true (preview env never has live Divera so always sent=false). Cleaned up all UI_REV_*, UI_BADGE_*, TEST_FMS_REVERT_* incidents.",
+  "rca of the issue": "N/A — feature works as specified. Resilience confirmed: when Divera-URL unreachable (DNS error in preview env), acknowledge endpoint still returns 200, reverted_to_fms is set, local resource is reset, and revert_divera_error contains the error string. SSE event 'fms_reverted' is still emitted."
+}

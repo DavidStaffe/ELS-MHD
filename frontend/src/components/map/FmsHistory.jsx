@@ -200,12 +200,33 @@ export function FmsHistory({
                 </div>
                 {isAlert && ackAt && (
                   <div
-                    className="mt-0.5 ml-5 flex items-center gap-1 text-[10px] text-emerald-400"
+                    className="mt-0.5 ml-5 flex flex-wrap items-center gap-1 text-[10px] text-emerald-400"
                     data-testid={`fms-event-ack-${e.id}`}
                   >
                     <Check className="h-2.5 w-2.5" />
                     quittiert von {ROLE_KURZ[ackRole] || ackRole || '—'} um{' '}
                     <span className="font-mono">{fmtTime(ackAt)}</span>
+                    {typeof e.reverted_to_fms === 'number' && (
+                      <span className="ml-1 inline-flex items-center gap-1 text-sky-400">
+                        · FMS {e.reverted_to_fms} wiederhergestellt
+                        {e.revert_sent_to_divera && (
+                          <span
+                            className="rounded bg-sky-500/20 px-1 py-px font-mono text-[9px] text-sky-300"
+                            title="Nachricht 'SPRECHEN SIE' an Divera-Fahrzeug gesendet"
+                          >
+                            → SPRECHEN SIE
+                          </span>
+                        )}
+                      </span>
+                    )}
+                    {e.revert_divera_error && (
+                      <span
+                        className="ml-1 text-amber-400"
+                        title={e.revert_divera_error}
+                      >
+                        · Divera-Push fehlgeschlagen
+                      </span>
+                    )}
                   </div>
                 )}
               </li>

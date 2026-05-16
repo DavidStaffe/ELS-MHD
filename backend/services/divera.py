@@ -72,6 +72,50 @@ async def fetch_vehicles(api_key: Optional[str] = None) -> List[Dict[str, Any]]:
     return data.get("data") or []
 
 
+async def set_vehicle_status(
+    divera_id: str,
+    status_id: int,
+    status_note: Optional[str] = None,
+    api_key: Optional[str] = None,
+) -> Dict[str, Any]:
+    """Setzt FMS-Status eines Fahrzeugs in Divera 24/7.
+
+    Endpoint: GET https://divera247.com/api/fms
+    Params:
+      accesskey, vehicle_id, status_id [1-9], status_note (optional)
+
+    Wird genutzt um nach Quittierung eines Sprechwunsches (FMS 5/0) den
+    vorherigen FMS-Status wiederherzustellen UND gleichzeitig die Nachricht
+    "SPRECHEN SIE" ueber status_note ans Fahrzeug zu schicken.
+
+    Raises httpx.HTTPError on network errors, ValueError on API errors.
+    """
+    key = api_key or DIVERA_API_KEY
+    if not key:
+        raise ValueError("DIVERA_API_KEY ist nicht konfiguriert")
+    if not divera_id:
+        raise ValueError("divera_id fehlt")
+    url = f"{DIVERA_BASE_URL}/api/fms"
+    params: Dict[str, Any] = {
+        "accesskey": key,
+        "vehicle_id": divera_id,
+        "status_id": status_id,
+    }
+    if status_note:
+        params["status_note"] = status_note
+    async with httpx.AsyncClient(timeout=10.0) as client:
+        resp = await client.get(url, params=params)
+        resp.raise_for_status()
+        try:
+            data = resp.json()
+        except ValueError:
+            data = {"raw": resp.text}
+    # Divera kann success=true/false zurueckliefern
+    if isinstance(data, dict) and data.get("success") is False:
+        raise ValueError(f"Divera FMS API error: {data.get('message', 'unknown')}")
+    return data if isinstance(data, dict) else {"raw": data}
+
+
 async def sync_incident(incident_id: str) -> Dict[str, Any]:
     """Pull vehicles + update linked resources for given incident.
 
