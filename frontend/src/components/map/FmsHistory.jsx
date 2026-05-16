@@ -143,7 +143,10 @@ export function FmsHistory({
                 )}
 
                 {showResourceName && (
-                  <span className="font-medium truncate min-w-0 max-w-[100px]">
+                  <span
+                    className="font-medium truncate min-w-0 max-w-[100px]"
+                    title={e.resource_name || ''}
+                  >
                     {e.resource_name || '—'}
                   </span>
                 )}
