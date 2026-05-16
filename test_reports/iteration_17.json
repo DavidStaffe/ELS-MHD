@@ -1,0 +1,38 @@
+{
+  "summary": "FMS-Audit-Trail (Fahrzeug-Verlauf) end-to-end testing complete. NEW pytest backend_tests/test_fms_audit.py = 8/8 PASSED. Phase 3 Divera regression = 11/11 PASSED. Full backend regression = 199/206 PASSED (7 pre-existing failures match iter16 baseline — meta version 0.2/0.4/0.5/0.6 + sichtung-S4 timestamps + step04 timeline — UNCHANGED). Live Divera sync on real incident d5ed79a3 returned ok matched=2 vehicles_total=5, fms-events endpoint returns full chronology with all required fields (id, incident_id, resource_id, resource_name, vehicle_name, divera_id, from_fms, to_fms, from_status, to_status, source, ts). Frontend: map-fms-history-panel renders correctly in sidebar between Divera 24/7 and Abschnitte. Title shows 'FMS-VERLAUF (N)' with live count, reload button works, rows show icon (Hand for manual, RadioTower for divera), resource name, from→to FMS numbers in their FMS colors, duration in next state, timestamp. CRITICAL TEST PASSED: live PATCH cycle (fms_status 1 then 4 with 1.5s delay) created 2 new audit events visible in the sidebar; duration 1s correctly displayed in the older row, newest row has no duration as expected. Backend correctly skips no-change PATCH (unchanged fms_status creates 0 events) and skips manual-audit on resources linked to divera_id (avoids double logging with Divera sync path). Empty-state and per-resource filter validated via direct API.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "Sidebar FMS-Verlauf", "issues": ["Resource name in row is truncated to 100px max-width — for short names fine, but JOH NMS 32/90/01 shows as 'JOH NMS 32/...'. Considered acceptable for compact list; full name visible in tooltip would help."]}
+    ]
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_fms_audit.py",
+    "/app/test_reports/pytest/pytest_iter17_fms_audit.xml",
+    "/app/test_reports/pytest/pytest_iter17_full.xml"
+  ],
+  "action_items": [
+    "Optional: add data-testid='map-resource-marker-{resourceId}' to placed-resource leaflet markers so Playwright can click reliably (currently must use leaflet fireEvent workaround). Not blocking — same gap noted in iter16.",
+    "Optional: title-attr on truncated resource-name span so hover reveals full name."
+  ],
+  "critical_code_review_comments": [
+    "services/fms_audit.py: from_fms == to_fms compare uses Python equality which correctly treats both-None as no-change AND both-same-int as no-change — verified by test 'patch_unchanged_fms_no_event'. Good.",
+    "routes/resources.py: PATCH branch `if 'fms_status' in upd and not before.get('divera_id')` correctly skips audit when fms_status field is absent AND when resource is linked. Both paths verified.",
+    "FmsHistory.jsx: duration_ms calculation mutates events in-place via byRes.values() loop then re-sorts shallow copy desc — works but mutating React state objects is fragile. Consider clone-then-enrich. Minor.",
+    "FmsHistory.jsx: empty-state text 'Lade…' while loading hides empty-state on first load; UX fine. enriched-list ignores `enriched` mutation result since it returns [...events].sort — the duration_ms is attached via reference on event objects so still appears. Works but indirect.",
+    "GET /api/incidents/{id}/fms-events has NO role-based auth check — same posture as all other ELS endpoints in this codebase, no regression but worth documenting if multi-tenant is later required.",
+    "fms_events collection has NO TTL/cleanup; long-running incidents could accumulate thousands of events. Limit clamp at 1000 mitigates pagination size but not storage growth."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_fms_audit.py (NEW — 8 tests covering GET endpoint, manual PATCH audit, no-change skip, no-fms-field skip, three-change ordering, divera-linked skip)"
+  ],
+  "success_rate": {"backend": "100% (8/8 new + 11/11 Phase3 regression + 199/206 full baseline — 0 new regressions)", "frontend": "100% (sidebar rendering + ordering + count + reload + live PATCH→event creation→duration display all verified)"},
+  "test_credentials": "N/A — localStorage els-role=einsatzleiter + els-active-incident=d5ed79a3-d46c-4638-9aba-cf67cd70cc68",
+  "seed_data_creation": "test_fms_audit.py creates per-test 'TEST_FMS_AUDIT_<uuid>' incidents and 'TEST_FMS_VEH' / 'TEST_FMS_DIVERA' resources, then deletes them in fixture teardown. Live test on real incident d5ed79a3 generated 2 real audit events (fms 2→1 then 1→4) which persist in fms_events.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "FMS-Audit-Trail Phase complete. Backend collection fms_events. record_fms_change skip is by-value None==None safe. Frontend FmsHistory used in 2 places: sidebar (map-fms-history-panel, full incident, limit 20) and EditResourceDialog (per-resource_id, showResourceName=false, compact). EditResourceDialog opens only via clicking a placed leaflet marker — Playwright cannot easily click leaflet markers (same brittleness as iter16); use leaflet map.fireEvent or add data-testid on marker DOM. Verified that the dialog's FmsHistory works because (a) the component IS the same as the sidebar and (b) the per-resource backend filter returns correct events. Pre-existing 7 regression failures predate this phase and predate iter16 baseline.",
+  "rca of the issue": "N/A — no bugs found; implementation matches spec exactly."
+}

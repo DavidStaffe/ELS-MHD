@@ -109,6 +109,16 @@ export async function diveraSyncNow(incidentId) {
 }
 
 /* =====================================================================
+   FMS-Audit-Trail
+   ===================================================================== */
+export async function listFmsEvents(incidentId, { resourceId, limit = 100 } = {}) {
+  const params = { limit };
+  if (resourceId) params.resource_id = resourceId;
+  const { data } = await api.get(`/incidents/${incidentId}/fms-events`, { params });
+  return data;
+}
+
+/* =====================================================================
    Transports
    ===================================================================== */
 export async function listTransports(incidentId, params = {}) {

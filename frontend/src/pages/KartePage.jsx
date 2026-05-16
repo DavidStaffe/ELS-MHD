@@ -33,6 +33,7 @@ import {
 import { ABSCHNITT_FARBEN, getFarbe } from '@/lib/abschnitt-meta';
 import { FMS_STATUS, fmsMeta } from '@/lib/fms-status';
 import { DiveraPanel } from '@/components/map/DiveraPanel';
+import { FmsHistory } from '@/components/map/FmsHistory';
 import { toast } from 'sonner';
 import {
   ArrowLeft,
@@ -297,6 +298,17 @@ function EditResourceDialog({ open, onOpenChange, resource, onSave, onRemove }) 
                 ? 'Manuell deaktiviert, da Divera-Verknuepfung gesetzt ist.'
                 : 'Wird vom Divera-Polling ueberschrieben, sobald eine Verknuepfung gesetzt ist.'}
             </p>
+          </div>
+
+          {/* FMS-Verlauf fuer diese Ressource */}
+          <div className="border-t border-border pt-3">
+            <FmsHistory
+              incidentId={resource.incident_id}
+              resourceId={resource.id}
+              showResourceName={false}
+              limit={20}
+              compact
+            />
           </div>
         </div>
 
@@ -675,6 +687,15 @@ export default function KartePage() {
               // refresh resources via OpsContext (already via SSE, but trigger manual reload)
             }}
           />
+
+          {/* FMS-Verlauf gesamt -------------------------------------- */}
+          <div className="els-surface p-3" data-testid="map-fms-history-panel">
+            <FmsHistory
+              incidentId={activeIncident.id}
+              limit={20}
+              compact
+            />
+          </div>
 
           {/* Abschnitte ---------------------------------------------- */}
           <div className="els-surface p-3" data-testid="map-abschnitte-panel">
