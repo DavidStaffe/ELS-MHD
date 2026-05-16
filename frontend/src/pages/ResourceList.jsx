@@ -12,8 +12,9 @@ import { StatusBadge, SectionCard, KpiTile, ConfirmModal } from "@/components/pr
 import { useOps } from "@/context/OpsContext";
 import { useIncidents } from "@/context/IncidentContext";
 import { useRole } from "@/context/RoleContext";
-import { listAbschnitte, updateResource as apiUpdateResource } from "@/lib/api";
+import { listAbschnitte, listDiveraVehicles, getDiveraConfigured, updateResource as apiUpdateResource } from "@/lib/api";
 import { getFarbe } from "@/lib/abschnitt-meta";
+import { fmsMeta } from "@/lib/fms-status";
 import {
     RESOURCE_STATUS, RESOURCE_STATUS_KEYS,
     RESOURCE_KATEGORIE, RESOURCE_KAT_KEYS
@@ -21,7 +22,7 @@ import {
 import { cn } from "@/lib/utils";
 import {
     ArrowLeft, Boxes, RefreshCw, Truck, Stethoscope, Users,
-    AlertTriangle, Circle, Plus, Edit3, Trash2
+    AlertTriangle, Circle, Plus, Edit3, Trash2, RadioTower, Unlink
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -58,7 +59,88 @@ function AbschnittChip({ abschnitt }) {
     );
 }
 
-function ResourceRow({ resource, abschnitt, abschnitte, onChangeStatus, onChangeAbschnitt, onEdit, onDelete, canEdit, canDelete }) {
+function DiveraInlineSelect({ resource, vehicles, onChange, canEdit }) {
+    const linked = resource.divera_id
+        ? vehicles.find((v) => String(v.id) === String(resource.divera_id))
+        : null;
+    const fms = linked?.fmsstatus;
+    const meta = fms != null ? fmsMeta(fms) : null;
+
+    return (
+        <Select
+            value={resource.divera_id ? String(resource.divera_id) : "none"}
+            onValueChange={(v) => onChange(resource.id, v === "none" ? null : v)}
+            disabled={!canEdit || vehicles.length === 0}
+        >
+            <SelectTrigger
+                className="w-44 h-8 bg-background text-caption"
+                data-testid={`resource-divera-select-${resource.id}`}
+                title={
+                    vehicles.length === 0
+                        ? "Keine Divera-Fahrzeuge verfuegbar"
+                        : "Mit Divera-Fahrzeug verknuepfen"
+                }
+            >
+                <div className="flex items-center gap-1.5 min-w-0">
+                    <RadioTower
+                        className={cn(
+                            "h-3 w-3 shrink-0",
+                            linked ? "text-emerald-500" : "text-muted-foreground/60"
+                        )}
+                    />
+                    {linked ? (
+                        <>
+                            <span className="truncate font-medium">{linked.name}</span>
+                            {meta && (
+                                <span
+                                    className="ml-auto font-mono text-[10px] font-bold"
+                                    style={{ color: meta.color }}
+                                >
+                                    {fms}
+                                </span>
+                            )}
+                        </>
+                    ) : (
+                        <span className="text-muted-foreground italic">Divera</span>
+                    )}
+                </div>
+            </SelectTrigger>
+            <SelectContent>
+                <SelectItem value="none">
+                    <span className="inline-flex items-center gap-1.5">
+                        <Unlink className="h-3 w-3" />
+                        nicht verknuepft
+                    </span>
+                </SelectItem>
+                {vehicles.map((v) => {
+                    const vMeta = v.fmsstatus != null ? fmsMeta(v.fmsstatus) : null;
+                    return (
+                        <SelectItem key={v.id} value={String(v.id)}>
+                            <span className="inline-flex items-center gap-2">
+                                <span className="font-medium">{v.name}</span>
+                                {v.shortname && v.shortname !== v.name && (
+                                    <span className="text-muted-foreground text-xs">
+                                        ({v.shortname})
+                                    </span>
+                                )}
+                                {vMeta && (
+                                    <span
+                                        className="ml-auto font-mono text-[10px] font-bold"
+                                        style={{ color: vMeta.color }}
+                                    >
+                                        FMS {v.fmsstatus}
+                                    </span>
+                                )}
+                            </span>
+                        </SelectItem>
+                    );
+                })}
+            </SelectContent>
+        </Select>
+    );
+}
+
+function ResourceRow({ resource, abschnitt, abschnitte, vehicles, onChangeStatus, onChangeAbschnitt, onChangeDivera, onEdit, onDelete, canEdit, canDelete }) {
     const meta = RESOURCE_STATUS[resource.status] || { label: resource.status, tone: "neutral" };
     const KatIcon = KAT_ICON[resource.kategorie] || Boxes;
     return (
@@ -77,6 +159,12 @@ function ResourceRow({ resource, abschnitt, abschnitte, onChangeStatus, onChange
                     <AbschnittChip abschnitt={abschnitt} />
                 </div>
             </div>
+            <DiveraInlineSelect
+                resource={resource}
+                vehicles={vehicles}
+                onChange={onChangeDivera}
+                canEdit={canEdit}
+            />
             <Select
                 value={resource.abschnitt_id || "none"}
                 onValueChange={(v) => onChangeAbschnitt(resource.id, v === "none" ? null : v)}
@@ -102,10 +190,12 @@ function ResourceRow({ resource, abschnitt, abschnitte, onChangeStatus, onChange
             <Select
                 value={resource.status}
                 onValueChange={(v) => onChangeStatus(resource.id, v)}
+                disabled={Boolean(resource.divera_id)}
             >
                 <SelectTrigger
                     className="w-36 h-8 bg-background"
                     data-testid={`resource-status-${resource.id}`}
+                    title={resource.divera_id ? "Status wird vom Divera-Polling gesteuert" : ""}
                 >
                     <SelectValue />
                 </SelectTrigger>
@@ -145,18 +235,21 @@ function ResourceRow({ resource, abschnitt, abschnitte, onChangeStatus, onChange
     );
 }
 
-function ResourceDialog({ open, onOpenChange, initial, abschnitte, onSave }) {
+function ResourceDialog({ open, onOpenChange, initial, abschnitte, vehicles, onSave }) {
     const [form, setForm] = React.useState({
         name: "", typ: "intern", kategorie: "sonstiges",
-        status: "verfuegbar", abschnitt_id: null, notiz: ""
+        status: "verfuegbar", abschnitt_id: null, divera_id: null, notiz: ""
     });
     React.useEffect(() => {
         setForm(initial || {
             name: "", typ: "intern", kategorie: "sonstiges",
-            status: "verfuegbar", abschnitt_id: null, notiz: ""
+            status: "verfuegbar", abschnitt_id: null, divera_id: null, notiz: ""
         });
     }, [initial, open]);
     const isEdit = Boolean(initial?.id);
+    const linkedVehicle = form.divera_id
+        ? vehicles.find((v) => String(v.id) === String(form.divera_id))
+        : null;
 
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
@@ -164,7 +257,8 @@ function ResourceDialog({ open, onOpenChange, initial, abschnitte, onSave }) {
                 <DialogHeader>
                     <DialogTitle>{isEdit ? "Ressource bearbeiten" : "Neue Ressource"}</DialogTitle>
                     <DialogDescription>
-                        Ressource fuer diesen Incident anlegen oder aendern.
+                        Ressource fuer diesen Incident anlegen oder aendern. Verknuepfung
+                        mit Divera-Fahrzeug uebernimmt automatisch Live-FMS-Status.
                     </DialogDescription>
                 </DialogHeader>
                 <div className="space-y-3">
@@ -209,7 +303,11 @@ function ResourceDialog({ open, onOpenChange, initial, abschnitte, onSave }) {
                     <div className="grid grid-cols-2 gap-2">
                         <div>
                             <label className="text-caption text-muted-foreground">Status</label>
-                            <Select value={form.status} onValueChange={(v) => setForm({ ...form, status: v })}>
+                            <Select
+                                value={form.status}
+                                onValueChange={(v) => setForm({ ...form, status: v })}
+                                disabled={Boolean(form.divera_id)}
+                            >
                                 <SelectTrigger data-testid="resource-status-select">
                                     <SelectValue />
                                 </SelectTrigger>
@@ -241,6 +339,76 @@ function ResourceDialog({ open, onOpenChange, initial, abschnitte, onSave }) {
                                 </SelectContent>
                             </Select>
                         </div>
+                    </div>
+                    <div>
+                        <label className="text-caption text-muted-foreground flex items-center gap-1.5">
+                            <RadioTower className="h-3 w-3" />
+                            Divera-Fahrzeug verknuepfen
+                        </label>
+                        <Select
+                            value={form.divera_id ? String(form.divera_id) : "none"}
+                            onValueChange={(v) => setForm({ ...form, divera_id: v === "none" ? null : v })}
+                            disabled={vehicles.length === 0}
+                        >
+                            <SelectTrigger data-testid="resource-divera-dialog">
+                                <SelectValue placeholder="— nicht verknuepft —" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="none">— nicht verknuepft —</SelectItem>
+                                {vehicles.map((v) => {
+                                    const vMeta = v.fmsstatus != null ? fmsMeta(v.fmsstatus) : null;
+                                    return (
+                                        <SelectItem key={v.id} value={String(v.id)}>
+                                            <span className="inline-flex items-center gap-2">
+                                                <span className="font-medium">{v.name}</span>
+                                                {v.shortname && v.shortname !== v.name && (
+                                                    <span className="text-muted-foreground text-xs">
+                                                        ({v.shortname})
+                                                    </span>
+                                                )}
+                                                {vMeta && (
+                                                    <span
+                                                        className="font-mono text-[10px] font-bold"
+                                                        style={{ color: vMeta.color }}
+                                                    >
+                                                        FMS {v.fmsstatus}
+                                                    </span>
+                                                )}
+                                            </span>
+                                        </SelectItem>
+                                    );
+                                })}
+                            </SelectContent>
+                        </Select>
+                        {vehicles.length === 0 ? (
+                            <p className="mt-1 text-[11px] text-muted-foreground italic">
+                                Keine Divera-Fahrzeuge verfuegbar (API-Key fehlt oder kein Zugriff).
+                                Pruefe DiveraPanel in der Karte.
+                            </p>
+                        ) : linkedVehicle ? (
+                            <p className="mt-1 text-[11px] text-muted-foreground">
+                                Verknuepft mit{" "}
+                                <span className="font-mono text-foreground">
+                                    {linkedVehicle.name}
+                                </span>
+                                {linkedVehicle.fmsstatus != null && (
+                                    <>
+                                        {" · aktueller FMS "}
+                                        <span
+                                            className="font-mono font-semibold"
+                                            style={{ color: fmsMeta(linkedVehicle.fmsstatus)?.color }}
+                                        >
+                                            {linkedVehicle.fmsstatus}
+                                        </span>
+                                    </>
+                                )}
+                                {" · Status & FMS werden vom Polling ueberschrieben."}
+                            </p>
+                        ) : (
+                            <p className="mt-1 text-[11px] text-muted-foreground">
+                                Bei Verknuepfung werden Status und FMS automatisch alle 30s synchronisiert.
+                            </p>
+                        )}
                     </div>
                 </div>
                 <DialogFooter>
@@ -378,6 +546,8 @@ export default function ResourceList() {
     const { resources, refreshResources, updResource, addResource, rmResource } = useOps();
     const { can } = useRole();
     const [abschnitte, setAbschnitte] = React.useState([]);
+    const [vehicles, setVehicles] = React.useState([]);
+    const [diveraConfigured, setDiveraConfigured] = React.useState(null);
     const [dialog, setDialog] = React.useState({ open: false, initial: null });
     const [confirmDelete, setConfirmDelete] = React.useState(null);
 
@@ -390,9 +560,42 @@ export default function ResourceList() {
         }
     }, [activeIncident?.id]);
 
+    const loadVehicles = React.useCallback(async () => {
+        try {
+            const v = await listDiveraVehicles();
+            setVehicles(Array.isArray(v) ? v : []);
+        } catch {
+            setVehicles([]);
+        }
+    }, []);
+
     React.useEffect(() => {
         loadAbschnitte();
     }, [loadAbschnitte]);
+
+    // Divera-Konfiguration einmal pruefen + Fahrzeuge laden + alle 30s refreshen (live FMS)
+    React.useEffect(() => {
+        let cancelled = false;
+        (async () => {
+            try {
+                const cfg = await getDiveraConfigured();
+                if (cancelled) return;
+                setDiveraConfigured(Boolean(cfg?.configured));
+                if (cfg?.configured) await loadVehicles();
+            } catch {
+                if (!cancelled) setDiveraConfigured(false);
+            }
+        })();
+        return () => {
+            cancelled = true;
+        };
+    }, [loadVehicles]);
+
+    React.useEffect(() => {
+        if (!diveraConfigured) return undefined;
+        const id = setInterval(loadVehicles, 30000);
+        return () => clearInterval(id);
+    }, [diveraConfigured, loadVehicles]);
 
     const abschnittById = React.useMemo(() => {
         const m = new Map();
@@ -406,6 +609,25 @@ export default function ResourceList() {
             await refreshResources();
         } catch (e) {
             // ignore
+        }
+    };
+
+    const handleChangeDivera = async (id, diveraId) => {
+        try {
+            await apiUpdateResource(id, { divera_id: diveraId });
+            await refreshResources();
+            // Fahrzeug-Liste sofort nachladen, damit FMS-Status aktuell ist
+            loadVehicles();
+            if (diveraId) {
+                const v = vehicles.find((x) => String(x.id) === String(diveraId));
+                toast.success(
+                    v ? `Mit "${v.name}" verknuepft` : "Verknuepfung gesetzt",
+                );
+            } else {
+                toast.success("Verknuepfung entfernt");
+            }
+        } catch (e) {
+            toast.error("Verknuepfung fehlgeschlagen");
         }
     };
 
@@ -515,6 +737,26 @@ export default function ResourceList() {
                 <StatusMatrix resources={resources} />
             </SectionCard>
 
+            {/* Divera-Konfigurations-Hinweis */}
+            {diveraConfigured === false && (
+                <div
+                    className="mt-4 rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-caption text-amber-300"
+                    data-testid="divera-not-configured"
+                >
+                    <span className="font-medium">Divera 24/7 nicht konfiguriert.</span>{" "}
+                    Setze <span className="font-mono">DIVERA_API_KEY</span> in der
+                    Backend-Konfiguration, um Fahrzeuge zu verknuepfen.
+                </div>
+            )}
+            {diveraConfigured && vehicles.length === 0 && (
+                <div
+                    className="mt-4 rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-caption text-amber-300"
+                    data-testid="divera-no-vehicles"
+                >
+                    Keine Divera-Fahrzeuge gefunden. Pruefe Zugriffs-Berechtigungen im Divera-Account.
+                </div>
+            )}
+
             <div className="mt-4 grid grid-cols-1 gap-4 xl:grid-cols-2">
                 <SectionCard title="Intern" testId="section-intern" padded={false}>
                     <div className="flex flex-col gap-1.5 p-2">
@@ -529,8 +771,10 @@ export default function ResourceList() {
                                 resource={r}
                                 abschnitt={r.abschnitt_id ? abschnittById.get(r.abschnitt_id) : null}
                                 abschnitte={abschnitte}
+                                vehicles={vehicles}
                                 onChangeStatus={(id, status) => updResource(id, { status })}
                                 onChangeAbschnitt={handleChangeAbschnitt}
+                                onChangeDivera={handleChangeDivera}
                                 onEdit={(x) => setDialog({ open: true, initial: x })}
                                 onDelete={(x) => setConfirmDelete(x)}
                                 canEdit={can("resource.update")}
@@ -552,8 +796,10 @@ export default function ResourceList() {
                                 resource={r}
                                 abschnitt={r.abschnitt_id ? abschnittById.get(r.abschnitt_id) : null}
                                 abschnitte={abschnitte}
+                                vehicles={vehicles}
                                 onChangeStatus={(id, status) => updResource(id, { status })}
                                 onChangeAbschnitt={handleChangeAbschnitt}
+                                onChangeDivera={handleChangeDivera}
                                 onEdit={(x) => setDialog({ open: true, initial: x })}
                                 onDelete={(x) => setConfirmDelete(x)}
                                 canEdit={can("resource.update")}
@@ -569,6 +815,7 @@ export default function ResourceList() {
                 onOpenChange={(v) => setDialog((d) => ({ ...d, open: v }))}
                 initial={dialog.initial}
                 abschnitte={abschnitte}
+                vehicles={vehicles}
                 onSave={handleSave}
             />
 
