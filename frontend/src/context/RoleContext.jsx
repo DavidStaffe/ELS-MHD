@@ -124,6 +124,7 @@ export function canRole(role, action) {
 
 const RoleContext = React.createContext(null);
 const ROLE_KEY = "els-role";
+const NAME_KEY = "els-user-name";
 
 export function useRole() {
     const ctx = React.useContext(RoleContext);
@@ -136,13 +137,32 @@ export function RoleProvider({ children }) {
         if (typeof window === "undefined") return null;
         return localStorage.getItem(ROLE_KEY) || null;
     });
+    const [userName, setUserName] = React.useState(() => {
+        if (typeof window === "undefined") return "";
+        return localStorage.getItem(NAME_KEY) || "";
+    });
     const [pickerOpen, setPickerOpen] = React.useState(false);
 
+    // Picker oeffnen wenn Rolle ODER Name fehlt.
     React.useEffect(() => {
-        if (!role) setPickerOpen(true);
-    }, [role]);
+        if (!role || !userName) setPickerOpen(true);
+    }, [role, userName]);
 
-    const setAndPersist = React.useCallback((r) => {
+    const setIdentity = React.useCallback((nextRole, nextName) => {
+        setRole(nextRole);
+        setUserName(nextName);
+        try {
+            if (nextRole) localStorage.setItem(ROLE_KEY, nextRole);
+            else localStorage.removeItem(ROLE_KEY);
+            if (nextName) localStorage.setItem(NAME_KEY, nextName);
+            else localStorage.removeItem(NAME_KEY);
+        } catch {
+            /* noop */
+        }
+    }, []);
+
+    // Backward-compat: setRole(key) ohne Name behaelt aktuellen Namen.
+    const setRoleOnly = React.useCallback((r) => {
         setRole(r);
         try {
             if (r) localStorage.setItem(ROLE_KEY, r);
@@ -161,12 +181,15 @@ export function RoleProvider({ children }) {
         () => ({
             role,
             roleMeta: role ? ROLES[role] : null,
-            setRole: setAndPersist,
+            userName,
+            displayName: userName || (role ? ROLES[role]?.label : "Nutzer"),
+            setRole: setRoleOnly,
+            setIdentity,
             can,
             pickerOpen,
             setPickerOpen
         }),
-        [role, setAndPersist, can, pickerOpen]
+        [role, userName, setRoleOnly, setIdentity, can, pickerOpen]
     );
 
     return <RoleContext.Provider value={value}>{children}</RoleContext.Provider>;

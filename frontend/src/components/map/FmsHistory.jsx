@@ -204,7 +204,17 @@ export function FmsHistory({
                     data-testid={`fms-event-ack-${e.id}`}
                   >
                     <Check className="h-2.5 w-2.5" />
-                    quittiert von {ROLE_KURZ[ackRole] || ackRole || '—'} um{' '}
+                    quittiert von{' '}
+                    {e.acknowledged_by_name ? (
+                      <span className="font-semibold text-emerald-300">
+                        {e.acknowledged_by_name}
+                      </span>
+                    ) : null}
+                    {' '}
+                    <span className="text-emerald-400/80">
+                      ({ROLE_KURZ[ackRole] || ackRole || '—'})
+                    </span>
+                    {' '}um{' '}
                     <span className="font-mono">{fmtTime(ackAt)}</span>
                     {typeof e.reverted_to_fms === 'number' && (
                       <span className="ml-1 inline-flex items-center gap-1 text-sky-400">

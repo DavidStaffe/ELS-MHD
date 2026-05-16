@@ -85,9 +85,10 @@ async def record_fms_change(
 async def acknowledge_fms_event(
     event_id: str,
     role: str,
+    name: Optional[str] = None,
 ) -> Optional[Dict[str, Any]]:
     """Quittiert ein FMS-5/0-Event:
-      1. Setzt acknowledged_by_role + acknowledged_at am Event.
+      1. Setzt acknowledged_by_role + acknowledged_by_name + acknowledged_at am Event.
       2. Wenn die Resource an Divera verknuepft ist UND vorher ein regulaerer
          FMS-Status (1-4,6-9) gesetzt war: ruft Divera-FMS-API auf, um den
          vorherigen Status wiederherzustellen und die Nachricht "SPRECHEN SIE"
@@ -112,6 +113,7 @@ async def acknowledge_fms_event(
 
     set_fields: Dict[str, Any] = {
         "acknowledged_by_role": role,
+        "acknowledged_by_name": (name or "").strip() or None,
         "acknowledged_at": iso(now_utc()),
     }
 

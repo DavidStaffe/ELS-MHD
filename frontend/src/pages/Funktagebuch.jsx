@@ -439,7 +439,7 @@ function DetailDialog({ entry, abschnitt, onClose, onEdit, canEdit }) {
 export default function Funktagebuch() {
     const navigate = useNavigate();
     const { activeIncident } = useIncidents();
-    const { can, roleMeta } = useRole();
+    const { can, roleMeta, userName, displayName } = useRole();
 
     const [entries, setEntries] = React.useState([]);
     const [abschnitte, setAbschnitte] = React.useState([]);
@@ -510,11 +510,14 @@ export default function Funktagebuch() {
 
     const handleSave = async (form) => {
         try {
+            const erfasstVon = userName
+                ? `${userName}${roleMeta?.kurz ? ` (${roleMeta.kurz})` : ""}`
+                : (roleMeta?.label || "Nutzer");
             const payload = {
                 ...form,
                 kategorie: "info",  // backward compat
                 von: form.absender,
-                erfasst_von: roleMeta?.label || "Nutzer",
+                erfasst_von: erfasstVon,
                 erfasst_rolle: roleMeta?.key || ""
             };
             if (dialog.initial?.id) {
@@ -533,20 +536,20 @@ export default function Funktagebuch() {
 
     const handleAck = async (entry) => {
         try {
-            await ackMessage(entry.id, roleMeta?.label || "Nutzer");
+            await ackMessage(entry.id, displayName);
             loadAll();
         } catch { toast.error("Quittieren fehlgeschlagen"); }
     };
     const handleConfirm = async (entry) => {
         try {
-            await confirmMessage(entry.id, { bestaetigt_von: roleMeta?.label || "Einsatzleiter" });
+            await confirmMessage(entry.id, { bestaetigt_von: displayName });
             toast.success("Bestaetigt");
             loadAll();
         } catch { toast.error("Bestaetigen fehlgeschlagen"); }
     };
     const handleFinalize = async (entry) => {
         try {
-            await finalizeMessage(entry.id, roleMeta?.label);
+            await finalizeMessage(entry.id, displayName);
             toast.success("Finalisiert");
             loadAll();
         } catch { toast.error("Finalisieren fehlgeschlagen"); }

@@ -55,7 +55,7 @@ export function GlobalHeader({
     className
 }) {
     const now = useClock(1000);
-    const { roleMeta, setPickerOpen } = useRole();
+    const { roleMeta, userName, setPickerOpen } = useRole();
 
     // Live-Dauer seit Incident-Start
     const duration = React.useMemo(() => {
@@ -172,16 +172,30 @@ export function GlobalHeader({
                         type="button"
                         onClick={() => setPickerOpen(true)}
                         data-testid="header-role-button"
-                        title="Rolle wechseln"
+                        title="Identifikation aendern"
                         className="hidden sm:flex items-center gap-1.5 rounded-md bg-surface-raised px-2.5 h-8 text-caption els-focus-ring hover:border-primary/60 border border-border transition-colors"
                     >
                         <RoleIcon className="h-3.5 w-3.5 text-primary" />
-                        <span className="text-muted-foreground">Rolle:</span>
-                        <span className="font-medium" data-testid="header-role">
-                            {roleMeta ? roleMeta.label : "waehlen"}
-                        </span>
+                        {userName ? (
+                            <span
+                                className="font-medium max-w-[140px] truncate"
+                                data-testid="header-user-name"
+                                title={userName}
+                            >
+                                {userName}
+                            </span>
+                        ) : (
+                            <>
+                                <span className="text-muted-foreground">Name:</span>
+                                <span className="font-medium text-status-red/80">erforderlich</span>
+                            </>
+                        )}
                         {roleMeta && (
-                            <span className="rounded bg-background px-1.5 py-0.5 font-mono text-[0.65rem] text-muted-foreground">
+                            <span
+                                className="rounded bg-background px-1.5 py-0.5 font-mono text-[0.65rem] text-muted-foreground"
+                                data-testid="header-role"
+                                title={roleMeta.label}
+                            >
                                 {roleMeta.kurz}
                             </span>
                         )}

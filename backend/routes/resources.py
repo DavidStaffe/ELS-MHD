@@ -25,6 +25,7 @@ FMS_ACK_ROLES = {"einsatzleiter", "fuehrungsassistenz"}
 
 class FmsAcknowledgePayload(BaseModel):
     role: str = Field(min_length=2, max_length=40)
+    name: Optional[str] = Field(default=None, max_length=120)
 
 
 @router.get("/incidents/{incident_id}/resources", response_model=List[dict])
@@ -131,7 +132,7 @@ async def acknowledge_fms(event_id: str, payload: FmsAcknowledgePayload):
             detail="Nur Einsatzleiter oder Fuehrungsassistenz duerfen quittieren.",
         )
     try:
-        updated = await acknowledge_fms_event(event_id, payload.role)
+        updated = await acknowledge_fms_event(event_id, payload.role, payload.name)
     except ValueError as exc:
         raise HTTPException(status_code=409, detail=str(exc))
     if updated is None:

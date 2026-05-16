@@ -47,7 +47,7 @@ function playBeep() {
  */
 export function useFmsAlerts() {
   const { activeIncident } = useIncidents();
-  const { role, can } = useRole();
+  const { role, userName, can } = useRole();
   const incidentId = activeIncident?.id || null;
   const isArchived = activeIncident?.status === 'abgeschlossen';
   const active = Boolean(incidentId) && !isArchived;
@@ -207,7 +207,7 @@ export function useFmsAlerts() {
     if (!role || !can('fms.acknowledge')) return { ok: false, error: 'permission' };
     setBusyId(event.id);
     try {
-      const updated = await acknowledgeFmsEvent(event.id, role);
+      const updated = await acknowledgeFmsEvent(event.id, role, userName);
       setEvents((prev) =>
         prev.map((e) => (e.id === event.id ? { ...e, ...updated } : e)),
       );
@@ -218,7 +218,7 @@ export function useFmsAlerts() {
     } finally {
       setBusyId(null);
     }
-  }, [role, can]);
+  }, [role, userName, can]);
 
   return {
     active,
