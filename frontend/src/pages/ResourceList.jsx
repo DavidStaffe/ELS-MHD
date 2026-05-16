@@ -8,7 +8,7 @@ import {
 import {
     Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle
 } from "@/components/ui/dialog";
-import { StatusBadge, SectionCard, KpiTile, ConfirmModal } from "@/components/primitives";
+import { SectionCard, KpiTile, ConfirmModal } from "@/components/primitives";
 import { useOps } from "@/context/OpsContext";
 import { useIncidents } from "@/context/IncidentContext";
 import { useRole } from "@/context/RoleContext";
@@ -73,7 +73,7 @@ function DiveraInlineSelect({ resource, vehicles, onChange, canEdit }) {
             disabled={!canEdit || vehicles.length === 0}
         >
             <SelectTrigger
-                className="w-44 h-8 bg-background text-caption"
+                className="w-36 xl:w-32 2xl:w-40 h-8 bg-background text-caption"
                 data-testid={`resource-divera-select-${resource.id}`}
                 title={
                     vehicles.length === 0
@@ -141,7 +141,6 @@ function DiveraInlineSelect({ resource, vehicles, onChange, canEdit }) {
 }
 
 function ResourceRow({ resource, abschnitt, abschnitte, vehicles, onChangeStatus, onChangeAbschnitt, onChangeDivera, onEdit, onDelete, canEdit, canDelete }) {
-    const meta = RESOURCE_STATUS[resource.status] || { label: resource.status, tone: "neutral" };
     const KatIcon = KAT_ICON[resource.kategorie] || Boxes;
     return (
         <div
@@ -170,7 +169,7 @@ function ResourceRow({ resource, abschnitt, abschnitte, vehicles, onChangeStatus
                 onValueChange={(v) => onChangeAbschnitt(resource.id, v === "none" ? null : v)}
             >
                 <SelectTrigger
-                    className="w-28 h-8 bg-background text-caption"
+                    className="w-24 h-8 bg-background text-caption"
                     data-testid={`resource-abschnitt-select-${resource.id}`}
                 >
                     <SelectValue placeholder="Abschnitt" />
@@ -184,16 +183,13 @@ function ResourceRow({ resource, abschnitt, abschnitte, vehicles, onChangeStatus
                     ))}
                 </SelectContent>
             </Select>
-            <StatusBadge tone={meta.tone} variant="soft" size="sm">
-                {meta.label}
-            </StatusBadge>
             <Select
                 value={resource.status}
                 onValueChange={(v) => onChangeStatus(resource.id, v)}
                 disabled={Boolean(resource.divera_id)}
             >
                 <SelectTrigger
-                    className="w-36 h-8 bg-background"
+                    className="w-32 h-8 bg-background"
                     data-testid={`resource-status-${resource.id}`}
                     title={resource.divera_id ? "Status wird vom Divera-Polling gesteuert" : ""}
                 >
