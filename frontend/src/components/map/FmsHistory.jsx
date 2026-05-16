@@ -3,7 +3,15 @@ import { listFmsEvents } from '@/lib/api';
 import { fmsMeta } from '@/lib/fms-status';
 import { StatusBadge } from '@/components/primitives';
 import { Button } from '@/components/ui/button';
-import { History, RefreshCw, RadioTower, Hand, ArrowRight, Clock3 } from 'lucide-react';
+import { History, RefreshCw, RadioTower, Hand, ArrowRight, Clock3, Check } from 'lucide-react';
+
+const ROLE_KURZ = {
+  einsatzleiter: 'EL',
+  fuehrungsassistenz: 'FA',
+  abschnittleitung: 'AL',
+  helfer: 'Helfer',
+  dokumentar: 'DOK',
+};
 
 function fmtDuration(ms) {
   if (ms == null || ms < 0) return '–';
@@ -121,64 +129,85 @@ export function FmsHistory({
           {enriched.map((e) => {
             const fromMeta = fmsMeta(e.from_fms);
             const toMeta = fmsMeta(e.to_fms);
+            const isAlert = e.to_fms === 0 || e.to_fms === 5;
+            const ackRole = e.acknowledged_by_role;
+            const ackAt = e.acknowledged_at;
             return (
               <li
                 key={e.id}
                 className={
-                  'flex items-center gap-2 rounded-md bg-surface-raised px-2 py-1 ' +
+                  'rounded-md bg-surface-raised px-2 py-1 ' +
                   (compact ? 'text-[11px]' : 'text-caption')
                 }
                 data-testid={`fms-event-${e.id}`}
               >
-                {e.source === 'divera' ? (
-                  <RadioTower
-                    className="h-3 w-3 shrink-0 text-emerald-500"
-                    title="Divera-Sync"
-                  />
-                ) : (
-                  <Hand
-                    className="h-3 w-3 shrink-0 text-muted-foreground"
-                    title="Manuell"
-                  />
-                )}
+                <div className="flex items-center gap-2">
+                  {e.source === 'divera' ? (
+                    <RadioTower
+                      className="h-3 w-3 shrink-0 text-emerald-500"
+                      title="Divera-Sync"
+                    />
+                  ) : (
+                    <Hand
+                      className="h-3 w-3 shrink-0 text-muted-foreground"
+                      title="Manuell"
+                    />
+                  )}
 
-                {showResourceName && (
-                  <span
-                    className="font-medium truncate min-w-0 max-w-[100px]"
-                    title={e.resource_name || ''}
+                  {showResourceName && (
+                    <span
+                      className="font-medium truncate min-w-0 max-w-[100px]"
+                      title={e.resource_name || ''}
+                    >
+                      {e.resource_name || '—'}
+                    </span>
+                  )}
+
+                  <span className="flex items-center gap-1 shrink-0">
+                    <span
+                      className="font-mono font-semibold tabular-nums"
+                      style={{ color: fromMeta?.color || '#94a3b8' }}
+                      title={fromMeta?.label || 'kein FMS'}
+                    >
+                      {e.from_fms ?? '–'}
+                    </span>
+                    <ArrowRight className="h-2.5 w-2.5 text-muted-foreground" />
+                    <span
+                      className="font-mono font-semibold tabular-nums"
+                      style={{ color: toMeta?.color || '#94a3b8' }}
+                      title={toMeta?.label || 'kein FMS'}
+                    >
+                      {e.to_fms ?? '–'}
+                    </span>
+                  </span>
+
+                  {isAlert && !ackAt && (
+                    <StatusBadge tone="red" variant="soft" size="sm">
+                      Sprechwunsch
+                    </StatusBadge>
+                  )}
+
+                  {e.duration_ms != null && (
+                    <span className="inline-flex items-center gap-1 text-muted-foreground tabular-nums">
+                      <Clock3 className="h-2.5 w-2.5" />
+                      {fmtDuration(e.duration_ms)}
+                    </span>
+                  )}
+
+                  <span className="ml-auto font-mono text-muted-foreground tabular-nums whitespace-nowrap">
+                    {fmtTime(e.ts)}
+                  </span>
+                </div>
+                {isAlert && ackAt && (
+                  <div
+                    className="mt-0.5 ml-5 flex items-center gap-1 text-[10px] text-emerald-400"
+                    data-testid={`fms-event-ack-${e.id}`}
                   >
-                    {e.resource_name || '—'}
-                  </span>
+                    <Check className="h-2.5 w-2.5" />
+                    quittiert von {ROLE_KURZ[ackRole] || ackRole || '—'} um{' '}
+                    <span className="font-mono">{fmtTime(ackAt)}</span>
+                  </div>
                 )}
-
-                <span className="flex items-center gap-1 shrink-0">
-                  <span
-                    className="font-mono font-semibold tabular-nums"
-                    style={{ color: fromMeta?.color || '#94a3b8' }}
-                    title={fromMeta?.label || 'kein FMS'}
-                  >
-                    {e.from_fms ?? '–'}
-                  </span>
-                  <ArrowRight className="h-2.5 w-2.5 text-muted-foreground" />
-                  <span
-                    className="font-mono font-semibold tabular-nums"
-                    style={{ color: toMeta?.color || '#94a3b8' }}
-                    title={toMeta?.label || 'kein FMS'}
-                  >
-                    {e.to_fms ?? '–'}
-                  </span>
-                </span>
-
-                {e.duration_ms != null && (
-                  <span className="inline-flex items-center gap-1 text-muted-foreground tabular-nums">
-                    <Clock3 className="h-2.5 w-2.5" />
-                    {fmtDuration(e.duration_ms)}
-                  </span>
-                )}
-
-                <span className="ml-auto font-mono text-muted-foreground tabular-nums whitespace-nowrap">
-                  {fmtTime(e.ts)}
-                </span>
               </li>
             );
           })}

@@ -90,6 +90,9 @@ const PERMS = {
     // Konflikte
     "konflikt.resolve": ["einsatzleiter", "helfer"],
 
+    // FMS-Sprechwunsch-Alarm-Quittierung (Sidebar/Header-Glocke)
+    "fms.acknowledge": ["einsatzleiter", "fuehrungsassistenz"],
+
     // Abschluss
     "abschluss.view": ["einsatzleiter", "dokumentar"],
     "abschluss.freigabe": ["einsatzleiter"],

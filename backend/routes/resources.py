@@ -4,13 +4,27 @@ from typing import List, Optional
 import uuid
 
 from fastapi import APIRouter, HTTPException
+from pydantic import BaseModel, Field
 
 from core.db import db
 from core.time import iso, now_utc
 from models import ResourceCreate, ResourceUpdate
-from services.fms_audit import record_fms_change
+from services.fms_audit import (
+    ALERT_FMS_CODES,
+    acknowledge_fms_event,
+    record_fms_change,
+)
+from services.realtime import publish_incident_event
 
 router = APIRouter(prefix="/api", tags=["resources"])
+
+
+# Allowed roles for FMS-Alarm-Quittierung (EL + FA).
+FMS_ACK_ROLES = {"einsatzleiter", "fuehrungsassistenz"}
+
+
+class FmsAcknowledgePayload(BaseModel):
+    role: str = Field(min_length=2, max_length=40)
 
 
 @router.get("/incidents/{incident_id}/resources", response_model=List[dict])
@@ -106,3 +120,29 @@ async def list_fms_events(
     limit = max(1, min(limit, 1000))
     events = await db.fms_events.find(query, {"_id": 0}).sort("ts", -1).to_list(limit)
     return events
+
+
+@router.post("/fms-events/{event_id}/acknowledge")
+async def acknowledge_fms(event_id: str, payload: FmsAcknowledgePayload):
+    """Quittiert ein FMS-5/0-Alert-Event. Nur EL/FA duerfen quittieren."""
+    if payload.role not in FMS_ACK_ROLES:
+        raise HTTPException(
+            status_code=403,
+            detail="Nur Einsatzleiter oder Fuehrungsassistenz duerfen quittieren.",
+        )
+    try:
+        updated = await acknowledge_fms_event(event_id, payload.role)
+    except ValueError as exc:
+        raise HTTPException(status_code=409, detail=str(exc))
+    if updated is None:
+        raise HTTPException(status_code=404, detail="Event nicht gefunden")
+    # SSE-Benachrichtigung damit andere Clients sofort UI updaten.
+    try:
+        await publish_incident_event({
+            "type": "fms_event_acknowledged",
+            "incident_id": updated.get("incident_id"),
+            "event_id": event_id,
+        })
+    except Exception:  # pragma: no cover
+        pass
+    return updated

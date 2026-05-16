@@ -389,6 +389,16 @@ export default function IncidentList() {
           setConfirmDelete(null);
         }}
       />
+
+      <EditIncidentDialog
+        open={editTarget !== null}
+        onOpenChange={(v) => !v && setEditTarget(null)}
+        incident={editTarget}
+        onSave={async (patch) => {
+          if (!editTarget) return;
+          await update(editTarget.id, patch);
+        }}
+      />
     </div>
   );
 }

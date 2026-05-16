@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { CommandPaletteTrigger } from "@/components/command/CommandPalette";
 import { formatDuration } from "@/lib/time";
 import { useRole, ROLES } from "@/context/RoleContext";
+import { FmsAlertCenter } from "@/components/fms/FmsAlertCenter";
 import { Sun, Moon, ShieldCheck, Stethoscope, FileCheck2, Clock3, LayoutGrid, UserCog, Radio, Layers } from "lucide-react";
 
 const ROLE_ICON = {
@@ -190,6 +191,9 @@ export function GlobalHeader({
 
             {/* Command Palette Trigger */}
             <CommandPaletteTrigger />
+
+            {/* FMS-Sprechwunsch-Glocke */}
+            <FmsAlertCenter />
 
             {/* Uhrzeit */}
             <div

@@ -118,6 +118,11 @@ export async function listFmsEvents(incidentId, { resourceId, limit = 100 } = {}
   return data;
 }
 
+export async function acknowledgeFmsEvent(eventId, role) {
+  const { data } = await api.post(`/fms-events/${eventId}/acknowledge`, { role });
+  return data;
+}
+
 /* =====================================================================
    Transports
    ===================================================================== */
