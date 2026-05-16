@@ -202,7 +202,7 @@ function AbschnittKachel({ abschnitt, kpi, onOpen, onEdit, onDelete, onToggleAkt
                                 className="h-7 w-7 text-status-red"
                                 onClick={() => onDelete(abschnitt)}
                                 data-testid={`abschnitt-delete-${abschnitt.id}`}
-                                title="Loeschen (nur bei abgeschlossenem Incident)"
+                                title="Loeschen (nicht moeglich solange Betten belegt)"
                             >
                                 <Trash2 className="h-3.5 w-3.5" />
                             </Button>

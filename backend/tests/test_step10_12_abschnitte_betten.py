@@ -140,9 +140,11 @@ class TestAbschnittCRUD:
         assert p.status_code == 200
         assert p.json()["aktiv"] is False
 
-    def test_delete_active_incident_returns_409(self, empty_incident):
-        """Demo/aktives Incident: DELETE Abschnitt = 409. Erstelle Incident mit status=aktiv."""
-        # empty_incident is status 'aktiv' by default
+    def test_delete_active_incident_returns_204(self, empty_incident):
+        """Aktive/operative Incidents: leerer Abschnitt darf geloescht werden (neue Regel).
+
+        Inkidente Status spielt keine Rolle mehr; entscheidend ist nur, ob Betten belegt sind.
+        """
         inc_id = empty_incident["id"]
         r = requests.post(
             f"{API}/incidents/{inc_id}/abschnitte",
@@ -152,7 +154,7 @@ class TestAbschnittCRUD:
         assert r.status_code == 201
         aid = r.json()["id"]
         d = requests.delete(f"{API}/abschnitte/{aid}", timeout=10)
-        assert d.status_code == 409, f"expected 409, got {d.status_code}: {d.text}"
+        assert d.status_code == 204, f"expected 204, got {d.status_code}: {d.text}"
 
     def test_delete_after_incident_abgeschlossen(self):
         """Bei status!=aktiv darf Abschnitt geloescht werden."""
