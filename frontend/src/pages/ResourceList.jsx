@@ -233,12 +233,12 @@ function ResourceRow({ resource, abschnitt, abschnitte, vehicles, onChangeStatus
 
 function ResourceDialog({ open, onOpenChange, initial, abschnitte, vehicles, onSave }) {
     const [form, setForm] = React.useState({
-        name: "", typ: "intern", kategorie: "sonstiges",
+        name: "", kuerzel: "", typ: "intern", kategorie: "sonstiges",
         status: "verfuegbar", abschnitt_id: null, divera_id: null, notiz: ""
     });
     React.useEffect(() => {
-        setForm(initial || {
-            name: "", typ: "intern", kategorie: "sonstiges",
+        setForm(initial ? { kuerzel: "", ...initial } : {
+            name: "", kuerzel: "", typ: "intern", kategorie: "sonstiges",
             status: "verfuegbar", abschnitt_id: null, divera_id: null, notiz: ""
         });
     }, [initial, open]);
@@ -258,14 +258,34 @@ function ResourceDialog({ open, onOpenChange, initial, abschnitte, vehicles, onS
                     </DialogDescription>
                 </DialogHeader>
                 <div className="space-y-3">
-                    <div>
-                        <label className="text-caption text-muted-foreground">Name</label>
-                        <Input
-                            value={form.name}
-                            onChange={(e) => setForm({ ...form, name: e.target.value })}
-                            placeholder="z.B. RTW 3, UHS Team 4"
-                            data-testid="resource-name-input"
-                        />
+                    <div className="grid grid-cols-[1fr_auto] gap-2">
+                        <div>
+                            <label className="text-caption text-muted-foreground">Name</label>
+                            <Input
+                                value={form.name}
+                                onChange={(e) => setForm({ ...form, name: e.target.value })}
+                                placeholder="z.B. RTW 3, UHS Team 4"
+                                data-testid="resource-name-input"
+                            />
+                        </div>
+                        <div className="w-24">
+                            <label className="text-caption text-muted-foreground">
+                                Kuerzel
+                                <span className="ml-1 text-[10px] text-muted-foreground/70">max 4</span>
+                            </label>
+                            <Input
+                                value={form.kuerzel || ""}
+                                onChange={(e) => setForm({
+                                    ...form,
+                                    kuerzel: e.target.value.toUpperCase().slice(0, 4),
+                                })}
+                                maxLength={4}
+                                placeholder="RTW3"
+                                data-testid="resource-kuerzel-input"
+                                className="font-mono uppercase tracking-wider text-center"
+                                title="Erscheint als Label auf dem Karten-Marker"
+                            />
+                        </div>
                     </div>
                     <div className="grid grid-cols-2 gap-2">
                         <div>

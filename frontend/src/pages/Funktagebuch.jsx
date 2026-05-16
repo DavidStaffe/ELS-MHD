@@ -11,6 +11,8 @@ import {
     Select, SelectContent, SelectItem, SelectTrigger, SelectValue
 } from "@/components/ui/select";
 import { FilterChip, StatusBadge, KpiTile, ConfirmModal } from "@/components/primitives";
+import { FmsHistory } from "@/components/map/FmsHistory";
+import { ChevronDown, ChevronUp } from "lucide-react";
 import { useIncidents } from "@/context/IncidentContext";
 import { useRole } from "@/context/RoleContext";
 import {
@@ -433,6 +435,42 @@ function DetailDialog({ entry, abschnitt, onClose, onEdit, canEdit }) {
 }
 
 /* ===================================================================== */
+/* FMS-VERLAUF (vollstaendig)                                            */
+/* ===================================================================== */
+
+function FmsHistoryCollapsible({ incidentId }) {
+    const [open, setOpen] = React.useState(true);
+    if (!incidentId) return null;
+    return (
+        <section
+            className="els-surface p-3"
+            data-testid="funk-fms-history"
+        >
+            <button
+                type="button"
+                onClick={() => setOpen((v) => !v)}
+                data-testid="funk-fms-history-toggle"
+                className="flex w-full items-center justify-between gap-2 text-left els-focus-ring rounded-sm"
+            >
+                <span className="text-caption uppercase tracking-wider text-muted-foreground">
+                    FMS-Verlauf (vollstaendig)
+                </span>
+                {open ? (
+                    <ChevronUp className="h-3.5 w-3.5 text-muted-foreground" />
+                ) : (
+                    <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
+                )}
+            </button>
+            {open && (
+                <div className="mt-2">
+                    <FmsHistory incidentId={incidentId} limit={500} compact />
+                </div>
+            )}
+        </section>
+    );
+}
+
+/* ===================================================================== */
 /* PAGE                                                                  */
 /* ===================================================================== */
 
@@ -687,6 +725,9 @@ export default function Funktagebuch() {
                     )}
                 </div>
             </div>
+
+            {/* FMS-Verlauf (vollstaendig) - Quelle der Wahrheit fuer alle FMS-Aenderungen */}
+            <FmsHistoryCollapsible incidentId={incidentId} />
 
             {/* Liste */}
             <div className="print-area">

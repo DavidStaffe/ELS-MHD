@@ -683,7 +683,7 @@ export default function KartePage() {
           {/* Sprechwunsch-Alarm-Panel (nur sichtbar wenn offene FMS-5/0-Alarme) */}
           <FmsAlertSidebarPanel />
 
-          {/* Divera --------------------------------------------------- */}
+          {/* 1. Divera 24/7 ------------------------------------------- */}
           <DiveraPanel
             incidentId={activeIncident.id}
             disabled={isArchived}
@@ -692,16 +692,31 @@ export default function KartePage() {
             }}
           />
 
-          {/* FMS-Verlauf gesamt -------------------------------------- */}
+          {/* 2. FMS-Legende ------------------------------------------- */}
+          <ResourceLegend />
+
+          {/* 3. FMS-Verlauf (nur letzte 5, voller Verlauf im Funktagebuch) */}
           <div className="els-surface p-3" data-testid="map-fms-history-panel">
             <FmsHistory
               incidentId={activeIncident.id}
-              limit={20}
+              limit={5}
               compact
             />
+            <div className="mt-2 text-right">
+              <Button
+                type="button"
+                variant="link"
+                size="sm"
+                onClick={() => navigate('/funktagebuch')}
+                data-testid="map-fms-history-fulllink"
+                className="h-auto p-0 text-caption text-primary"
+              >
+                Vollstaendiger Verlauf im Funktagebuch →
+              </Button>
+            </div>
           </div>
 
-          {/* Abschnitte ---------------------------------------------- */}
+          {/* 4. Abschnitte -------------------------------------------- */}
           <div className="els-surface p-3" data-testid="map-abschnitte-panel">
             <div className="flex items-center justify-between mb-2">
               <div className="text-caption uppercase tracking-wider text-muted-foreground flex items-center gap-1">
@@ -808,15 +823,11 @@ export default function KartePage() {
             )}
           </div>
 
-          <div className="els-surface p-3" data-testid="map-resources-unplaced">
-            <div className="text-caption uppercase tracking-wider text-muted-foreground mb-2">
-              Nicht platziert ({unplacedResources.length})
-            </div>
-            {unplacedResources.length === 0 ? (
-              <div className="text-caption text-muted-foreground italic">
-                Alle Ressourcen sind auf der Karte.
+          {unplacedResources.length > 0 && (
+            <div className="els-surface p-3" data-testid="map-resources-unplaced">
+              <div className="text-caption uppercase tracking-wider text-muted-foreground mb-2">
+                Nicht platziert ({unplacedResources.length})
               </div>
-            ) : (
               <ul className="space-y-1.5">
                 {unplacedResources.map((r) => (
                   <li
@@ -844,10 +855,8 @@ export default function KartePage() {
                   </li>
                 ))}
               </ul>
-            )}
-          </div>
-
-          <ResourceLegend />
+            </div>
+          )}
 
           <div className="els-surface p-3" data-testid="map-hints">
             <div className="text-caption uppercase tracking-wider text-muted-foreground mb-1">

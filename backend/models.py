@@ -174,6 +174,7 @@ class Transport(TransportBase):
 class ResourceBase(BaseModel):
     model_config = ConfigDict(extra="ignore")
     name: str = Field(min_length=1, max_length=80)
+    kuerzel: Optional[str] = Field(default=None, max_length=4)
     typ: TransportTyp
     kategorie: ResourceKategorie = "sonstiges"
     status: ResourceStatus = "verfuegbar"
@@ -192,6 +193,7 @@ class ResourceCreate(ResourceBase):
 class ResourceUpdate(BaseModel):
     model_config = ConfigDict(extra="ignore")
     name: Optional[str] = None
+    kuerzel: Optional[str] = Field(default=None, max_length=4)
     typ: Optional[TransportTyp] = None
     kategorie: Optional[ResourceKategorie] = None
     status: Optional[ResourceStatus] = None

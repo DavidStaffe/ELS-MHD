@@ -52,6 +52,7 @@ async def create_resource(incident_id: str, payload: ResourceCreate):
         "id": str(uuid.uuid4()),
         "incident_id": incident_id,
         "name": data["name"],
+        "kuerzel": data.get("kuerzel"),
         "typ": data["typ"],
         "kategorie": data.get("kategorie", "sonstiges"),
         "status": data.get("status", "verfuegbar"),

@@ -298,10 +298,10 @@ export function IncidentMap({
           .filter((r) => r.lat != null && r.lng != null)
           .map((r) => {
             const color = resourceColor(r);
-            const icon = makeResourceIcon({
-              label: r.name?.split(' ')[0] || '',
-              color,
-            });
+            const label = (r.kuerzel && r.kuerzel.trim())
+              || r.name?.split(' ')[0]
+              || '';
+            const icon = makeResourceIcon({ label, color });
             return (
               <Marker
                 key={r.id}
