@@ -41,20 +41,21 @@ def test_incident(api_client):
 
 
 class TestMetaVersion:
-    """Tests for GET /api/meta - version 0.4.0"""
+    """Tests for GET /api/meta - version 1.0.0"""
 
-    def test_meta_returns_version_040(self, api_client):
-        """GET /api/meta should return version 0.4.0"""
+    def test_meta_returns_version_1_0_0(self, api_client):
+        """GET /api/meta should return version 1.0.0 (post-Schritt-12 release)."""
         response = api_client.get(f"{BASE_URL}/api/meta")
         assert response.status_code == 200
 
         data = response.json()
         assert (
-            data["version"] == "0.4.0"
-        ), f"Expected version 0.4.0, got {data.get('version')}"
-        assert (
-            data["step"] == "04 – Patientendetail"
-        ), f"Expected step '04 – Patientendetail', got {data.get('step')}"
+            data["version"] == "1.0.0"
+        ), f"Expected version 1.0.0, got {data.get('version')}"
+        # Step contains the consolidated step range; we only assert format.
+        assert isinstance(data.get("step"), str) and data["step"], (
+            f"Expected non-empty 'step' string, got {data.get('step')!r}"
+        )
 
 
 class TestS4ToS0Migration:

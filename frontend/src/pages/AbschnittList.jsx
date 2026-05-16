@@ -509,7 +509,9 @@ export default function AbschnittList() {
 
     const canCreate = can("abschnitt.create");
     const canUpdate = can("abschnitt.update");
-    const canDelete = can("abschnitt.delete") && activeIncident.status === "abgeschlossen";
+    // Loeschen ist erlaubt sobald die Rolle es darf. Das Backend prueft
+    // ob noch belegte Betten am Abschnitt haengen und antwortet ggf. mit 409.
+    const canDelete = can("abschnitt.delete");
     const canAssign = can("abschnitt.assign_resource");
 
     const unassignedResources = resources.filter((r) => !r.abschnitt_id);

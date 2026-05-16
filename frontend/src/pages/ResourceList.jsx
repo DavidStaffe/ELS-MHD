@@ -556,6 +556,51 @@ function StatusMatrix({ resources }) {
     );
 }
 
+function ResourceSection({
+    title,
+    testId,
+    emptyLabel,
+    resources,
+    abschnittById,
+    abschnitte,
+    vehicles,
+    onChangeStatus,
+    onChangeAbschnitt,
+    onChangeDivera,
+    onEdit,
+    onDelete,
+    canEdit,
+    canDelete,
+}) {
+    return (
+        <SectionCard title={title} testId={testId} padded={false}>
+            <div className="flex flex-col gap-1.5 p-2">
+                {resources.length === 0 && (
+                    <div className="px-3 py-4 text-center text-caption text-muted-foreground">
+                        {emptyLabel}
+                    </div>
+                )}
+                {resources.map((r) => (
+                    <ResourceRow
+                        key={r.id}
+                        resource={r}
+                        abschnitt={r.abschnitt_id ? abschnittById.get(r.abschnitt_id) : null}
+                        abschnitte={abschnitte}
+                        vehicles={vehicles}
+                        onChangeStatus={onChangeStatus}
+                        onChangeAbschnitt={onChangeAbschnitt}
+                        onChangeDivera={onChangeDivera}
+                        onEdit={onEdit}
+                        onDelete={onDelete}
+                        canEdit={canEdit}
+                        canDelete={canDelete}
+                    />
+                ))}
+            </div>
+        </SectionCard>
+    );
+}
+
 export default function ResourceList() {
     const navigate = useNavigate();
     const { activeIncident } = useIncidents();
@@ -774,56 +819,38 @@ export default function ResourceList() {
             )}
 
             <div className="mt-4 grid grid-cols-1 gap-4 xl:grid-cols-2">
-                <SectionCard title="Intern" testId="section-intern" padded={false}>
-                    <div className="flex flex-col gap-1.5 p-2">
-                        {intern.length === 0 && (
-                            <div className="px-3 py-4 text-center text-caption text-muted-foreground">
-                                Keine internen Ressourcen
-                            </div>
-                        )}
-                        {intern.map((r) => (
-                            <ResourceRow
-                                key={r.id}
-                                resource={r}
-                                abschnitt={r.abschnitt_id ? abschnittById.get(r.abschnitt_id) : null}
-                                abschnitte={abschnitte}
-                                vehicles={vehicles}
-                                onChangeStatus={(id, status) => updResource(id, { status })}
-                                onChangeAbschnitt={handleChangeAbschnitt}
-                                onChangeDivera={handleChangeDivera}
-                                onEdit={(x) => setDialog({ open: true, initial: x })}
-                                onDelete={(x) => setConfirmDelete(x)}
-                                canEdit={can("resource.update")}
-                                canDelete={can("resource.delete")}
-                            />
-                        ))}
-                    </div>
-                </SectionCard>
-                <SectionCard title="Extern" testId="section-extern" padded={false}>
-                    <div className="flex flex-col gap-1.5 p-2">
-                        {extern.length === 0 && (
-                            <div className="px-3 py-4 text-center text-caption text-muted-foreground">
-                                Keine externen Ressourcen
-                            </div>
-                        )}
-                        {extern.map((r) => (
-                            <ResourceRow
-                                key={r.id}
-                                resource={r}
-                                abschnitt={r.abschnitt_id ? abschnittById.get(r.abschnitt_id) : null}
-                                abschnitte={abschnitte}
-                                vehicles={vehicles}
-                                onChangeStatus={(id, status) => updResource(id, { status })}
-                                onChangeAbschnitt={handleChangeAbschnitt}
-                                onChangeDivera={handleChangeDivera}
-                                onEdit={(x) => setDialog({ open: true, initial: x })}
-                                onDelete={(x) => setConfirmDelete(x)}
-                                canEdit={can("resource.update")}
-                                canDelete={can("resource.delete")}
-                            />
-                        ))}
-                    </div>
-                </SectionCard>
+                <ResourceSection
+                    title="Intern"
+                    testId="section-intern"
+                    emptyLabel="Keine internen Ressourcen"
+                    resources={intern}
+                    abschnittById={abschnittById}
+                    abschnitte={abschnitte}
+                    vehicles={vehicles}
+                    onChangeStatus={(id, status) => updResource(id, { status })}
+                    onChangeAbschnitt={handleChangeAbschnitt}
+                    onChangeDivera={handleChangeDivera}
+                    onEdit={(x) => setDialog({ open: true, initial: x })}
+                    onDelete={(x) => setConfirmDelete(x)}
+                    canEdit={can("resource.update")}
+                    canDelete={can("resource.delete")}
+                />
+                <ResourceSection
+                    title="Extern"
+                    testId="section-extern"
+                    emptyLabel="Keine externen Ressourcen"
+                    resources={extern}
+                    abschnittById={abschnittById}
+                    abschnitte={abschnitte}
+                    vehicles={vehicles}
+                    onChangeStatus={(id, status) => updResource(id, { status })}
+                    onChangeAbschnitt={handleChangeAbschnitt}
+                    onChangeDivera={handleChangeDivera}
+                    onEdit={(x) => setDialog({ open: true, initial: x })}
+                    onDelete={(x) => setConfirmDelete(x)}
+                    canEdit={can("resource.update")}
+                    canDelete={can("resource.delete")}
+                />
             </div>
 
             <ResourceDialog

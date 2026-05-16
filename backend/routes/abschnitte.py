@@ -63,11 +63,20 @@ async def delete_abschnitt(abschnitt_id: str):
     a = await db.abschnitte.find_one({"id": abschnitt_id}, {"_id": 0})
     if not a:
         raise HTTPException(status_code=404, detail="Abschnitt nicht gefunden")
-    inc = await db.incidents.find_one({"id": a["incident_id"]}, {"_id": 0})
-    if inc and inc.get("status") in ("operativ", "geplant"):
+    # Loeschen NUR erlaubt wenn keine Betten des Abschnitts belegt sind.
+    # (Betten in Status 'frei' oder 'gesperrt' werden mit-entkoppelt und bleiben
+    # als orphan im System, koennen anderem Abschnitt zugeordnet werden.)
+    occupied = await db.betten.count_documents({
+        "abschnitt_id": abschnitt_id,
+        "status": "belegt",
+    })
+    if occupied > 0:
         raise HTTPException(
             status_code=409,
-            detail="Abschnitt kann bei laufendem Incident nur deaktiviert, nicht geloescht werden",
+            detail=(
+                f"Abschnitt nicht loeschbar: {occupied} Bett(en) belegt. "
+                "Patienten bitte zuerst freigeben oder verlegen."
+            ),
         )
     await db.resources.update_many(
         {"abschnitt_id": abschnitt_id}, {"$set": {"abschnitt_id": None}},

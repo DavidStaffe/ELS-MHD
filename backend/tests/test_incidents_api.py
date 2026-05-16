@@ -22,17 +22,19 @@ def api_client():
 class TestMetaEndpoint:
     """Tests for /api/meta endpoint"""
 
-    def test_meta_returns_version_0_2_0(self, api_client):
-        """GET /api/meta should return version 0.2.0 and step info"""
+    def test_meta_returns_version_1_0_0(self, api_client):
+        """GET /api/meta should return version 1.0.0 and step info"""
         response = api_client.get(f"{BASE_URL}/api/meta")
         assert response.status_code == 200
 
         data = response.json()
         assert (
-            data["version"] == "0.2.0"
-        ), f"Expected version 0.2.0, got {data.get('version')}"
+            data["version"] == "1.0.0"
+        ), f"Expected version 1.0.0, got {data.get('version')}"
         assert "step" in data, "Response should contain 'step' field"
-        assert "02" in data["step"], f"Step should contain '02', got {data.get('step')}"
+        assert isinstance(data["step"], str) and data["step"], (
+            f"Step should be non-empty string, got {data.get('step')!r}"
+        )
         assert data["app"] == "ELS MHD"
 
 
