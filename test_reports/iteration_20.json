@@ -1,0 +1,29 @@
+{
+  "summary": "Iteration 20 verifies Echtzeit-SSE FMS push, FmsAlertSidebarPanel real-time appearance, shared state between header bell and sidebar panel, helfer-readonly behavior, and Divera auto-position (lat/lng update + 0/0 plausibility skip). All 9 specified scenarios PASS. Backend 4/4 pytest green, Frontend 6/6 playwright assertions green.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_realtime_sse_fms.py",
+    "/app/test_reports/pytest/pytest_iter20.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "services/divera.py.sync_incident uses 'from core.db import db' and 'from services.fms_audit import record_fms_change' — both bind module-level names at import time, which complicates mock-based tests (workaround in test_realtime_sse_fms.py: patch divera_module.db AND fms_audit_module.db). Not a runtime defect.",
+    "useFmsAlerts EventSource (line 125) connects to API_BASE/incidents/stream WITHOUT credentials/headers, OK for current public preview but ensure auth-token handling is added when auth is introduced.",
+    "useFmsAlerts beep interval (5s) does NOT reset when soundOn toggles — interval keeps running but inner check 'if(!soundOn)return' silences it. Minor: leaves orphan interval until unmount; acceptable.",
+    "FmsAlertSidebarPanel shows max-h-[280px] scrollable list — good for high alert volume. Pulse animation overlay uses pointer-events-none — no click blocking.",
+    "Real-time SSE measurement: PATCH→panel render was 0.53s (well under 2s spec). Polling-Fallback (10s) is additive and harmless."
+  ],
+  "updated_files": ["/app/backend/tests/test_realtime_sse_fms.py"],
+  "success_rate": {"backend": "100% (4/4 pytest)", "frontend": "100% (6/6 scenarios)"},
+  "test_credentials": "N/A — localStorage els-role + els-active-incident bypass active in preview build (iter19 confirmed).",
+  "seed_data_creation": "None persistent. Test triggered transient FMS-5 events on resource KTW 1 (2508ce07-...) in MANV-Uebung Sued (ad55e8cd-...) and acked them. Final state: fms_status=2, all alerts acknowledged.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "SSE realtime + Sidebar-Panel + Divera-Auto-Position complete. Tests live at /app/backend/tests/test_realtime_sse_fms.py — pytest 4/4. UI selectors: fms-alert-sidebar-panel (root), fms-alert-sidebar-list, fms-alert-sidebar-item-<eventId>, fms-alert-sidebar-ack-<eventId>, fms-alert-sidebar-sound. Header bell unchanged (fms-alert-bell, fms-alert-badge). Both consume useFmsAlerts hook → singleton-like shared state confirmed (ack in one removes from both). Helfer-role: panel still rendered (read-only) with 'Quittierung nur durch EL/FA' subtitle and disabled Quittieren buttons. SSE-Push measured at ~0.5s. IMPORTANT for next agent: setting role/active-incident via page.evaluate(localStorage.setItem) AFTER page load does NOT propagate to React state (useRole reads on mount). Always use page.add_init_script BEFORE goto.",
+  "rca of the issue": "N/A — feature works as specified."
+}

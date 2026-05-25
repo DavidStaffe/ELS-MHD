@@ -4,16 +4,16 @@
  * und Bettansicht verwendet.
  */
 export const ABSCHNITT_FARBEN = [
-    { key: "red", label: "Rot", chipBg: "bg-rose-500/80", dot: "bg-rose-500", border: "border-rose-500", soft: "bg-rose-500/15 text-rose-500" },
-    { key: "orange", label: "Orange", chipBg: "bg-orange-500/80", dot: "bg-orange-500", border: "border-orange-500", soft: "bg-orange-500/15 text-orange-500" },
-    { key: "yellow", label: "Gelb", chipBg: "bg-amber-500/80", dot: "bg-amber-500", border: "border-amber-500", soft: "bg-amber-500/15 text-amber-500" },
-    { key: "green", label: "Gruen", chipBg: "bg-emerald-500/80", dot: "bg-emerald-500", border: "border-emerald-500", soft: "bg-emerald-500/15 text-emerald-500" },
-    { key: "teal", label: "Teal", chipBg: "bg-teal-500/80", dot: "bg-teal-500", border: "border-teal-500", soft: "bg-teal-500/15 text-teal-500" },
-    { key: "blue", label: "Blau", chipBg: "bg-sky-500/80", dot: "bg-sky-500", border: "border-sky-500", soft: "bg-sky-500/15 text-sky-400" },
-    { key: "indigo", label: "Indigo", chipBg: "bg-indigo-500/80", dot: "bg-indigo-500", border: "border-indigo-500", soft: "bg-indigo-500/15 text-indigo-400" },
-    { key: "purple", label: "Violett", chipBg: "bg-violet-500/80", dot: "bg-violet-500", border: "border-violet-500", soft: "bg-violet-500/15 text-violet-400" },
-    { key: "pink", label: "Pink", chipBg: "bg-pink-500/80", dot: "bg-pink-500", border: "border-pink-500", soft: "bg-pink-500/15 text-pink-400" },
-    { key: "gray", label: "Grau", chipBg: "bg-slate-500/80", dot: "bg-slate-500", border: "border-slate-500", soft: "bg-slate-500/15 text-slate-400" }
+    { key: "red", label: "Rot", chipBg: "bg-rose-500/80", dot: "bg-rose-500", border: "border-rose-500", soft: "bg-rose-500/15 text-rose-500", hex: "#f43f5e" },
+    { key: "orange", label: "Orange", chipBg: "bg-orange-500/80", dot: "bg-orange-500", border: "border-orange-500", soft: "bg-orange-500/15 text-orange-500", hex: "#f97316" },
+    { key: "yellow", label: "Gelb", chipBg: "bg-amber-500/80", dot: "bg-amber-500", border: "border-amber-500", soft: "bg-amber-500/15 text-amber-500", hex: "#f59e0b" },
+    { key: "green", label: "Gruen", chipBg: "bg-emerald-500/80", dot: "bg-emerald-500", border: "border-emerald-500", soft: "bg-emerald-500/15 text-emerald-500", hex: "#10b981" },
+    { key: "teal", label: "Teal", chipBg: "bg-teal-500/80", dot: "bg-teal-500", border: "border-teal-500", soft: "bg-teal-500/15 text-teal-500", hex: "#14b8a6" },
+    { key: "blue", label: "Blau", chipBg: "bg-sky-500/80", dot: "bg-sky-500", border: "border-sky-500", soft: "bg-sky-500/15 text-sky-400", hex: "#0ea5e9" },
+    { key: "indigo", label: "Indigo", chipBg: "bg-indigo-500/80", dot: "bg-indigo-500", border: "border-indigo-500", soft: "bg-indigo-500/15 text-indigo-400", hex: "#6366f1" },
+    { key: "purple", label: "Violett", chipBg: "bg-violet-500/80", dot: "bg-violet-500", border: "border-violet-500", soft: "bg-violet-500/15 text-violet-400", hex: "#8b5cf6" },
+    { key: "pink", label: "Pink", chipBg: "bg-pink-500/80", dot: "bg-pink-500", border: "border-pink-500", soft: "bg-pink-500/15 text-pink-400", hex: "#ec4899" },
+    { key: "gray", label: "Grau", chipBg: "bg-slate-500/80", dot: "bg-slate-500", border: "border-slate-500", soft: "bg-slate-500/15 text-slate-400", hex: "#64748b" }
 ];
 
 export function getFarbe(key) {

@@ -38,14 +38,16 @@ def test_incident(api_client):
     api_client.delete(f"{BASE_URL}/api/incidents/{incident['id']}")
 
 class TestMeta:
-    """Test /api/meta endpoint for version 0.6.0"""
-    
-    def test_meta_version_060(self, api_client):
+    """Test /api/meta endpoint for version 1.0.0"""
+
+    def test_meta_version_1_0_0(self, api_client):
         response = api_client.get(f"{BASE_URL}/api/meta")
         assert response.status_code == 200
         data = response.json()
-        assert data["version"] == "0.6.0", f"Expected version 0.6.0, got {data['version']}"
-        assert "Ressourcen" in data["step"] or "06" in data["step"], f"Step should mention Ressourcen or 06: {data['step']}"
+        assert data["version"] == "1.0.0", f"Expected version 1.0.0, got {data['version']}"
+        assert isinstance(data.get("step"), str) and data["step"], (
+            f"Expected non-empty 'step' string, got {data.get('step')!r}"
+        )
 
 class TestResourcesLazySeed:
     """Test Resources lazy seeding - 9 default resources created on first GET"""

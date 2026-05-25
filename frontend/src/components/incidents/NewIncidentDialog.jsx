@@ -19,6 +19,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { MapPicker } from '@/components/map/MapPicker';
 import { toLocalInput, fromLocalInput } from '@/lib/time';
 
 const TYPEN = [
@@ -40,6 +41,7 @@ export function NewIncidentDialog({ open, onOpenChange, onCreate }) {
   const [startLocal, setStartLocal] = React.useState(defaultStart);
   const [beschreibung, setBeschreibung] = React.useState('');
   const [isPlanned, setIsPlanned] = React.useState(false);
+  const [location, setLocation] = React.useState(null); // { lat, lng, address? }
   const [submitting, setSubmitting] = React.useState(false);
   const [error, setError] = React.useState(null);
 
@@ -50,6 +52,7 @@ export function NewIncidentDialog({ open, onOpenChange, onCreate }) {
     setStartLocal(defaultStart());
     setBeschreibung('');
     setIsPlanned(false);
+    setLocation(null);
     setError(null);
   }, []);
 
@@ -75,6 +78,11 @@ export function NewIncidentDialog({ open, onOpenChange, onCreate }) {
         demo: false,
         start_at: fromLocalInput(startLocal),
       };
+      if (location?.lat != null && location?.lng != null) {
+        payload.ort_lat = location.lat;
+        payload.ort_lng = location.lng;
+        payload.ort_zoom = 15;
+      }
       await onCreate(payload);
       onOpenChange?.(false);
     } catch (err) {
@@ -89,7 +97,7 @@ export function NewIncidentDialog({ open, onOpenChange, onCreate }) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
-        className="sm:max-w-lg bg-card border-border"
+        className="sm:max-w-xl bg-card border-border max-h-[90vh] overflow-y-auto"
         data-testid="new-incident-dialog"
       >
         <DialogHeader>
@@ -158,6 +166,24 @@ export function NewIncidentDialog({ open, onOpenChange, onCreate }) {
               onChange={(e) => setOrt(e.target.value)}
               placeholder="z.B. Festplatz Sued"
               maxLength={180}
+            />
+          </div>
+
+          <div className="space-y-1.5">
+            <Label>Lagekarte (optional)</Label>
+            <p className="text-caption text-muted-foreground">
+              Adresse suchen oder direkt auf die Karte klicken, um den Einsatz-Ort
+              zu setzen. Der Marker laesst sich verschieben. Spaeter editierbar.
+            </p>
+            <MapPicker
+              value={location}
+              onChange={(loc) => {
+                setLocation(loc);
+                if (loc?.address && !ort.trim()) {
+                  setOrt(loc.address);
+                }
+              }}
+              height="220px"
             />
           </div>
 
