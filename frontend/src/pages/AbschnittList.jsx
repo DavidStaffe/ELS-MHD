@@ -202,7 +202,7 @@ function AbschnittKachel({ abschnitt, kpi, onOpen, onEdit, onDelete, onToggleAkt
                                 className="h-7 w-7 text-status-red"
                                 onClick={() => onDelete(abschnitt)}
                                 data-testid={`abschnitt-delete-${abschnitt.id}`}
-                                title="Loeschen (nur bei abgeschlossenem Incident)"
+                                title="Loeschen (nicht moeglich solange Betten belegt)"
                             >
                                 <Trash2 className="h-3.5 w-3.5" />
                             </Button>
@@ -509,7 +509,9 @@ export default function AbschnittList() {
 
     const canCreate = can("abschnitt.create");
     const canUpdate = can("abschnitt.update");
-    const canDelete = can("abschnitt.delete") && activeIncident.status === "abgeschlossen";
+    // Loeschen ist erlaubt sobald die Rolle es darf. Das Backend prueft
+    // ob noch belegte Betten am Abschnitt haengen und antwortet ggf. mit 409.
+    const canDelete = can("abschnitt.delete");
     const canAssign = can("abschnitt.assign_resource");
 
     const unassignedResources = resources.filter((r) => !r.abschnitt_id);

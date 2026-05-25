@@ -1,0 +1,42 @@
+{
+  "summary": "Iteration 24 verifies (a) new Abschnitt-Delete rule (Backend 204/204/409/404), (b) ResourceList DRY-Refactor with section-intern/section-extern testids, (c) Versions-asserts on /api/meta = 1.0.0 across 4 test files. Backend: 4/4 new delete-rule tests GREEN + 4/4 version asserts GREEN. Frontend: delete-button enabled on operativ incident, empty Abschnitt successfully deleted via ConfirmModal, belegt Abschnitt blocked with 409 + remains in DOM. ResourceList renders both sections with full row controls (Divera/Abschnitt/Status selects + Edit + Delete).",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "test_step10_12_abschnitte_betten.py::TestAbschnittCRUD::test_delete_active_incident_returns_409", "issue": "Test is OUTDATED under the new rule: expects 409 on empty abschnitt in active incident, but new behaviour returns 204. Verified failure: 'expected 409, got 204'. Sibling test test_delete_after_incident_abgeschlossen still passes coincidentally. Main agent must update or remove this test to reflect the new rule."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "AbschnittList.jsx:205", "issue": "Stale title attribute on delete button reads 'Loeschen (nur bei abgeschlossenem Incident)' but rule no longer requires abgeschlossen. Should reflect new gating: 'Loeschen (nicht moeglich solange Betten belegt)' or similar.", "selector": "[data-testid^=\"abschnitt-delete-\"]", "priority": "LOW"}
+    ],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_abschnitt_delete_rule.py",
+    "/app/test_reports/pytest/iteration_24_abschnitt_delete.xml",
+    "/app/test_reports/pytest/iteration_24_version_asserts.xml",
+    "/app/test_reports/pytest/iteration_24_step10_regression.xml"
+  ],
+  "action_items": [
+    "Update or delete obsolete test test_step10_12_abschnitte_betten.py::TestAbschnittCRUD::test_delete_active_incident_returns_409 to match the new rule (no incident-status gating; only check belegte Betten).",
+    "Fix stale title attribute on AbschnittList delete button (line ~205): 'Loeschen (nur bei abgeschlossenem Incident)' -> 'Loeschen (nicht moeglich solange Betten belegt)'."
+  ],
+  "critical_code_review_comments": [
+    "routes/abschnitte.delete_abschnitt: count_documents on betten with status='belegt' is the correct gate; correctly decouples freie/gesperrte Betten + Resources via update_many setting abschnitt_id=null before delete_one. Verified end-to-end via API+UI.",
+    "AbschnittList.jsx:514 canDelete simplified to just can('abschnitt.delete') matches the spec; backend now owns the busy-bed check. Verified delete button is_disabled()=False on operativ incident.",
+    "ResourceList.jsx:559 ResourceSection extraction: clean DRY refactor. section-intern + section-extern testids preserved, all inline controls (Divera/Abschnitt/Status/Edit/Delete) render and function as before. Verified live by inspecting both rendered sections.",
+    "Version asserts: 4 test files now consistently assert version 1.0.0 via /api/meta and (where applicable) generic isinstance(str)+non-empty step assert. All 4 pass when REACT_APP_BACKEND_URL is exported into env."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_abschnitt_delete_rule.py (NEW: 4 tests covering 204/204/409/404 paths)"
+  ],
+  "success_rate": {"backend": "100% (4/4 new + 4/4 version asserts)", "frontend": "100% (2/2 delete flows + 2/2 sections)"},
+  "test_credentials": "localStorage els-role='einsatzleiter', els-user-name='Max Mustermann' (or fill picker dialog manually with role=Einsatzleiter).",
+  "seed_data_creation": "Backend tests: per-test fresh incidents prefixed TEST_AbschDelRule (auto-cleaned). Frontend test: TEST_UI24 incident with 2 abschnitte (UI_Empty + UI_Belegt with 1 patient + 1 belegtes Bett); cleaned via DELETE /api/incidents/{id} at end.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Iter 24 verified DELETE /api/abschnitte/{id} new rule + ResourceList DRY refactor + version asserts. Backend test file: /app/backend/tests/test_abschnitt_delete_rule.py (4 tests). To activate an incident in frontend session: navigate to /einstieg -> find card containing target incident name -> click that card's 'Lage oeffnen' button. localStorage key 'els-active-incident-id' DOES NOT work; must go through UI 'Lage oeffnen' button. Version tests need REACT_APP_BACKEND_URL exported in env (they read os.environ at module load, not via Path fallback like test_step10).",
+  "rca of the issue": "Outdated test test_delete_active_incident_returns_409 in test_step10_12_abschnitte_betten.py was missed during the rule migration. The change set updated abschnitte.py but not the legacy test which asserted the old contract (409 for active incident, regardless of beds). New rule no longer considers incident status, only belegte Betten. Mitigation: replace assertion to expect 204 OR delete the test in favor of new test_abschnitt_delete_rule.py which covers all paths."
+}

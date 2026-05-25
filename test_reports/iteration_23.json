@@ -1,0 +1,28 @@
+{
+  "summary": "Iteration 23 verifies (a) ResourceBase.kuerzel max_length=4 + persistence in POST/PATCH/GET, (b) KartePage sidebar reordering (Divera -> FMS-Legende -> FMS-Verlauf(limit=5)+Link -> Abschnitte -> Nicht-platziert conditionally), (c) Funktagebuch FmsHistoryCollapsible toggle, (d) ResourceList kuerzel input uppercase+maxLength=4. Backend: 6/6 pytest GREEN. Frontend: 5/5 critical assertions passing (sidebar order verified in DOM, full-link navigates to /funktagebuch, toggle collapse/expand verified by child-count diff, kuerzel input transforms abcdefg -> ABCD, maxlength attribute=4).",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {"ui_bugs": [], "integration_issues": [], "design_issues": []},
+  "test_report_links": [
+    "/app/backend/tests/test_resources_kuerzel.py",
+    "/app/test_reports/pytest/iteration_23_kuerzel.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "models.ResourceBase.kuerzel: Optional[str] = Field(default=None, max_length=4) and same on ResourceUpdate -- Pydantic validates strictly (verified: POST with kuerzel='ABCDE' -> 422, PATCH with 'TOOLONG' -> 422).",
+    "routes/resources.create_resource now reads data.get('kuerzel') correctly into the new doc dict (bug fix from previous iteration confirmed); GET returns persisted value.",
+    "KartePage sidebar DOM order verified live: ['divera-panel','map-fms-legend','map-fms-history-panel','map-abschnitte-panel','map-resources-unplaced','map-hints']. FmsAlertSidebarPanel renders conditionally only when open alerts exist (none on test incident, so not in DOM -- expected).",
+    "map-fms-history-fulllink button navigates to /funktagebuch via react-router useNavigate -- verified.",
+    "Funktagebuch FmsHistoryCollapsible: default open (2 children), toggle collapses to 1 child, re-toggle expands back to 2 -- verified end-to-end.",
+    "ResourceList ResourceDialog kuerzel input: e.target.value.toUpperCase().slice(0,4) + maxLength=4 -- verified by filling 'abcdefg' -> resulting value 'ABCD'. data-testid='resource-kuerzel-input' present.",
+    "IncidentMap.jsx:301 uses r.kuerzel preferentially with fallback to r.name.split(' ')[0] -- code-reviewed (live marker label rendering on Leaflet not visually asserted but logic is straightforward).",
+    "Unplaced panel conditionally rendered with {unplacedResources.length > 0 && ...} -- verified by presence in DOM when 1 unplaced resource exists; will hide when zero (confirmed by source review)."
+  ],
+  "updated_files": ["/app/backend/tests/test_resources_kuerzel.py"],
+  "success_rate": {"backend": "100% (6/6)", "frontend": "100% (5/5 critical flows)"},
+  "test_credentials": "localStorage els-role=einsatzleiter, els-user-name=Max Mustermann (set via page.evaluate then reload; add_init_script unreliable in this env).",
+  "seed_data_creation": "Per test: TEST_KUERZEL_<uuid> incident + several resources, cleaned up via module fixture. Frontend test created 'Test RTW Karte' (kuerzel RTW9, lat/lng=50,8) and 'Test Unplaced K23' (kuerzel UNPL) on Marathon Muenchen incident; cleanup DELETE called at end.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Iter23 verified kuerzel feature end-to-end. Test file /app/backend/tests/test_resources_kuerzel.py covers POST/PATCH/GET/validation/edge=4. UI flow: localStorage identity must be set then page.reload() (add_init_script alone insufficient). To activate incident in fresh session: go to /einstieg -> click 'Lage oeffnen' button -> incident becomes active for /karte and /ressourcen. ResourceList 'Ressource anlegen' button (not 'Neue Ressource') opens the dialog containing data-testid='resource-kuerzel-input'.",
+  "rca of the issue": "N/A -- feature works end-to-end as specified. Previous bug (kuerzel not being read in create_resource) has been fixed by adding data.get('kuerzel') to the insert doc; backend now persists it. All 12 acceptance criteria from review_request satisfied."
+}

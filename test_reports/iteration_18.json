@@ -1,0 +1,40 @@
+{
+  "summary": "FMS-Alarm-Quittierung end-to-end testing complete. 7/7 NEW backend tests in test_fms_acknowledge.py PASS (einsatzleiter 200, fuehrungsassistenz 200, helfer 403, double 409, non-alert FMS 3 returns 409, unknown event 404, new GET fields is_alert/acknowledged_by_role/acknowledged_at present). Frontend: EditIncidentDialog opens via pencil button on IncidentCard with all fields prefilled (Name/Typ/Ort/MapPicker/Beschreibung/Speichern). FmsAlertCenter bell hidden on / without active incident (count=0) and visible with active incident (count=1). Helfer role correctly disables Quittieren button AND shows amber warning banner. Sound toggle button (data-testid='fms-alert-sound-toggle') present in popover. Existing FMS-Audit tests (test_fms_audit.py) 8/8 still PASS — no regressions to prior phase. Pre-existing test_incidents_api.py failures (13) are due to that file lacking BASE_URL fallback and are NOT regressions.",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_fms_acknowledge.py",
+    "/app/test_reports/pytest/pytest_iter18_ack.xml",
+    "/app/test_reports/pytest/pytest_iter18_regression.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "services/fms_audit.py acknowledge_fms_event(): correctly distinguishes 404 (event not found returns None) vs 409 (ValueError for non-alert or already-ack) — clean separation enforced by routes/resources.py. Good.",
+    "routes/resources.py POST /api/fms-events/{event_id}/acknowledge: SSE publish wrapped in try/except — won't fail the response if realtime is degraded. Good defensive coding.",
+    "FmsAlertCenter.jsx firstLoadRef seen-set initialization: marks pre-existing alerts as seen on first load to avoid beep-spam on refresh. Correct behavior. Persisted to localStorage with .slice(-500) cap to prevent unbounded growth. Good.",
+    "FmsAlertCenter.jsx playBeep() creates a NEW AudioContext on every beep and closes it after 600ms — this is conservative but creates GC churn under sustained alerts (every 5s). A single shared AudioContext (created on first user gesture) would be more efficient. Minor performance nit, not blocking.",
+    "FmsAlertCenter.jsx polling interval is 10s — combined with backend not pushing SSE for new fms_events on PATCH (only fms_event_acknowledged is pushed), there is up to 10s delay before a new FMS-5/0 alarm reaches the UI. Acceptable per spec but suggest emitting an SSE 'fms_event_created' on record_fms_change to allow instant updates.",
+    "FmsAlertCenter.jsx uses both ALERT_FMS_CODES check on backend AND a duplicate to_fms in {0,5} filter on frontend (line 152-154). Defensive duplication is fine but the truth source should be backend's is_alert field — frontend could simply filter e.is_alert && !e.acknowledged_at.",
+    "Backend acknowledge_fms_event uses find_one then find_one_and_update (two queries) — not atomic. Two concurrent ack requests from EL+FA on the same event could both pass the 'already-acknowledged' check before either writes. Probability is very low (UI removes the item after ack) but a single atomic find_one_and_update with filter {acknowledged_at: None, to_fms: {$in: [0,5]}} would be ideal."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_fms_acknowledge.py (NEW — 7 tests for acknowledge endpoint + new GET fields)"
+  ],
+  "success_rate": {
+    "backend": "100% (7/7 new acknowledge tests + 8/8 prior FMS-audit tests = 15/15)",
+    "frontend": "100% (EditIncidentDialog open+prefill, bell visibility (with/without active incident), helfer-disable, warning banner, sound toggle all verified)"
+  },
+  "test_credentials": "N/A — localStorage els-role=einsatzleiter or helfer, els-active-incident=ad55e8cd-...",
+  "seed_data_creation": "test_fms_acknowledge.py creates per-module TEST_FMS_ACK_<id> incident + TEST_ACK_VEH resource, teardown deletes both. Frontend test reused demo incident MANV-Uebung Sued (ad55e8cd) and patched KTW 1 fms_status to 5 and 0 to generate alerts.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "FMS-Alarm-Quittierung phase complete and stable. New endpoint POST /api/fms-events/{event_id}/acknowledge enforces role-set {einsatzleiter, fuehrungsassistenz} (403 else), 409 on double-ack or non-alert event, 404 on unknown id. Frontend FmsAlertCenter polls every 10s, hides itself when activeIncident is null or status='abgeschlossen', uses firstLoadRef to suppress refresh-beep, persists sound preference via localStorage 'els-fms-alert-sound' ('0'=off, '1'=on or absent=on). Bell uses data-testid 'fms-alert-bell'; badge 'fms-alert-badge'; popover 'fms-alert-popover'; per-item ack button 'fms-alert-ack-<eventId>'; sound toggle 'fms-alert-sound-toggle'. New GET fields on /api/incidents/{id}/fms-events: is_alert (bool), acknowledged_by_role (str|null), acknowledged_at (iso|null). Old events created before this iteration may be missing these fields — UI handles gracefully via optional chaining.",
+  "rca of the issue": "N/A — no bugs found. All spec requirements implemented and verified."
+}

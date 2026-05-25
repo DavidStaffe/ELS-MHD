@@ -37,6 +37,9 @@ class IncidentBase(BaseModel):
     typ: IncidentTyp = "veranstaltung"
     ort: str = Field(min_length=0, max_length=180, default="")
     beschreibung: str = Field(default="", max_length=2000)
+    ort_lat: Optional[float] = Field(default=None, ge=-90, le=90)
+    ort_lng: Optional[float] = Field(default=None, ge=-180, le=180)
+    ort_zoom: Optional[int] = Field(default=None, ge=1, le=22)
 
 
 class IncidentCreate(IncidentBase):
@@ -54,6 +57,9 @@ class IncidentUpdate(BaseModel):
     status: Optional[IncidentStatus] = None
     start_at: Optional[datetime] = None
     end_at: Optional[datetime] = None
+    ort_lat: Optional[float] = Field(default=None, ge=-90, le=90)
+    ort_lng: Optional[float] = Field(default=None, ge=-180, le=180)
+    ort_zoom: Optional[int] = Field(default=None, ge=1, le=22)
 
 
 class Incident(IncidentBase):
@@ -64,6 +70,11 @@ class Incident(IncidentBase):
     end_at: Optional[datetime] = None
     created_at: datetime = Field(default_factory=now_utc)
     updated_at: datetime = Field(default_factory=now_utc)
+    # Divera-Polling-Status (Phase 3)
+    divera_enabled: bool = False
+    divera_last_poll_at: Optional[datetime] = None
+    divera_last_poll_status: Optional[str] = None
+    divera_last_match_count: Optional[int] = None
 
 
 class IncidentMetaPatch(BaseModel):
@@ -163,11 +174,16 @@ class Transport(TransportBase):
 class ResourceBase(BaseModel):
     model_config = ConfigDict(extra="ignore")
     name: str = Field(min_length=1, max_length=80)
+    kuerzel: Optional[str] = Field(default=None, max_length=4)
     typ: TransportTyp
     kategorie: ResourceKategorie = "sonstiges"
     status: ResourceStatus = "verfuegbar"
     notiz: str = Field(default="", max_length=1000)
     abschnitt_id: Optional[str] = None
+    lat: Optional[float] = Field(default=None, ge=-90, le=90)
+    lng: Optional[float] = Field(default=None, ge=-180, le=180)
+    divera_id: Optional[str] = Field(default=None, max_length=64)
+    fms_status: Optional[int] = Field(default=None, ge=0, le=9)
 
 
 class ResourceCreate(ResourceBase):
@@ -177,11 +193,16 @@ class ResourceCreate(ResourceBase):
 class ResourceUpdate(BaseModel):
     model_config = ConfigDict(extra="ignore")
     name: Optional[str] = None
+    kuerzel: Optional[str] = Field(default=None, max_length=4)
     typ: Optional[TransportTyp] = None
     kategorie: Optional[ResourceKategorie] = None
     status: Optional[ResourceStatus] = None
     notiz: Optional[str] = None
     abschnitt_id: Optional[str] = None
+    lat: Optional[float] = Field(default=None, ge=-90, le=90)
+    lng: Optional[float] = Field(default=None, ge=-180, le=180)
+    divera_id: Optional[str] = Field(default=None, max_length=64)
+    fms_status: Optional[int] = Field(default=None, ge=0, le=9)
 
 
 # --- Messages / Funktagebuch ------------------------------------------------
@@ -242,6 +263,9 @@ class AbschnittBase(BaseModel):
     farbe: str = Field(default="blue", max_length=20)
     beschreibung: str = Field(default="", max_length=1000)
     aktiv: bool = True
+    # Polygon: Liste von [lat, lng]-Paaren (Leaflet-Konvention).
+    # Ein Polygon hat >= 3 Punkte; None = kein Polygon gezeichnet.
+    polygon: Optional[List[List[float]]] = None
 
 
 class AbschnittCreate(AbschnittBase):
@@ -254,6 +278,7 @@ class AbschnittUpdate(BaseModel):
     farbe: Optional[str] = None
     beschreibung: Optional[str] = None
     aktiv: Optional[bool] = None
+    polygon: Optional[List[List[float]]] = None
 
 
 class Abschnitt(AbschnittBase):

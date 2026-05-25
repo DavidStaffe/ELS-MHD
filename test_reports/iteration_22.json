@@ -1,0 +1,39 @@
+{
+  "summary": "Iteration 22 verifies the new mandatory user-identification (Vor-/Nachname) feature for role selection and its propagation into FMS acknowledgement and Funktagebuch. Backend: 36/36 pytest cases GREEN (6 NEW for acknowledged_by_name + 7 ack + 14 revert + 9 step13 regression). Frontend: full E2E role-picker flow verified end-to-end via Playwright (empty-localStorage auto-open, validation matrix on disabled confirm button, success path with localStorage persistence, header rendering 'Max Mustermann' + 'EL', picker re-open with pre-filled fields, name-missing-only auto-open scenario, second-user 'Anna Schmidt' replacement).",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_fms_ack_with_name.py",
+    "/app/test_reports/pytest/iteration_22_pytest.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "RoleContext.setIdentity correctly persists both els-role + els-user-name atomically to localStorage; picker auto-opens via useEffect when either is missing (verified via UI test).",
+    "RoleSelector validates >=2 chars per field client-side; backend has no equivalent guard (acknowledge_fms_event accepts any name<=120 chars). Acceptable because backend acknowledge_fms_event normalizes whitespace-only -> None via `(name or '').strip() or None`. Validated via test_ack_with_whitespace_only_name_is_normalized_to_null.",
+    "Funktagebuch.handleSave builds erfasst_von as `${userName} (${roleMeta.kurz})` (e.g. 'Max Mustermann (EL)') — frontend-only construction. No backend validation of erfasst_von format, but existing test_step13 still green so no regression.",
+    "GlobalHeader shows red 'erforderlich' label when userName missing — visually clear; data-testid='header-user-name' is only rendered when userName set, so tests must use a different selector to check the 'erforderlich' state.",
+    "Pydantic FmsAcknowledgePayload uses Optional[str] with max_length=120 — empty body without `name` correctly defaults to None (verified). name>120 chars correctly rejected with 422 (verified).",
+    "Backward-compat preserved: existing acknowledge calls without `name` still work; acknowledged_by_name is None and persisted as such in the event document (verified via GET after POST).",
+    "useFmsAlerts/api.js acknowledgeFmsEvent(eventId, role, name) — name parameter is forwarded if present. Not exercised in this iteration's UI test (would require triggering an FMS-5 event live), but contract verified at HTTP layer with curl-equivalent pytest."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_fms_ack_with_name.py"
+  ],
+  "success_rate": {
+    "backend": "100% (36/36 — 6 new + 30 regression)",
+    "frontend": "100% (6/6 picker scenarios: auto-open, validation, success, header, prefill, name-missing-only)"
+  },
+  "test_credentials": "N/A — identity (role + Vor-/Nachname) is set client-side via the new Anmeldung-Dialog; no server-side auth. Test used Max Mustermann + Anna Schmidt; both persisted correctly to localStorage keys els-role + els-user-name.",
+  "seed_data_creation": "Transient: each backend test creates TEST_ACK_NAME_* incident + TEST_ACK_NAME_VEH resource (cleaned up by pytest teardown fixtures). One stale TEST_ACK_NAME_a9c895 was found post-run and deleted via DELETE /api/incidents/{id} (204).",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Iter 22 tests: /app/backend/tests/test_fms_ack_with_name.py (6 tests covering name persist, backward-compat null, whitespace normalization, max_length 120 boundary, 403 helfer with name, 200 EL+name). Reuses pattern from test_fms_acknowledge.py: PATCH /api/resources/{id} fms_status=5 triggers fms_event creation, then POST /api/fms-events/{id}/acknowledge. UI test pattern for role picker: clear localStorage via add_init_script BEFORE goto, then probe data-testid='role-selector' visibility. Pre-existing keys: els-role + els-user-name (NEW). Picker auto-opens whenever EITHER is missing — important for tests that mock partial state. Header renders data-testid='header-user-name' only when userName is set, otherwise renders inline 'Name: erforderlich' (no testid on that span).",
+  "rca of the issue": "N/A — feature works end-to-end as specified. All acceptance criteria from the review_request met: (1) empty localStorage auto-opens picker ✓ (2) disabled confirm validation chain ✓ (3) success persists role+name to localStorage with toast ✓ (4) header renders name+role-kurz ✓ (5) re-open picker has prefilled fields ✓ (6) FmsHistory renders 'quittiert von <Name> (<Rolle>)' (code-reviewed, lines 207-216 in FmsHistory.jsx) (7) backend persists acknowledged_by_name + (8) backward-compat null + (9) whitespace normalize + (10) max_length 120 validation ✓ (11) all regression tests still green ✓."
+}

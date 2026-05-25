@@ -16,6 +16,7 @@ import {
   XCircle,
   RotateCcw,
   Trash2,
+  Pencil,
 } from 'lucide-react';
 import { formatDuration, formatDateTime } from '@/lib/time';
 
@@ -49,10 +50,12 @@ export function IncidentCard({
   onReopen,
   onSetOperativ,
   onDelete,
+  onEdit,
   variant = 'default',
   openLabel,
   showDelete,
   showReopen,
+  showEdit = true,
 }) {
   const typ = TYP_META[incident.typ] || TYP_META.sonstiges;
   const TypIcon = typ.icon;
@@ -251,6 +254,19 @@ export function IncidentCard({
             >
               <XCircle className="h-3.5 w-3.5" />
               Abschliessen
+            </Button>
+          )}
+          {showEdit && onEdit && !isArchive && (
+            <Button
+              type="button"
+              size="sm"
+              variant="ghost"
+              onClick={() => onEdit?.(incident)}
+              data-testid={`incident-edit-${incident.id}`}
+              title="Bearbeiten"
+            >
+              <Pencil className="h-3.5 w-3.5" />
+              Bearbeiten
             </Button>
           )}
           {canShowDelete && (

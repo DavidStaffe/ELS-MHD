@@ -1,0 +1,37 @@
+{
+  "summary": "Divera-Verknuepfung UI (frontend-only) end-to-end verified on /ressourcen. All 9 spec scenarios pass: inline DiveraInlineSelect renders per ResourceRow with data-testid='resource-divera-select-<id>' (9 rows in demo MANV-Uebung Sued), dropdown opens with 'nicht verknuepft' + 5 live Divera vehicles (96955..96959, FMS-Codes visible), selecting a vehicle issues PATCH /api/resources/{id} with body {\"divera_id\":\"96955\"} and trigger label becomes 'JOH SE EVT 1' + FMS 6 (colored). Status-Select then disabled (is_disabled=True). Unlink sends PATCH {\"divera_id\":null}. ResourceDialog edit button reveals data-testid='resource-divera-dialog' Select with same options. Banners: divera-not-configured and divera-no-vehicles correctly hidden (GET /api/divera/configured returns configured:true, /vehicles returns 5 entries). Role-picker bypass via localStorage els-role=einsatzleiter works. Regression: Abschnitt-Select, Status-Select (when not linked), Bearbeiten and Loeschen buttons all still present and unmodified.",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "/ressourcen ResourceRow", "issues": ["Resource name truncates very aggressively (1-2 chars: 'E...', 'U...', 'K...') at xl breakpoint because flex-1 name column is squeezed by the new w-44 Divera-Select between name and Abschnitt-Select. On 2-column xl layout the row becomes too narrow. Consider shrinking DiveraInlineSelect width (w-36) or stacking the row on narrow viewports, or moving DiveraInlineSelect to a secondary line below the name."]}
+    ]
+  },
+  "test_report_links": [],
+  "action_items": [
+    "Optional UX polish: address Resource-Name truncation on /ressourcen 2-col xl layout caused by w-44 DiveraInlineSelect."
+  ],
+  "critical_code_review_comments": [
+    "ResourceList.jsx handleChangeDivera() resolves the toast 'Mit \"<name>\" verknuepft' using the stale vehicles state (before refreshResources/loadVehicles complete). For first-time link this works because vehicles is already loaded, but if a freshly-pulled vehicle isn't in the cached list yet the toast falls back to 'Verknuepfung gesetzt'. Acceptable.",
+    "DiveraInlineSelect: SelectTrigger uses fixed width w-44 (176px). When the page is rendered in 2-column xl layout (ResourceList xl:grid-cols-2), this causes the resource name column to truncate to 1-2 chars. Either reduce width to w-36/w-32 or relocate the select below the name on narrow rows.",
+    "Auto-Refresh polling: setInterval(loadVehicles, 30000) runs as long as diveraConfigured=true even when the user is no longer on /ressourcen — fine for now (low traffic, single endpoint) but unmount cleanup is correct so no leak.",
+    "ResourceDialog locally manages divera_id state via setForm but on Save still goes through addResource/updResource via OpsContext (not direct apiUpdateResource). Verify OpsContext.updResource passes divera_id through unchanged — quick scan in /lib/api shows updateResource accepts the field, so OK. Persistence verified end-to-end in iteration_14 (backend) and via the inline-select PATCH calls in this run.",
+    "Status-Select disabled-state: the disabled prop is correctly bound to Boolean(resource.divera_id) and tooltip 'Status wird vom Divera-Polling gesteuert' is set on the trigger. Playwright confirmed page.is_disabled() returns True after link.",
+    "Banners use data-testid divera-not-configured and divera-no-vehicles and render mutually exclusively based on diveraConfigured===false vs (configured && vehicles.length===0). Correct logic."
+  ],
+  "updated_files": [],
+  "success_rate": {
+    "backend": "N/A (frontend-only request; backend endpoints verified live via curl: /api/divera/configured 200, /api/divera/vehicles 200 with 5 entries, PATCH /api/resources/{id} accepted divera_id string and null per network capture)",
+    "frontend": "100% (9/9 spec scenarios: inline select visible, dropdown options, link PATCH, toast, label change, status disable, unlink PATCH, dialog select, banners correctly hidden)"
+  },
+  "test_credentials": "N/A — localStorage els-role=einsatzleiter; active incident MANV-Uebung Sued (ad55e8cd-18f0-42c8-b4d6-780314394eb2)",
+  "seed_data_creation": "None — used existing demo incident and live Divera vehicles (96955-96959). Test re-linked then unlinked one resource (3dceda9f-10cb-42b6-964b-08121354c872) so end-state is unchanged.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Divera-Verknuepfung phase complete. ResourceList.jsx (/ressourcen) now exposes per-row 'resource-divera-select-<id>' (Inline) and dialog-level 'resource-divera-dialog'. PATCH /api/resources/{id} accepts {divera_id:'<vehicle_id>'|null}. When linked, status-select disabled with tooltip. Two amber banners conditional: 'divera-not-configured' and 'divera-no-vehicles'. Auto-refresh of vehicles list every 30s. Backend live with 5 Divera vehicles. Minor cosmetic: row layout cramped on xl 2-col grid — name column truncates.",
+  "rca of the issue": "N/A — no bugs found. Feature works as specified."
+}
