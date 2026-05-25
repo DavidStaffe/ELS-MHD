@@ -1,0 +1,7 @@
+{
+  "name": "els-mhd",
+  "private": true,
+  "scripts": {
+    "dev": "node scripts/start-dev.js"
+  }
+}
