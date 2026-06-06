@@ -215,8 +215,12 @@ export default function PatientList() {
     );
   }
 
-  const handleQuickCreate = async ({ sichtung }) => {
-    await create({ sichtung });
+  const handleQuickCreate = async ({ sichtung, isDummy, created_by_resource }) => {
+    if (isDummy) {
+        await createDummy({ created_by_resource });
+    } else {
+        await create({ sichtung });
+    }
   };
 
   const openNew = () => {

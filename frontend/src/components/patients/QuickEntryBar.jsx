@@ -114,6 +114,32 @@ export function QuickEntryBar({
           </button>
         ))}
 
+
+        <div className="mx-1 h-10 w-px bg-border" />
+        
+        <button
+            type="button"
+            disabled={disabled || busyKey !== null}
+            onClick={() => {
+                const resource = window.prompt("Erzeugende Ressource / Streife für den Dummy-Patienten:");
+                if (resource && resource.trim()) {
+                    setBusyKey("dummy");
+                    onQuickCreate?.({ isDummy: true, created_by_resource: resource.trim() }).finally(() => setBusyKey(null));
+                }
+            }}
+            data-testid="quick-dummy"
+            title="Dummy-Patient ohne Sichtung anlegen"
+            className={cn(
+              'relative inline-flex h-12 flex-col items-center justify-center rounded-md border border-border px-3 font-semibold shadow-sm transition-all active:scale-[0.97] disabled:opacity-60',
+              'els-focus-ring hover:bg-surface-raised'
+            )}
+          >
+            <span className="font-mono text-heading leading-none">DUMMY</span>
+            <span className="text-[0.65rem] uppercase opacity-80 mt-1">ohne Sichtung</span>
+            {busyKey === "dummy" && (
+              <span className="absolute inset-0 rounded-md bg-black/20 animate-pulse" />
+            )}
+        </button>
         <div className="mx-1 h-10 w-px bg-border" />
 
         <Button

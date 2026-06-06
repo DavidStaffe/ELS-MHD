@@ -48,7 +48,9 @@ import {
     Edit3,
     ArrowLeft,
     Zap as Bolt,
-    Layers
+    Layers,
+    Truck,
+    CheckCircle2
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -311,7 +313,7 @@ function AssignPatientDialog({ open, onOpenChange, patients, onAssign }) {
 /* -------------------------------------------------------------------- */
 /* Bett-Kachel                                                          */
 /* -------------------------------------------------------------------- */
-function BettKachel({ bett, patient, abschnitt, onAssignClick, onRelease, onLock, onUnlock, onDelete, onEdit, canAssign, canEdit, canDelete, canLock }) {
+function BettKachel({ bett, patient, abschnitt, onAssignClick, onRelease, onLock, onUnlock, onDelete, onEdit, canAssign, canEdit, canDelete, canLock, onDragStart }) {
     const Icon = TYP_ICON[bett.typ] || Bed;
     const farbe = abschnitt ? getFarbe(abschnitt.farbe) : null;
     const [now, setNow] = React.useState(Date.now());
@@ -365,10 +367,16 @@ function BettKachel({ bett, patient, abschnitt, onAssignClick, onRelease, onLock
             {/* Body abhaengig vom Status */}
             <div className="mt-3">
                 {bett.status === "belegt" && patient && (
-                    <div className="flex items-center gap-2 rounded-md bg-status-red/10 p-2" data-testid={`bett-patient-${bett.id}`}>
+                    <div 
+                        className="flex items-center gap-2 rounded-md bg-status-red/10 p-2 cursor-grab active:cursor-grabbing" 
+                        data-testid={`bett-patient-${bett.id}`}
+                        draggable
+                        onDragStart={(e) => onDragStart && onDragStart(e, patient.id)}
+                    >
                         {patient.sichtung && <SichtungBadge level={patient.sichtung} size="sm" />}
                         <div className="flex-1 min-w-0">
                             <div className="font-mono text-body">{patient.kennung}</div>
+                            {patient.is_dummy && <div className="text-[0.6rem] bg-status-gray text-status-gray-fg w-max px-1 rounded uppercase">Dummy</div>}
                             <div className="text-caption text-muted-foreground">
                                 belegt seit {dauer || "–"}
                             </div>
@@ -583,6 +591,49 @@ export default function BettenPage() {
             toast.error("Freigabe fehlgeschlagen");
         }
     };
+    const handleDischargeAreaDrop = async (patientId, option) => {
+        try {
+            const { updatePatient } = require('@/lib/api');
+            let payload = {};
+            if (option === 'heim') {
+                payload = { status: "wartet_auf_abholung" };
+            } else if (option === 'rd') {
+                payload = { status: "uebergeben", verbleib: "rd", fallabschluss_typ: "rd_uebergabe" };
+            } else if (option === 'event') {
+                payload = { status: "entlassen", verbleib: "event", fallabschluss_typ: "entlassung" };
+            }
+            await updatePatient(patientId, payload);
+            await refreshPatients();
+            await fetchBetten(); // reload betten to ensure they are marked as free
+            toast.success("Patient entlassen/übergeben");
+        } catch (e) {
+            toast.error(e?.response?.data?.detail || "Verschieben fehlgeschlagen");
+        }
+    };
+    
+    const handleDragStart = (e, patientId) => {
+        e.dataTransfer.setData("patientId", patientId);
+    };
+
+    const handleDragOver = (e) => {
+        e.preventDefault(); // allow drop
+    };
+
+    const handleBettDrop = async (e, bettId) => {
+        e.preventDefault();
+        const patientId = e.dataTransfer.getData("patientId");
+        if (!patientId || !bettId) return;
+        
+        try {
+            const updated = await assignBett(bettId, patientId);
+            setBetten((l) => l.map((b) => (b.id === updated.id ? updated : b)));
+            await refreshPatients();
+            toast.success("Patient via Drag&Drop zugewiesen");
+        } catch (err) {
+            toast.error(err?.response?.data?.detail || "Zuweisung fehlgeschlagen");
+        }
+    };
+
 
     const handleLock = async (bett) => {
         try {
@@ -721,7 +772,12 @@ export default function BettenPage() {
                     </h2>
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
                         {patients.filter(p => p.status === "in_uhs_waiting_area").map(p => (
-                            <div key={p.id} className="els-surface p-3 flex flex-col gap-2 relative">
+                            <div 
+                                key={p.id} 
+                                className="els-surface p-3 flex flex-col gap-2 relative cursor-grab active:cursor-grabbing border border-border/50 shadow-sm hover:border-border transition-colors"
+                                draggable
+                                onDragStart={(e) => handleDragStart(e, p.id)}
+                            >
                                 <div className="flex items-start justify-between">
                                     <div className="font-mono font-bold">{p.kennung}</div>
                                     <SichtungBadge level={p.sichtung} />
@@ -795,25 +851,124 @@ export default function BettenPage() {
                     data-testid="betten-grid"
                 >
                     {filtered.map((b) => (
-                        <BettKachel
-                            key={b.id}
-                            bett={b}
-                            patient={b.patient_id ? patientById.get(b.patient_id) : null}
-                            abschnitt={b.abschnitt_id ? abschnittById.get(b.abschnitt_id) : null}
-                            onAssignClick={(x) => setAssignOpen({ open: true, bett: x })}
-                            onRelease={handleRelease}
-                            onLock={handleLock}
-                            onUnlock={handleUnlock}
-                            onDelete={(x) => setConfirmDelete(x)}
-                            onEdit={(x) => setBettDialog({ open: true, initial: x })}
-                            canAssign={canAssign}
-                            canEdit={canUpdate}
-                            canDelete={canDelete}
-                            canLock={canLock}
-                        />
+                        <div key={b.id} onDragOver={handleDragOver} onDrop={(e) => handleBettDrop(e, b.id)}>
+                            <BettKachel
+                                bett={b}
+                                patient={b.patient_id ? patientById.get(b.patient_id) : null}
+                                abschnitt={b.abschnitt_id ? abschnittById.get(b.abschnitt_id) : null}
+                                onAssignClick={(x) => setAssignOpen({ open: true, bett: x })}
+                                onRelease={handleRelease}
+                                onLock={handleLock}
+                                onUnlock={handleUnlock}
+                                onDelete={(x) => setConfirmDelete(x)}
+                                onEdit={(x) => setBettDialog({ open: true, initial: x })}
+                                canAssign={canAssign}
+                                canEdit={canUpdate}
+                                canDelete={canDelete}
+                                canLock={canLock}
+                                onDragStart={handleDragStart}
+                            />
+                        </div>
                     ))}
                 </div>
             )}
+
+            {/* Entlassungsbereich (Dropzones) */}
+            <div className="mt-8 pt-6 border-t border-border">
+                <h2 className="text-lg font-semibold mb-4 text-muted-foreground flex items-center gap-2">
+                    <UserMinus className="h-5 w-5" />
+                    Entlassungsbereich (Patient hierher ziehen zum Entlassen)
+                </h2>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div 
+                        className="els-surface border-dashed border-2 border-border hover:border-status-gray hover:bg-surface-raised p-6 flex flex-col items-center justify-center text-center gap-2 transition-colors cursor-pointer"
+                        onDragOver={handleDragOver}
+                        onDrop={(e) => {
+                            e.preventDefault();
+                            const pid = e.dataTransfer.getData("patientId");
+                            if(pid) handleDischargeAreaDrop(pid, "heim");
+                        }}
+                        data-testid="dropzone-heim"
+                    >
+                        <UserMinus className="h-8 w-8 text-status-gray" />
+                        <div className="font-semibold">Abholung (Angehörige)</div>
+                        <div className="text-xs text-muted-foreground">Warten auf Abholung / Heim</div>
+                    </div>
+                    
+                    <div 
+                        className="els-surface border-dashed border-2 border-border hover:border-status-blue hover:bg-surface-raised p-6 flex flex-col items-center justify-center text-center gap-2 transition-colors cursor-pointer"
+                        onDragOver={handleDragOver}
+                        onDrop={(e) => {
+                            e.preventDefault();
+                            const pid = e.dataTransfer.getData("patientId");
+                            if(pid) handleDischargeAreaDrop(pid, "rd");
+                        }}
+                        data-testid="dropzone-rd"
+                    >
+                        <Truck className="h-8 w-8 text-status-blue" />
+                        <div className="font-semibold">Rettungsdienst</div>
+                        <div className="text-xs text-muted-foreground">Übergabe an Transportmittel</div>
+                    </div>
+                    
+                    <div 
+                        className="els-surface border-dashed border-2 border-border hover:border-status-green hover:bg-surface-raised p-6 flex flex-col items-center justify-center text-center gap-2 transition-colors cursor-pointer"
+                        onDragOver={handleDragOver}
+                        onDrop={(e) => {
+                            e.preventDefault();
+                            const pid = e.dataTransfer.getData("patientId");
+                            if(pid) handleDischargeAreaDrop(pid, "event");
+                        }}
+                        data-testid="dropzone-event"
+                    >
+                        <CheckCircle2 className="h-8 w-8 text-status-green" />
+                        <div className="font-semibold">Zurück zur Veranstaltung</div>
+                        <div className="text-xs text-muted-foreground">Patient in Veranstaltung entlassen</div>
+                    </div>
+                </div>
+                
+                {/* Abhol-Wartebereich Liste (wartet_auf_abholung) */}
+                {patients.filter(p => p.status === "wartet_auf_abholung").length > 0 && (
+                    <div className="mt-6 p-4 rounded-md border border-border bg-surface-sunken">
+                        <h3 className="text-md font-semibold mb-3 flex items-center gap-2">
+                            <UserMinus className="h-4 w-4 text-status-gray" />
+                            Abhol-Wartebereich
+                            <span className="bg-status-gray text-status-gray-fg text-xs px-2 py-0.5 rounded-full">
+                                {patients.filter(p => p.status === "wartet_auf_abholung").length}
+                            </span>
+                        </h3>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
+                            {patients.filter(p => p.status === "wartet_auf_abholung").map(p => (
+                                <div key={p.id} className="els-surface p-3 flex flex-col gap-1 border border-border/50 shadow-sm">
+                                    <div className="flex items-center justify-between">
+                                        <div className="font-mono font-bold">{p.kennung}</div>
+                                        <SichtungBadge level={p.sichtung} size="sm" />
+                                    </div>
+                                    <div className="text-xs text-muted-foreground">
+                                        Wartet auf Abholung
+                                    </div>
+                                    <Button
+                                        size="sm"
+                                        variant="outline"
+                                        className="mt-2 text-xs"
+                                        onClick={async () => {
+                                            try {
+                                                const { updatePatient } = require('@/lib/api');
+                                                await updatePatient(p.id, { status: "entlassen", verbleib: "heim", fallabschluss_typ: "entlassung" });
+                                                await refreshPatients();
+                                                toast.success("Patient final entlassen");
+                                            } catch (e) {
+                                                toast.error("Fehler bei Entlassung");
+                                            }
+                                        }}
+                                    >
+                                        Final entlassen
+                                    </Button>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                )}
+            </div>
 
             <BettDialog
                 open={bettDialog.open}
