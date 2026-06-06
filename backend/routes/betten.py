@@ -125,7 +125,7 @@ async def assign_bett(bett_id: str, payload: BettAssign):
     )
     await db.patients.update_one(
         {"id": payload.patient_id},
-        {"$set": {"bett_id": bett_id, "updated_at": iso(now)}},
+        {"$set": {"bett_id": bett_id, "status": "in_behandlung", "updated_at": iso(now)}},
     )
     return await db.betten.find_one({"id": bett_id}, {"_id": 0})
 

@@ -193,6 +193,8 @@ async def update_patient(patient_id: str, payload: PatientUpdate):
     now = now_utc()
     update["updated_at"] = iso(now)
 
+    if "sichtung" in update and update["sichtung"] and existing.get("is_dummy"):
+        update["is_dummy"] = False
     if "sichtung" in update and not existing.get("sichtung_at"):
         update["sichtung_at"] = iso(now)
 
@@ -390,3 +392,99 @@ async def delete_patient(patient_id: str):
             },
         )
     return None
+
+
+@router.post("/incidents/{incident_id}/patients/dummy", response_model=dict, status_code=201)
+async def create_dummy_patient(incident_id: str, payload: PatientCreate):
+    inc = await db.incidents.find_one({"id": incident_id}, {"_id": 0})
+    if not inc:
+        raise HTTPException(status_code=404, detail="Incident nicht gefunden")
+    if inc.get("status") == "geplant":
+        raise HTTPException(
+            status_code=409,
+            detail="Incident ist geplant. Patienten koennen erst im operativen Status angelegt werden",
+        )
+    
+    payload.is_dummy = True
+    kennung = await next_kennung(incident_id)
+    now = now_utc()
+    patient = Patient(
+        **payload.model_dump(exclude_none=True),
+        incident_id=incident_id,
+        kennung=kennung,
+    )
+    
+    doc = patient.model_dump()
+    for k in ("created_at", "updated_at", "sichtung_at", "behandlung_start_at", "transport_angefordert_at", "fallabschluss_at"):
+        if isinstance(doc.get(k), datetime):
+            doc[k] = iso(doc[k])
+    
+    await db.patients.insert_one(doc)
+    
+    await log_system_entry(
+        incident_id=incident_id,
+        text=f"Dummy-Patient {kennung} angelegt",
+        funk_typ="system",
+        prioritaet="normal",
+        patient_id=patient.id,
+    )
+    await publish_patient_event(
+        incident_id,
+        {
+            "kind": "patient",
+            "action": "created",
+            "patient_id": patient.id,
+            "ts": iso(now_utc()),
+        },
+    )
+    return {k: v for k, v in doc.items() if k != "_id"}
+
+
+@router.post("/patients/{patient_id}/complete", response_model=dict)
+async def complete_patient(patient_id: str, payload: PatientUpdate):
+    payload.is_dummy = False
+    return await update_patient(patient_id, payload)
+
+
+@router.post("/patients/{patient_id}/waiting-area", response_model=dict)
+async def move_to_waiting_area(patient_id: str):
+    existing = await db.patients.find_one({"id": patient_id}, {"_id": 0})
+    if not existing:
+        raise HTTPException(status_code=404, detail="Patient nicht gefunden")
+    
+    now = now_utc()
+    update = {
+        "status": "in_uhs_waiting_area",
+        "updated_at": iso(now)
+    }
+    
+    if existing.get("bett_id"):
+        await db.betten.update_one(
+            {"id": existing["bett_id"]},
+            {"$set": {"status": "frei", "patient_id": None, "belegt_seit": None}}
+        )
+        update["bett_id"] = None
+        
+    result = await db.patients.find_one_and_update(
+        {"id": patient_id},
+        {"$set": update},
+        return_document=True,
+        projection={"_id": 0}
+    )
+    
+    await log_system_entry(
+        incident_id=result["incident_id"],
+        text=f"Patient {result.get('kennung')} in UHS-Wartebereich verschoben",
+        funk_typ="system",
+        patient_id=patient_id,
+    )
+    await publish_patient_event(
+        result["incident_id"],
+        {
+            "kind": "patient",
+            "action": "updated",
+            "patient_id": patient_id,
+            "ts": iso(now_utc()),
+        },
+    )
+    return result

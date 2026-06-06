@@ -260,7 +260,7 @@ function BulkDialog({ open, onOpenChange, abschnitte, onBulk }) {
 /* -------------------------------------------------------------------- */
 function AssignPatientDialog({ open, onOpenChange, patients, onAssign }) {
     const eligible = patients.filter(
-        (p) => ["wartend", "in_behandlung"].includes(p.status) && !p.bett_id
+        (p) => ["wartend", "in_uhs_waiting_area", "in_behandlung"].includes(p.status) && !p.bett_id
     );
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
@@ -708,6 +708,62 @@ export default function BettenPage() {
                     Ohne Abschnitt
                 </FilterChip>
             </div>
+
+            {/* UHS-Wartebereich */}
+            {patients.filter(p => p.status === "in_uhs_waiting_area").length > 0 && (
+                <div className="mb-6 rounded-md border border-border bg-surface-sunken p-4" data-testid="uhs-wartebereich">
+                    <h2 className="text-lg font-semibold mb-3 flex items-center gap-2">
+                        <UserPlus className="h-5 w-5 text-status-yellow" />
+                        UHS-Wartebereich
+                        <span className="bg-status-yellow text-status-yellow-fg text-xs px-2 py-0.5 rounded-full">
+                            {patients.filter(p => p.status === "in_uhs_waiting_area").length}
+                        </span>
+                    </h2>
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
+                        {patients.filter(p => p.status === "in_uhs_waiting_area").map(p => (
+                            <div key={p.id} className="els-surface p-3 flex flex-col gap-2 relative">
+                                <div className="flex items-start justify-between">
+                                    <div className="font-mono font-bold">{p.kennung}</div>
+                                    <SichtungBadge level={p.sichtung} />
+                                </div>
+                                
+                                {p.is_dummy && (
+                                    <div className="text-xs bg-status-gray text-status-gray-fg w-max px-1.5 py-0.5 rounded border border-status-gray/30 font-medium tracking-wide">
+                                        DUMMY
+                                    </div>
+                                )}
+                                
+                                <div className="text-xs text-muted-foreground flex flex-col gap-0.5">
+                                    {p.created_by_resource && (
+                                        <div><span className="font-medium text-foreground">Von:</span> {p.created_by_resource}</div>
+                                    )}
+                                    {p.notiz && (
+                                        <div className="line-clamp-2" title={p.notiz}><span className="font-medium text-foreground">Notiz:</span> {p.notiz}</div>
+                                    )}
+                                </div>
+                                
+                                <div className="mt-auto pt-2 border-t border-border">
+                                    <Button
+                                        size="sm"
+                                        variant="outline"
+                                        className="w-full text-xs h-7"
+                                        onClick={() => {
+                                            // Optional: wir können assignOpen nutzen, aber `bett` ist dort das gewählte Bett.
+                                            // Hier wollen wir den Patienten in ein leeres Bett setzen.
+                                            // Die AssignPatientDialog ist "wähle einen Patient für Bett X".
+                                            // Hier bräuchten wir "Wähle Bett für Patient Y".
+                                            // Oder einfach "Zuweisen via Bett-Klick" Nachricht?
+                                        }}
+                                        disabled
+                                    >
+                                        Bitte unten ein Bett wählen und "Patient aufnehmen" klicken
+                                    </Button>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            )}
 
             {/* Grid */}
             {loading ? (

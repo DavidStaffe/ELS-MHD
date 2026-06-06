@@ -32,7 +32,7 @@
     "frontend": "100% (alle 9 Hauptrouten + PatientDetail rendern fehlerfrei, 0 console errors, 0 error boundaries)."
   },
   "test_credentials": "Keine Auth. localStorage['els-role']='einsatzleiter' und localStorage['els-active-incident']=<demo_incident_id>.",
-  "seed_data_creation": "POST /api/incidents/demo erzeugt kompletten Demo. Cleanup: 4 ueberfluessige Demo-Incidents via DELETE /api/incidents/{id} entfernt. Aktuell nur 1 Demo-Incident in DB (Grossveranstaltung Messe, id=f08b5f8b-83f4-4863-8335-d1cbdc051da3).",
+  "seed_data_creation": "POST /api/incidents/demo erzeugt kompletten Demo. Cleanup: 4 ueberfluessige Demo-Incidents via DELETE /api/incidents/{id} entfernt. Aktuell nur 1 Demo-Incident in DB (Grossveranstaltung Messe, id=keyword-catalog-test).",
   "retest_needed": false,
   "should_main_agent_self_test": false,
   "context_for_next_testing_agent": "Refactor validiert. server.py 70 Zeilen ok. pytest-Run-Kommando: `cd /app/backend && REACT_APP_BACKEND_URL=<preview-url> python -m pytest tests/ -v --tb=short`. Die 5 Version-String-Fails sind pre-existing. Frontend-Routen alle gruen mit localStorage-Rolle + Incident-ID.",

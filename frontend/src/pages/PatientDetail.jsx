@@ -170,7 +170,7 @@ export default function PatientDetail() {
   const { patientId } = useParams();
   const navigate = useNavigate();
   const { activeIncident, setActive } = useIncidents();
-  const { patients, update, remove, refresh, reopen } = usePatients();
+  const { patients, update, remove, refresh, reopen, moveToWaitingArea } = usePatients();
   const { refresh: refreshTransports } = useTransports();
 
   const [reopenOpen, setReopenOpen] = React.useState(false);
@@ -757,9 +757,23 @@ export default function PatientDetail() {
                   disabled={busy || closed || !can('bett.assign_patient')}
                   data-testid="pd-bett-assign"
                 >
-                  <Bed className="h-4 w-4" />
+                  <Bed className="mr-2 h-4 w-4" />
                   Bett zuweisen
                 </Button>
+                {patient.status !== 'in_uhs_waiting_area' && (
+                  <Button
+                    variant="outline"
+                    onClick={async () => {
+                      try {
+                        const updated = await moveToWaitingArea(patient.id);
+                        setPatient(updated);
+                      } catch(e) {}
+                    }}
+                    disabled={busy || closed || !can('bett.assign_patient')}
+                  >
+                    In Wartebereich
+                  </Button>
+                )}
               </div>
             )}
           </SectionCard>

@@ -155,6 +155,17 @@ const NAV_GROUPS = (
       },
     ],
   },
+  {
+    label: 'Einstellungen',
+    items: [
+      {
+        to: '/keywords',
+        icon: Settings,
+        label: 'Stichwörter',
+        testId: 'nav-keywords',
+      },
+    ],
+  },
 ];
 
 export function Sidebar({ className }) {

@@ -5,6 +5,9 @@ import {
   createPatient as apiCreate,
   updatePatient as apiUpdate,
   deletePatient as apiDelete,
+  createDummyPatient as apiCreateDummy,
+  completePatient as apiComplete,
+  moveToWaitingArea as apiMoveToWaitingArea,
   reopenPatient as apiReopen,
 } from '@/lib/api';
 import { useIncidents } from '@/context/IncidentContext';
@@ -131,6 +134,29 @@ export function PatientProvider({ children }) {
     return updated;
   }, []);
 
+  const createDummy = React.useCallback(
+    async (payload) => {
+      if (!incidentId) throw new Error('Kein aktiver Incident');
+      const created = await apiCreateDummy(incidentId, payload);
+      setPatients((prev) => [...prev, created]);
+      return created;
+    },
+    [incidentId],
+  );
+
+  const complete = React.useCallback(async (id, payload) => {
+    const updated = await apiComplete(id, payload);
+    setPatients((prev) => prev.map((p) => (p.id === id ? updated : p)));
+    return updated;
+  }, []);
+
+  const moveToWaitingArea = React.useCallback(async (id) => {
+    const updated = await apiMoveToWaitingArea(id);
+    setPatients((prev) => prev.map((p) => (p.id === id ? updated : p)));
+    return updated;
+  }, []);
+
+
   const remove = React.useCallback(async (id) => {
     await apiDelete(id);
     setPatients((prev) => prev.filter((p) => p.id !== id));
@@ -162,7 +188,7 @@ export function PatientProvider({ children }) {
     const addTo = (b, p) => {
       b.total++;
       if (p.sichtung && b[p.sichtung] !== undefined) b[p.sichtung]++;
-      if (p.status === 'wartend') b.wartend++;
+      if (p.status === 'wartend' || p.status === 'in_uhs_waiting_area') b.wartend++;
       else if (p.status === 'in_behandlung') b.behandlung++;
       else if (p.status === 'transportbereit') b.transport++;
       else if (p.status === 'uebergeben' || p.status === 'entlassen')
@@ -184,7 +210,10 @@ export function PatientProvider({ children }) {
       incidentId,
       refresh,
       create,
+      createDummy,
       update,
+      complete,
+      moveToWaitingArea,
       remove,
       reopen,
       kpis,
@@ -196,7 +225,10 @@ export function PatientProvider({ children }) {
       incidentId,
       refresh,
       create,
+      createDummy,
       update,
+      complete,
+      moveToWaitingArea,
       remove,
       reopen,
       kpis,

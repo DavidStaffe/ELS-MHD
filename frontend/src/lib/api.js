@@ -74,6 +74,21 @@ export async function reopenPatient(id) {
   const { data } = await api.post(`/patients/${id}/reopen`);
   return data;
 }
+export async function createDummyPatient(incidentId, payload) {
+  const { data } = await api.post(`/incidents/${incidentId}/patients/dummy`, payload);
+  return data;
+}
+
+export async function completePatient(id, payload) {
+  const { data } = await api.post(`/patients/${id}/complete`, payload);
+  return data;
+}
+
+export async function moveToWaitingArea(id) {
+  const { data } = await api.post(`/patients/${id}/waiting-area`);
+  return data;
+}
+
 
 /* =====================================================================
    Divera 24/7
@@ -325,3 +340,27 @@ export async function releaseBett(bettId) {
   const { data } = await api.post(`/betten/${bettId}/release`);
   return data;
 }
+
+/* =====================================================================
+   Keywords (Stichwort-Katalog)
+   ===================================================================== */
+export async function listKeywords(active = null) {
+  const params = active !== null ? { active } : {};
+  const { data } = await api.get('/keywords', { params });
+  return data;
+}
+
+export async function createKeyword(payload) {
+  const { data } = await api.post('/keywords', payload);
+  return data;
+}
+
+export async function updateKeyword(id, payload) {
+  const { data } = await api.patch(`/keywords/${id}`, payload);
+  return data;
+}
+
+export async function deleteKeyword(id) {
+  await api.delete(`/keywords/${id}`);
+}
+
