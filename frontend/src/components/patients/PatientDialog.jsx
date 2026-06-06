@@ -40,13 +40,14 @@ export function PatientDialog({
     const [status, setStatus] = React.useState(initial?.status ?? "wartend");
     const [verbleib, setVerbleib] = React.useState(initial?.verbleib ?? "unbekannt");
     const [notiz, setNotiz] = React.useState(initial?.notiz ?? "");
-    const [isDummy, setIsDummy] = React.useState(initial?.is_dummy ?? false);
     const [createdByResource, setCreatedByResource] = React.useState(initial?.created_by_resource ?? "");
     const [keywordId, setKeywordId] = React.useState(initial?.keyword_id ?? "");
     
     const [submitting, setSubmitting] = React.useState(false);
     const [error, setError] = React.useState(null);
     const [keywords, setKeywords] = React.useState([]);
+    
+    const isDummy = !sichtung;
 
     React.useEffect(() => {
         if (!open) return;
@@ -54,7 +55,6 @@ export function PatientDialog({
         setStatus(initial?.status ?? "wartend");
         setVerbleib(initial?.verbleib ?? "unbekannt");
         setNotiz(initial?.notiz ?? "");
-        setIsDummy(initial?.is_dummy ?? false);
         setCreatedByResource(initial?.created_by_resource ?? "");
         setKeywordId(initial?.keyword_id ?? "");
         setError(null);
@@ -83,17 +83,19 @@ export function PatientDialog({
                 verbleib,
                 notiz: notiz.trim()
             };
-            if (sichtung) payload.sichtung = sichtung;
+            if (sichtung) {
+                payload.sichtung = sichtung;
+            } else {
+                payload.sichtung = null;
+            }
             
             if (isDummy) {
-                payload.is_dummy = true;
                 if (!createdByResource.trim()) {
                     throw new Error("Erzeugende Ressource (Streife) ist bei Dummy-Patienten erforderlich.");
                 }
                 payload.created_by_resource = createdByResource.trim();
             } else {
-                payload.is_dummy = false;
-                payload.created_by_resource = null; // optionally clearing it, or keeping it
+                payload.created_by_resource = createdByResource.trim() || null;
             }
             if (keywordId) payload.keyword_id = keywordId;
 
@@ -128,17 +130,8 @@ export function PatientDialog({
                 </DialogHeader>
 
                 <form onSubmit={handleSubmit} className="space-y-4">
-                    {!isEdit && (
-                        <div className="flex items-center space-x-2 rounded-md border p-3">
-                            <Switch id="pd-dummy" checked={isDummy} onCheckedChange={setIsDummy} data-testid="pd-dummy-switch" />
-                            <Label htmlFor="pd-dummy" className="flex flex-col">
-                                <span>Als Dummy anlegen</span>
-                                <span className="font-normal text-xs text-muted-foreground">Patient ohne sofortige Sichtung anlegen</span>
-                            </Label>
-                        </div>
-                    )}
                     
-                    {isDummy && !isEdit && (
+                    {isDummy && (
                         <div className="space-y-1.5">
                             <Label htmlFor="pd-resource">Erzeugende Ressource / Streife *</Label>
                             <Input
@@ -149,6 +142,7 @@ export function PatientDialog({
                                 placeholder="z.B. Streife 1"
                                 required={isDummy}
                             />
+                            <div className="text-xs text-muted-foreground mt-1">Ohne Sichtungskategorie wird der Patient automatisch als DUMMY angelegt.</div>
                         </div>
                     )}
 

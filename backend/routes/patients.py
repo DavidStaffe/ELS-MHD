@@ -102,6 +102,7 @@ async def create_patient(incident_id: str, payload: PatientCreate):
         incident_id=incident_id,
         kennung=kennung,
     )
+    patient.is_dummy = not bool(patient.sichtung)
     resource_change_ts = iso(now)
     if patient.behandlung_ressource_id:
         resource = await db.resources.find_one(
@@ -181,7 +182,7 @@ async def update_patient(patient_id: str, payload: PatientUpdate):
     )
     if not incident:
         raise HTTPException(status_code=404, detail="Incident nicht gefunden")
-    update = payload.model_dump(exclude_none=True)
+    update = payload.model_dump(exclude_unset=True)
     if not update:
         raise HTTPException(status_code=400, detail="Keine Aenderungen angegeben")
 
@@ -193,9 +194,10 @@ async def update_patient(patient_id: str, payload: PatientUpdate):
     now = now_utc()
     update["updated_at"] = iso(now)
 
-    if "sichtung" in update and update["sichtung"] and existing.get("is_dummy"):
-        update["is_dummy"] = False
-    if "sichtung" in update and not existing.get("sichtung_at"):
+    if "sichtung" in update:
+        update["is_dummy"] = not bool(update["sichtung"])
+        
+    if "sichtung" in update and update["sichtung"] and not existing.get("sichtung_at"):
         update["sichtung_at"] = iso(now)
 
     if "sichtung" in update and existing.get("sichtung") != update["sichtung"]:
