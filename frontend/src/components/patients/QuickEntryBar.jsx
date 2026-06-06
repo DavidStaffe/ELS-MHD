@@ -12,7 +12,16 @@ import {
   DialogFooter,
 } from '@/components/ui/dialog';
 import { SICHTUNG } from '@/lib/patient-meta';
-import { Plus, Keyboard } from 'lucide-react';
+import { Plus, Keyboard, Loader2 } from 'lucide-react';
+import { useIncidents } from '@/context/IncidentContext';
+import { listResources } from '@/lib/api';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue
+} from "@/components/ui/select";
 
 /**
  * QuickEntryBar – Schnellerfassung am unteren Bildschirmrand.
@@ -27,9 +36,22 @@ export function QuickEntryBar({
   disabled = false,
   className,
 }) {
+  const { activeIncident } = useIncidents();
   const [busyKey, setBusyKey] = React.useState(null);
   const [dummyPromptOpen, setDummyPromptOpen] = React.useState(false);
   const [dummyResource, setDummyResource] = React.useState('');
+  const [resources, setResources] = React.useState([]);
+  const [loadingResources, setLoadingResources] = React.useState(false);
+
+  React.useEffect(() => {
+    if (dummyPromptOpen && activeIncident) {
+      setLoadingResources(true);
+      listResources(activeIncident.id)
+        .then((data) => setResources(data))
+        .catch(() => {})
+        .finally(() => setLoadingResources(false));
+    }
+  }, [dummyPromptOpen, activeIncident]);
 
   const handleQuick = React.useCallback(
     async (level) => {
@@ -174,12 +196,18 @@ export function QuickEntryBar({
           <form
             onSubmit={async (e) => {
               e.preventDefault();
-              if (dummyResource.trim()) {
+              if (dummyResource) {
                 setBusyKey("dummy");
                 setDummyPromptOpen(false);
                 try {
                   if (onQuickCreate) {
-                    await onQuickCreate({ isDummy: true, created_by_resource: dummyResource.trim() });
+                    const selectedRes = resources.find(r => r.id === dummyResource);
+                    const payload = {
+                      isDummy: true,
+                      behandlung_ressource_id: dummyResource,
+                      created_by_resource: selectedRes ? selectedRes.name : dummyResource
+                    };
+                    await onQuickCreate(payload);
                   }
                 } catch (err) {
                   console.error(err);
@@ -193,18 +221,26 @@ export function QuickEntryBar({
           >
             <div>
               <Label>Erzeugende Ressource</Label>
-              <Input
-                value={dummyResource}
-                onChange={(e) => setDummyResource(e.target.value)}
-                autoFocus
-                required
-              />
+              {loadingResources ? (
+                 <div className="flex items-center gap-2 mt-2 text-sm text-muted-foreground"><Loader2 className="h-4 w-4 animate-spin" /> Ressourcen werden geladen...</div>
+              ) : (
+                <Select value={dummyResource} onValueChange={setDummyResource} required>
+                    <SelectTrigger className="mt-1">
+                        <SelectValue placeholder="Ressource wählen" />
+                    </SelectTrigger>
+                    <SelectContent>
+                        {resources.map((r) => (
+                            <SelectItem key={r.id} value={r.id}>{r.name}</SelectItem>
+                        ))}
+                    </SelectContent>
+                </Select>
+              )}
             </div>
             <DialogFooter>
               <Button type="button" variant="outline" onClick={() => setDummyPromptOpen(false)}>
                 Abbrechen
               </Button>
-              <Button type="submit" disabled={!dummyResource.trim()}>
+              <Button type="submit" disabled={!dummyResource || loadingResources}>
                 Anlegen
               </Button>
             </DialogFooter>

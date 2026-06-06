@@ -215,12 +215,12 @@ export default function PatientList() {
     );
   }
 
-  const handleQuickCreate = async ({ sichtung, isDummy, created_by_resource }) => {
+  const handleQuickCreate = async (payload) => {
     try {
-        if (isDummy) {
-            await createDummy({ created_by_resource });
+        if (payload.isDummy) {
+            await createDummy(payload);
         } else {
-            await create({ sichtung });
+            await create(payload);
         }
     } catch(err) {
         console.error("QuickCreate error:", err);

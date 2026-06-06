@@ -40,14 +40,19 @@ export function PatientDialog({
     const [status, setStatus] = React.useState(initial?.status ?? "wartend");
     const [verbleib, setVerbleib] = React.useState(initial?.verbleib ?? "unbekannt");
     const [notiz, setNotiz] = React.useState(initial?.notiz ?? "");
+    const [behandlungRessourceId, setBehandlungRessourceId] = React.useState(initial?.behandlung_ressource_id ?? "");
     const [createdByResource, setCreatedByResource] = React.useState(initial?.created_by_resource ?? "");
     const [keywordId, setKeywordId] = React.useState(initial?.keyword_id ?? "");
     
     const [submitting, setSubmitting] = React.useState(false);
     const [error, setError] = React.useState(null);
     const [keywords, setKeywords] = React.useState([]);
+    const [resources, setResources] = React.useState([]);
+    const [loadingResources, setLoadingResources] = React.useState(false);
     
     const isDummy = !sichtung;
+    
+    const { activeIncident } = require('@/context/IncidentContext').useIncidents();
 
     React.useEffect(() => {
         if (!open) return;
@@ -55,12 +60,17 @@ export function PatientDialog({
         setStatus(initial?.status ?? "wartend");
         setVerbleib(initial?.verbleib ?? "unbekannt");
         setNotiz(initial?.notiz ?? "");
+        setBehandlungRessourceId(initial?.behandlung_ressource_id ?? "");
         setCreatedByResource(initial?.created_by_resource ?? "");
         setKeywordId(initial?.keyword_id ?? "");
         setError(null);
         
         listKeywords(true).then(data => setKeywords(data)).catch(() => {});
-    }, [open, initial]);
+        if (activeIncident) {
+            setLoadingResources(true);
+            require('@/lib/api').listResources(activeIncident.id).then(data => setResources(data)).catch(() => {}).finally(() => setLoadingResources(false));
+        }
+    }, [open, initial, activeIncident]);
 
     const handleKeywordChange = (val) => {
         const id = val === "none" ? "" : val;
@@ -90,12 +100,14 @@ export function PatientDialog({
             }
             
             if (isDummy) {
-                if (!createdByResource.trim()) {
+                if (!behandlungRessourceId || behandlungRessourceId === "none") {
                     throw new Error("Erzeugende Ressource (Streife) ist bei Dummy-Patienten erforderlich.");
                 }
-                payload.created_by_resource = createdByResource.trim();
+                const selectedRes = resources.find(r => r.id === behandlungRessourceId);
+                payload.behandlung_ressource_id = behandlungRessourceId;
+                payload.created_by_resource = selectedRes ? selectedRes.name : createdByResource;
             } else {
-                payload.created_by_resource = createdByResource.trim() || null;
+                payload.behandlung_ressource_id = (behandlungRessourceId && behandlungRessourceId !== "none") ? behandlungRessourceId : null;
             }
             if (keywordId) payload.keyword_id = keywordId;
 
@@ -134,14 +146,16 @@ export function PatientDialog({
                     {isDummy && (
                         <div className="space-y-1.5">
                             <Label htmlFor="pd-resource">Erzeugende Ressource / Streife *</Label>
-                            <Input
-                                id="pd-resource"
-                                data-testid="pd-resource"
-                                value={createdByResource}
-                                onChange={(e) => setCreatedByResource(e.target.value)}
-                                placeholder="z.B. Streife 1"
-                                required={isDummy}
-                            />
+                            <Select value={behandlungRessourceId} onValueChange={setBehandlungRessourceId} required={isDummy}>
+                                <SelectTrigger className="mt-1" id="pd-resource" data-testid="pd-resource">
+                                    <SelectValue placeholder="Ressource wählen" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    {resources.map((r) => (
+                                        <SelectItem key={r.id} value={r.id}>{r.name}</SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
                             <div className="text-xs text-muted-foreground mt-1">Ohne Sichtungskategorie wird der Patient automatisch als DUMMY angelegt.</div>
                         </div>
                     )}
