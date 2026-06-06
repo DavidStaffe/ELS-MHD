@@ -14,7 +14,7 @@ import { useIncidents } from '@/context/IncidentContext';
 
 const PatientContext = React.createContext(null);
 
-const CLOSED_STATES = new Set(['uebergeben', 'entlassen']);
+const CLOSED_STATES = new Set(['uebergeben', 'entlassen', 'wartet_auf_abholung']);
 export const isPatientClosed = (p) => CLOSED_STATES.has(p?.status);
 
 export function usePatients() {
@@ -191,7 +191,7 @@ export function PatientProvider({ children }) {
       if (p.status === 'wartend' || p.status === 'in_uhs_waiting_area') b.wartend++;
       else if (p.status === 'in_behandlung') b.behandlung++;
       else if (p.status === 'transportbereit') b.transport++;
-      else if (p.status === 'uebergeben' || p.status === 'entlassen')
+      else if (p.status === 'uebergeben' || p.status === 'entlassen' || p.status === 'wartet_auf_abholung')
         b.abgeschlossen++;
     };
     for (const p of patients) {

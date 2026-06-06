@@ -29,7 +29,8 @@ import {
     deleteBett,
     assignBett,
     releaseBett,
-    listAbschnitte
+    listAbschnitte,
+    updatePatient
 } from "@/lib/api";
 import { BETT_TYPEN, BETT_STATUS, BETT_TYP_KEYS, getFarbe } from "@/lib/abschnitt-meta";
 import { cn } from "@/lib/utils";
@@ -593,7 +594,6 @@ export default function BettenPage() {
     };
     const handleDischargeAreaDrop = async (patientId, option) => {
         try {
-            const { updatePatient } = require('@/lib/api');
             let payload = {};
             if (option === 'heim') {
                 payload = { status: "wartet_auf_abholung" };
@@ -604,7 +604,7 @@ export default function BettenPage() {
             }
             await updatePatient(patientId, payload);
             await refreshPatients();
-            await fetchBetten(); // reload betten to ensure they are marked as free
+            await loadAll(); // reload betten to ensure they are marked as free
             toast.success("Patient entlassen/übergeben");
         } catch (e) {
             toast.error(e?.response?.data?.detail || "Verschieben fehlgeschlagen");
@@ -612,7 +612,7 @@ export default function BettenPage() {
     };
     
     const handleDragStart = (e, patientId) => {
-        e.dataTransfer.setData("patientId", patientId);
+        e.dataTransfer.setData("text/plain", patientId);
     };
 
     const handleDragOver = (e) => {
@@ -851,7 +851,7 @@ export default function BettenPage() {
                     data-testid="betten-grid"
                 >
                     {filtered.map((b) => (
-                        <div key={b.id} onDragOver={handleDragOver} onDrop={(e) => handleBettDrop(e, b.id)}>
+                        <div key={b.id} onDragOver={handleDragOver} onDragEnter={handleDragOver} onDrop={(e) => handleBettDrop(e, b.id)}>
                             <BettKachel
                                 bett={b}
                                 patient={b.patient_id ? patientById.get(b.patient_id) : null}
@@ -883,9 +883,10 @@ export default function BettenPage() {
                     <div 
                         className="els-surface border-dashed border-2 border-border hover:border-status-gray hover:bg-surface-raised p-6 flex flex-col items-center justify-center text-center gap-2 transition-colors cursor-pointer"
                         onDragOver={handleDragOver}
+                        onDragEnter={handleDragOver}
                         onDrop={(e) => {
                             e.preventDefault();
-                            const pid = e.dataTransfer.getData("patientId");
+                            const pid = e.dataTransfer.getData("text/plain");
                             if(pid) handleDischargeAreaDrop(pid, "heim");
                         }}
                         data-testid="dropzone-heim"
@@ -900,7 +901,7 @@ export default function BettenPage() {
                         onDragOver={handleDragOver}
                         onDrop={(e) => {
                             e.preventDefault();
-                            const pid = e.dataTransfer.getData("patientId");
+                            const pid = e.dataTransfer.getData("text/plain");
                             if(pid) handleDischargeAreaDrop(pid, "rd");
                         }}
                         data-testid="dropzone-rd"
@@ -915,7 +916,7 @@ export default function BettenPage() {
                         onDragOver={handleDragOver}
                         onDrop={(e) => {
                             e.preventDefault();
-                            const pid = e.dataTransfer.getData("patientId");
+                            const pid = e.dataTransfer.getData("text/plain");
                             if(pid) handleDischargeAreaDrop(pid, "event");
                         }}
                         data-testid="dropzone-event"
@@ -952,7 +953,6 @@ export default function BettenPage() {
                                         className="mt-2 text-xs"
                                         onClick={async () => {
                                             try {
-                                                const { updatePatient } = require('@/lib/api');
                                                 await updatePatient(p.id, { status: "entlassen", verbleib: "heim", fallabschluss_typ: "entlassung" });
                                                 await refreshPatients();
                                                 toast.success("Patient final entlassen");

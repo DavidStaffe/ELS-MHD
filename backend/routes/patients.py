@@ -290,21 +290,22 @@ async def update_patient(patient_id: str, payload: PatientUpdate):
     )
     if "transport_typ" in update and update["transport_typ"]:
         await ensure_transport_for_patient(result)
-    if update.get("status") in ("uebergeben", "entlassen"):
-        await db.transports.update_many(
-            {"patient_id": patient_id, "status": {"$ne": "abgeschlossen"}},
-            {
-                "$set": {
-                    "status": "abgeschlossen",
-                    "abgeschlossen_at": iso(now),
-                    "updated_at": iso(now),
-                }
-            },
-        )
+    if update.get("status") in ("uebergeben", "entlassen", "wartet_auf_abholung"):
+        if update.get("status") in ("uebergeben", "entlassen"):
+            await db.transports.update_many(
+                {"patient_id": patient_id, "status": {"$ne": "abgeschlossen"}},
+                {
+                    "$set": {
+                        "status": "abgeschlossen",
+                        "abgeschlossen_at": iso(now),
+                        "updated_at": iso(now),
+                    }
+                },
+            )
         await release_bett_for_patient(patient_id)
         await log_system_entry(
             incident_id=result["incident_id"],
-            text=f"Fallabschluss {result.get('kennung')}: {update['status']}",
+            text=f"Fallabschluss/Verlegung {result.get('kennung')}: {update['status']}",
             funk_typ="system",
             patient_id=patient_id,
         )

@@ -1,6 +1,16 @@
 import * as React from 'react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from '@/components/ui/dialog';
 import { SICHTUNG } from '@/lib/patient-meta';
 import { Plus, Keyboard } from 'lucide-react';
 
@@ -18,6 +28,8 @@ export function QuickEntryBar({
   className,
 }) {
   const [busyKey, setBusyKey] = React.useState(null);
+  const [dummyPromptOpen, setDummyPromptOpen] = React.useState(false);
+  const [dummyResource, setDummyResource] = React.useState('');
 
   const handleQuick = React.useCallback(
     async (level) => {
@@ -120,13 +132,7 @@ export function QuickEntryBar({
         <button
             type="button"
             disabled={disabled || busyKey !== null}
-            onClick={() => {
-                const resource = window.prompt("Erzeugende Ressource / Streife für den Dummy-Patienten:");
-                if (resource && resource.trim()) {
-                    setBusyKey("dummy");
-                    onQuickCreate?.({ isDummy: true, created_by_resource: resource.trim() }).finally(() => setBusyKey(null));
-                }
-            }}
+            onClick={() => setDummyPromptOpen(true)}
             data-testid="quick-dummy"
             title="Dummy-Patient ohne Sichtung anlegen"
             className={cn(
@@ -156,6 +162,56 @@ export function QuickEntryBar({
           </kbd>
         </Button>
       </div>
+
+      <Dialog open={dummyPromptOpen} onOpenChange={setDummyPromptOpen}>
+        <DialogContent className="sm:max-w-sm" data-testid="dummy-prompt-dialog">
+          <DialogHeader>
+            <DialogTitle>Dummy-Patient anlegen</DialogTitle>
+            <DialogDescription>
+              Wer meldet diesen Patienten? (z.B. "Streife 1")
+            </DialogDescription>
+          </DialogHeader>
+          <form
+            onSubmit={async (e) => {
+              e.preventDefault();
+              if (dummyResource.trim()) {
+                setBusyKey("dummy");
+                setDummyPromptOpen(false);
+                try {
+                  if (onQuickCreate) {
+                    await onQuickCreate({ isDummy: true, created_by_resource: dummyResource.trim() });
+                  }
+                } catch (err) {
+                  console.error(err);
+                } finally {
+                  setBusyKey(null);
+                  setDummyResource("");
+                }
+              }
+            }}
+            className="space-y-4"
+          >
+            <div>
+              <Label>Erzeugende Ressource</Label>
+              <Input
+                value={dummyResource}
+                onChange={(e) => setDummyResource(e.target.value)}
+                autoFocus
+                required
+              />
+            </div>
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={() => setDummyPromptOpen(false)}>
+                Abbrechen
+              </Button>
+              <Button type="submit" disabled={!dummyResource.trim()}>
+                Anlegen
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+
     </div>
   );
 }

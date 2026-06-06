@@ -72,7 +72,7 @@ function DauerSeitSichtung({ patient }) {
   const [now, setNow] = React.useState(() => Date.now());
   React.useEffect(() => {
     if (!patient.sichtung_at) return undefined;
-    if (patient.status === 'uebergeben' || patient.status === 'entlassen')
+    if (patient.status === 'uebergeben' || patient.status === 'entlassen' || patient.status === 'wartet_auf_abholung')
       return undefined;
     const id = setInterval(() => setNow(Date.now()), 30 * 1000);
     return () => clearInterval(id);
@@ -216,10 +216,14 @@ export default function PatientList() {
   }
 
   const handleQuickCreate = async ({ sichtung, isDummy, created_by_resource }) => {
-    if (isDummy) {
-        await createDummy({ created_by_resource });
-    } else {
-        await create({ sichtung });
+    try {
+        if (isDummy) {
+            await createDummy({ created_by_resource });
+        } else {
+            await create({ sichtung });
+        }
+    } catch(err) {
+        console.error("QuickCreate error:", err);
     }
   };
 

@@ -16,6 +16,7 @@ PatientStatus = Literal[
     "in_uhs_waiting_area",
     "in_behandlung",
     "transportbereit",
+    "wartet_auf_abholung",
     "uebergeben",
     "entlassen",
 ]
