@@ -72,7 +72,7 @@ function DauerSeitSichtung({ patient }) {
   const [now, setNow] = React.useState(() => Date.now());
   React.useEffect(() => {
     if (!patient.sichtung_at) return undefined;
-    if (patient.status === 'uebergeben' || patient.status === 'entlassen')
+    if (patient.status === 'uebergeben' || patient.status === 'entlassen' || patient.status === 'wartet_auf_abholung')
       return undefined;
     const id = setInterval(() => setNow(Date.now()), 30 * 1000);
     return () => clearInterval(id);
@@ -93,7 +93,7 @@ function DauerSeitSichtung({ patient }) {
 export default function PatientList() {
   const navigate = useNavigate();
   const { activeIncident } = useIncidents();
-  const { patients, loading, error, refresh, create, update, remove, kpis } =
+  const { patients, loading, error, refresh, create, createDummy, update, complete, remove, kpis } =
     usePatients();
   const { registerCommand } = useCommandPalette();
 
@@ -215,8 +215,16 @@ export default function PatientList() {
     );
   }
 
-  const handleQuickCreate = async ({ sichtung }) => {
-    await create({ sichtung });
+  const handleQuickCreate = async (payload) => {
+    try {
+        if (payload.isDummy) {
+            await createDummy(payload);
+        } else {
+            await create(payload);
+        }
+    } catch(err) {
+        console.error("QuickCreate error:", err);
+    }
   };
 
   const openNew = () => {
@@ -233,7 +241,14 @@ export default function PatientList() {
       key: 'kennung',
       label: 'Kennung',
       width: '10%',
-      render: (p) => <span className="font-mono font-medium">{p.kennung}</span>,
+      render: (p) => (
+          <div className="flex flex-col items-start gap-1">
+            <span className="font-mono font-medium">{p.kennung}</span>
+            {p.is_dummy && (
+              <span className="text-[0.65rem] bg-status-gray text-status-gray-fg px-1.5 py-0.5 rounded border border-status-gray/30 tracking-wider">DUMMY</span>
+            )}
+          </div>
+      ),
     },
     {
       key: 'sichtung',
@@ -611,11 +626,19 @@ export default function PatientList() {
           if (!v) setEditPatient(null);
         }}
         initial={editPatient}
-        onSubmit={async (payload) => {
+        onSubmit={async (payload, isDummy) => {
           if (editPatient) {
-            await update(editPatient.id, payload);
+            if (editPatient.is_dummy && !isDummy) {
+                await complete(editPatient.id, payload);
+            } else {
+                await update(editPatient.id, payload);
+            }
           } else {
-            await create(payload);
+            if (isDummy) {
+                await createDummy(payload);
+            } else {
+                await create(payload);
+            }
           }
         }}
       />

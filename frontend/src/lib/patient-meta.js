@@ -9,8 +9,10 @@ export const SICHTUNG_KEYS = SICHTUNG.map((s) => s.key);
 
 export const PATIENT_STATUS = {
     wartend: { label: "Wartend", tone: "yellow" },
+    in_uhs_waiting_area: { label: "UHS Wartebereich", tone: "yellow" },
     in_behandlung: { label: "In Behandlung", tone: "info" },
     transportbereit: { label: "Transportbereit", tone: "green" },
+    wartet_auf_abholung: { label: "Wartet auf Abholung", tone: "gray" },
     uebergeben: { label: "Uebergeben", tone: "gray" },
     entlassen: { label: "Entlassen", tone: "gray" }
 };

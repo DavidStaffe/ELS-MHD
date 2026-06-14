@@ -21,6 +21,7 @@ import KonfliktList from "@/pages/KonfliktList";
 import AbschlussPage from "@/pages/AbschlussPage";
 import AbschnittList from "@/pages/AbschnittList";
 import BettenPage from "@/pages/BettenPage";
+import KeywordsPage from "@/pages/KeywordsPage";
 
 function App() {
     return (
@@ -42,6 +43,7 @@ function App() {
                                         <Route path="/ressourcen" element={<ResourceList />} />
                                         <Route path="/abschnitte" element={<AbschnittList />} />
                                         <Route path="/betten" element={<BettenPage />} />
+                                        <Route path="/keywords" element={<KeywordsPage />} />
                                         <Route path="/kommunikation" element={<Funktagebuch />} />
                                         <Route path="/funktagebuch" element={<Funktagebuch />} />
                                         <Route path="/kommunikation-legacy" element={<MessageList />} />

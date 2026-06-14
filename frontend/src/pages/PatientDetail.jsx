@@ -113,7 +113,7 @@ function Prozesszeiten({ patient }) {
   const [now, setNow] = React.useState(Date.now());
   React.useEffect(() => {
     const closed =
-      patient.status === 'uebergeben' || patient.status === 'entlassen';
+      patient.status === 'uebergeben' || patient.status === 'entlassen' || patient.status === 'wartet_auf_abholung';
     if (closed) return undefined;
     const id = setInterval(() => setNow(Date.now()), 30 * 1000);
     return () => clearInterval(id);
@@ -170,7 +170,7 @@ export default function PatientDetail() {
   const { patientId } = useParams();
   const navigate = useNavigate();
   const { activeIncident, setActive } = useIncidents();
-  const { patients, update, remove, refresh, reopen } = usePatients();
+  const { patients, update, remove, refresh, reopen, moveToWaitingArea } = usePatients();
   const { refresh: refreshTransports } = useTransports();
 
   const [reopenOpen, setReopenOpen] = React.useState(false);
@@ -468,7 +468,7 @@ export default function PatientDetail() {
     tone: 'neutral',
   };
   const closed =
-    patient.status === 'uebergeben' || patient.status === 'entlassen';
+    patient.status === 'uebergeben' || patient.status === 'entlassen' || patient.status === 'wartet_auf_abholung';
 
   return (
     <div className="mx-auto w-full max-w-[1400px] px-6 py-6">
@@ -757,9 +757,23 @@ export default function PatientDetail() {
                   disabled={busy || closed || !can('bett.assign_patient')}
                   data-testid="pd-bett-assign"
                 >
-                  <Bed className="h-4 w-4" />
+                  <Bed className="mr-2 h-4 w-4" />
                   Bett zuweisen
                 </Button>
+                {patient.status !== 'in_uhs_waiting_area' && (
+                  <Button
+                    variant="outline"
+                    onClick={async () => {
+                      try {
+                        const updated = await moveToWaitingArea(patient.id);
+                        setPatient(updated);
+                      } catch(e) {}
+                    }}
+                    disabled={busy || closed || !can('bett.assign_patient')}
+                  >
+                    In Wartebereich
+                  </Button>
+                )}
               </div>
             )}
           </SectionCard>
@@ -808,7 +822,8 @@ export default function PatientDetail() {
             )}
             {/* Wiedereroeffnen-Option fuer abgeschlossene Patienten */}
             {(patient.status === 'uebergeben' ||
-              patient.status === 'entlassen') && (
+              patient.status === 'entlassen' ||
+              patient.status === 'wartet_auf_abholung') && (
               <div className="mt-3 flex items-center justify-between gap-3 rounded-md border border-border bg-surface-sunken px-3 py-2">
                 <div className="text-caption text-muted-foreground">
                   Patient kehrt zurueck? Wiedereroeffnung setzt den Fall auf "In

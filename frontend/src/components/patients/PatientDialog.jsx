@@ -11,6 +11,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { Switch } from "@/components/ui/switch";
 import {
     Select,
     SelectContent,
@@ -26,6 +27,7 @@ import {
     PATIENT_STATUS,
     PATIENT_VERBLEIB
 } from "@/lib/patient-meta";
+import { listKeywords } from "@/lib/api";
 
 export function PatientDialog({
     open,
@@ -38,8 +40,19 @@ export function PatientDialog({
     const [status, setStatus] = React.useState(initial?.status ?? "wartend");
     const [verbleib, setVerbleib] = React.useState(initial?.verbleib ?? "unbekannt");
     const [notiz, setNotiz] = React.useState(initial?.notiz ?? "");
+    const [behandlungRessourceId, setBehandlungRessourceId] = React.useState(initial?.behandlung_ressource_id ?? "");
+    const [createdByResource, setCreatedByResource] = React.useState(initial?.created_by_resource ?? "");
+    const [keywordId, setKeywordId] = React.useState(initial?.keyword_id ?? "");
+    
     const [submitting, setSubmitting] = React.useState(false);
     const [error, setError] = React.useState(null);
+    const [keywords, setKeywords] = React.useState([]);
+    const [resources, setResources] = React.useState([]);
+    const [loadingResources, setLoadingResources] = React.useState(false);
+    
+    const isDummy = !sichtung;
+    
+    const { activeIncident } = require('@/context/IncidentContext').useIncidents();
 
     React.useEffect(() => {
         if (!open) return;
@@ -47,8 +60,28 @@ export function PatientDialog({
         setStatus(initial?.status ?? "wartend");
         setVerbleib(initial?.verbleib ?? "unbekannt");
         setNotiz(initial?.notiz ?? "");
+        setBehandlungRessourceId(initial?.behandlung_ressource_id ?? "");
+        setCreatedByResource(initial?.created_by_resource ?? "");
+        setKeywordId(initial?.keyword_id ?? "");
         setError(null);
-    }, [open, initial]);
+        
+        listKeywords(true).then(data => setKeywords(data)).catch(() => {});
+        if (activeIncident) {
+            setLoadingResources(true);
+            require('@/lib/api').listResources(activeIncident.id).then(data => setResources(data)).catch(() => {}).finally(() => setLoadingResources(false));
+        }
+    }, [open, initial, activeIncident]);
+
+    const handleKeywordChange = (val) => {
+        const id = val === "none" ? "" : val;
+        setKeywordId(id);
+        if (id) {
+            const kw = keywords.find(k => k.id === id);
+            if (kw && kw.default_triage_category) {
+                setSichtung(kw.default_triage_category);
+            }
+        }
+    };
 
     const handleSubmit = async (e) => {
         e.preventDefault();
@@ -60,8 +93,25 @@ export function PatientDialog({
                 verbleib,
                 notiz: notiz.trim()
             };
-            if (sichtung) payload.sichtung = sichtung;
-            await onSubmit(payload);
+            if (sichtung) {
+                payload.sichtung = sichtung;
+            } else {
+                payload.sichtung = null;
+            }
+            
+            if (isDummy) {
+                if (!behandlungRessourceId || behandlungRessourceId === "none") {
+                    throw new Error("Erzeugende Ressource (Streife) ist bei Dummy-Patienten erforderlich.");
+                }
+                const selectedRes = resources.find(r => r.id === behandlungRessourceId);
+                payload.behandlung_ressource_id = behandlungRessourceId;
+                payload.created_by_resource = selectedRes ? selectedRes.name : createdByResource;
+            } else {
+                payload.behandlung_ressource_id = (behandlungRessourceId && behandlungRessourceId !== "none") ? behandlungRessourceId : null;
+            }
+            if (keywordId) payload.keyword_id = keywordId;
+
+            await onSubmit(payload, isDummy);
             onOpenChange?.(false);
         } catch (err) {
             setError(
@@ -92,8 +142,26 @@ export function PatientDialog({
                 </DialogHeader>
 
                 <form onSubmit={handleSubmit} className="space-y-4">
+                    
+                    {isDummy && (
+                        <div className="space-y-1.5">
+                            <Label htmlFor="pd-resource">Erzeugende Ressource / Streife *</Label>
+                            <Select value={behandlungRessourceId} onValueChange={setBehandlungRessourceId} required={isDummy}>
+                                <SelectTrigger className="mt-1" id="pd-resource" data-testid="pd-resource">
+                                    <SelectValue placeholder="Ressource wählen" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    {resources.map((r) => (
+                                        <SelectItem key={r.id} value={r.id}>{r.name}</SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
+                            <div className="text-xs text-muted-foreground mt-1">Ohne Sichtungskategorie wird der Patient automatisch als DUMMY angelegt.</div>
+                        </div>
+                    )}
+
                     <div className="space-y-2">
-                        <Label>Sichtungsstufe</Label>
+                        <Label>Sichtungsstufe {isDummy ? "(Optional)" : ""}</Label>
                         <div className="grid grid-cols-4 gap-2">
                             {SICHTUNG.map((s) => {
                                 const active = sichtung === s.key;
@@ -130,6 +198,23 @@ export function PatientDialog({
                         </div>
                     </div>
 
+                    <div className="space-y-1.5">
+                        <Label htmlFor="pd-keyword">Stichwort</Label>
+                        <Select value={keywordId || "none"} onValueChange={handleKeywordChange}>
+                            <SelectTrigger id="pd-keyword" data-testid="pd-keyword">
+                                <SelectValue placeholder="Kein Stichwort gewählt" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="none">Kein Stichwort</SelectItem>
+                                {keywords.map((kw) => (
+                                    <SelectItem key={kw.id} value={kw.id}>
+                                        {kw.name}
+                                    </SelectItem>
+                                ))}
+                            </SelectContent>
+                        </Select>
+                    </div>
+
                     <div className="grid grid-cols-2 gap-4">
                         <div className="space-y-1.5">
                             <Label htmlFor="pd-status">Status</Label>
@@ -140,7 +225,7 @@ export function PatientDialog({
                                 <SelectContent>
                                     {STATUS_OPTIONS.map((s) => (
                                         <SelectItem key={s} value={s}>
-                                            {PATIENT_STATUS[s].label}
+                                            {PATIENT_STATUS[s]?.label || s}
                                         </SelectItem>
                                     ))}
                                 </SelectContent>

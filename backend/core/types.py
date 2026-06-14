@@ -13,8 +13,10 @@ IncidentStatus = Literal["geplant", "operativ", "abgeschlossen", "archiviert"]
 SichtungStufe = Literal["S0", "S1", "S2", "S3"]
 PatientStatus = Literal[
     "wartend",
+    "in_uhs_waiting_area",
     "in_behandlung",
     "transportbereit",
+    "wartet_auf_abholung",
     "uebergeben",
     "entlassen",
 ]

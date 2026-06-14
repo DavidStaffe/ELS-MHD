@@ -34,7 +34,7 @@
     "/app/backend/tests/test_phase3_divera.py (new — 11 Phase 3 tests)"
   ],
   "success_rate": {"backend": "100% (11/11 new Phase 3 tests + 182/189 regression — same 7 pre-existing failures as baseline)", "frontend": "100% (divera-panel render+ordering, divera-toggle ON/OFF, divera-sync-now triggers + timestamp/count update, EditResourceDialog map-resource-divera dropdown with 5 vehicles + disabled FMS select, resource pin auto-positioned from Divera lat/lng)"},
-  "test_credentials": "N/A — localStorage els-role=einsatzleiter + els-active-incident=d5ed79a3-d46c-4638-9aba-cf67cd70cc68",
+  "test_credentials": "N/A — localStorage els-role=einsatzleiter + els-active-incident=keyword-catalog-test",
   "seed_data_creation": "test_phase3_divera.py creates TEST_DIVERA_RES resource, links it to Divera vehicle 96955, syncs, then unlinks and DELETEs. Also creates TEST_DIVERA_ARCHIVED incident for the 409 path (PATCH /api/incidents not implemented — that single subtest gracefully skips; not a regression).",
   "retest_needed": false,
   "main_agent_can_self_test": true,

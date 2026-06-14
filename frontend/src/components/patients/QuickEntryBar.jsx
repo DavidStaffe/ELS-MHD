@@ -1,8 +1,27 @@
 import * as React from 'react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from '@/components/ui/dialog';
 import { SICHTUNG } from '@/lib/patient-meta';
-import { Plus, Keyboard } from 'lucide-react';
+import { Plus, Keyboard, Loader2 } from 'lucide-react';
+import { useIncidents } from '@/context/IncidentContext';
+import { listResources } from '@/lib/api';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue
+} from "@/components/ui/select";
 
 /**
  * QuickEntryBar – Schnellerfassung am unteren Bildschirmrand.
@@ -17,7 +36,22 @@ export function QuickEntryBar({
   disabled = false,
   className,
 }) {
+  const { activeIncident } = useIncidents();
   const [busyKey, setBusyKey] = React.useState(null);
+  const [dummyPromptOpen, setDummyPromptOpen] = React.useState(false);
+  const [dummyResource, setDummyResource] = React.useState('');
+  const [resources, setResources] = React.useState([]);
+  const [loadingResources, setLoadingResources] = React.useState(false);
+
+  React.useEffect(() => {
+    if (dummyPromptOpen && activeIncident) {
+      setLoadingResources(true);
+      listResources(activeIncident.id)
+        .then((data) => setResources(data))
+        .catch(() => {})
+        .finally(() => setLoadingResources(false));
+    }
+  }, [dummyPromptOpen, activeIncident]);
 
   const handleQuick = React.useCallback(
     async (level) => {
@@ -114,6 +148,26 @@ export function QuickEntryBar({
           </button>
         ))}
 
+
+        <div className="mx-1 h-10 w-px bg-border" />
+        
+        <button
+            type="button"
+            disabled={disabled || busyKey !== null}
+            onClick={() => setDummyPromptOpen(true)}
+            data-testid="quick-dummy"
+            title="Dummy-Patient ohne Sichtung anlegen"
+            className={cn(
+              'relative inline-flex h-12 flex-col items-center justify-center rounded-md border border-border px-3 font-semibold shadow-sm transition-all active:scale-[0.97] disabled:opacity-60',
+              'els-focus-ring hover:bg-surface-raised'
+            )}
+          >
+            <span className="font-mono text-heading leading-none">DUMMY</span>
+            <span className="text-[0.65rem] uppercase opacity-80 mt-1">ohne Sichtung</span>
+            {busyKey === "dummy" && (
+              <span className="absolute inset-0 rounded-md bg-black/20 animate-pulse" />
+            )}
+        </button>
         <div className="mx-1 h-10 w-px bg-border" />
 
         <Button
@@ -130,6 +184,70 @@ export function QuickEntryBar({
           </kbd>
         </Button>
       </div>
+
+      <Dialog open={dummyPromptOpen} onOpenChange={setDummyPromptOpen}>
+        <DialogContent className="sm:max-w-sm" data-testid="dummy-prompt-dialog">
+          <DialogHeader>
+            <DialogTitle>Dummy-Patient anlegen</DialogTitle>
+            <DialogDescription>
+              Wer meldet diesen Patienten? (z.B. "Streife 1")
+            </DialogDescription>
+          </DialogHeader>
+          <form
+            onSubmit={async (e) => {
+              e.preventDefault();
+              if (dummyResource) {
+                setBusyKey("dummy");
+                setDummyPromptOpen(false);
+                try {
+                  if (onQuickCreate) {
+                    const selectedRes = resources.find(r => r.id === dummyResource);
+                    const payload = {
+                      isDummy: true,
+                      behandlung_ressource_id: dummyResource,
+                      created_by_resource: selectedRes ? selectedRes.name : dummyResource
+                    };
+                    await onQuickCreate(payload);
+                  }
+                } catch (err) {
+                  console.error(err);
+                } finally {
+                  setBusyKey(null);
+                  setDummyResource("");
+                }
+              }
+            }}
+            className="space-y-4"
+          >
+            <div>
+              <Label>Erzeugende Ressource</Label>
+              {loadingResources ? (
+                 <div className="flex items-center gap-2 mt-2 text-sm text-muted-foreground"><Loader2 className="h-4 w-4 animate-spin" /> Ressourcen werden geladen...</div>
+              ) : (
+                <Select value={dummyResource} onValueChange={setDummyResource} required>
+                    <SelectTrigger className="mt-1">
+                        <SelectValue placeholder="Ressource wählen" />
+                    </SelectTrigger>
+                    <SelectContent>
+                        {resources.map((r) => (
+                            <SelectItem key={r.id} value={r.id}>{r.name}</SelectItem>
+                        ))}
+                    </SelectContent>
+                </Select>
+              )}
+            </div>
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={() => setDummyPromptOpen(false)}>
+                Abbrechen
+              </Button>
+              <Button type="submit" disabled={!dummyResource || loadingResources}>
+                Anlegen
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+
     </div>
   );
 }

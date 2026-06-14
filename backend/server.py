@@ -19,6 +19,7 @@ from routes.abschnitte import router as abschnitte_router
 from routes.betten import router as betten_router
 from routes.analytics import router as analytics_router
 from routes.divera import router as divera_router
+from routes.keywords import router as keywords_router
 from services import divera as divera_service
 
 
@@ -48,6 +49,7 @@ for r in (
     betten_router,
     analytics_router,
     divera_router,
+    keywords_router,
 ):
     app.include_router(r)
 

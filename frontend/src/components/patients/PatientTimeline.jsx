@@ -18,7 +18,7 @@ export function PatientTimeline({ patient, events = DEFAULT_EVENTS }) {
   const [now, setNow] = React.useState(() => Date.now());
   React.useEffect(() => {
     const closed =
-      patient.status === 'uebergeben' || patient.status === 'entlassen';
+      patient.status === 'uebergeben' || patient.status === 'entlassen' || patient.status === 'wartet_auf_abholung';
     if (closed) return undefined;
     const id = setInterval(() => setNow(Date.now()), 30 * 1000);
     return () => clearInterval(id);
@@ -236,6 +236,7 @@ export function PatientTimeline({ patient, events = DEFAULT_EVENTS }) {
       {/* Live-Dauer seit letztem Event (wenn nicht abgeschlossen) */}
       {patient.status !== 'uebergeben' &&
         patient.status !== 'entlassen' &&
+        patient.status !== 'wartet_auf_abholung' &&
         lastTimestamp && (
           <li className="flex items-start gap-3" data-testid="timeline-live">
             <div className="flex h-5 w-5 shrink-0 items-center justify-center">

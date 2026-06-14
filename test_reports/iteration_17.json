@@ -29,7 +29,7 @@
     "/app/backend/tests/test_fms_audit.py (NEW — 8 tests covering GET endpoint, manual PATCH audit, no-change skip, no-fms-field skip, three-change ordering, divera-linked skip)"
   ],
   "success_rate": {"backend": "100% (8/8 new + 11/11 Phase3 regression + 199/206 full baseline — 0 new regressions)", "frontend": "100% (sidebar rendering + ordering + count + reload + live PATCH→event creation→duration display all verified)"},
-  "test_credentials": "N/A — localStorage els-role=einsatzleiter + els-active-incident=d5ed79a3-d46c-4638-9aba-cf67cd70cc68",
+  "test_credentials": "N/A — localStorage els-role=einsatzleiter + els-active-incident=keyword-catalog-test",
   "seed_data_creation": "test_fms_audit.py creates per-test 'TEST_FMS_AUDIT_<uuid>' incidents and 'TEST_FMS_VEH' / 'TEST_FMS_DIVERA' resources, then deletes them in fixture teardown. Live test on real incident d5ed79a3 generated 2 real audit events (fms 2→1 then 1→4) which persist in fms_events.",
   "retest_needed": false,
   "main_agent_can_self_test": true,

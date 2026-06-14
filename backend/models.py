@@ -96,6 +96,9 @@ class PatientBase(BaseModel):
     transport_typ: Optional[TransportTyp] = None
     fallabschluss_typ: Optional[FallabschlussTyp] = None
     bett_id: Optional[str] = None
+    is_dummy: bool = False
+    created_by_resource: Optional[str] = Field(default=None, max_length=80)
+    keyword_id: Optional[str] = None
 
 
 class PatientCreate(PatientBase):
@@ -112,6 +115,9 @@ class PatientUpdate(BaseModel):
     transport_typ: Optional[TransportTyp] = None
     fallabschluss_typ: Optional[FallabschlussTyp] = None
     bett_id: Optional[str] = None
+    is_dummy: Optional[bool] = None
+    created_by_resource: Optional[str] = None
+    keyword_id: Optional[str] = None
 
 
 class Patient(PatientBase):
@@ -335,6 +341,35 @@ class Bett(BettBase):
 
 
 # --- Report -----------------------------------------------------------------
+
+# --- Keywords (Stichwort-Katalog) -------------------------------------------
+
+class KeywordBase(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    name: str = Field(min_length=1, max_length=120)
+    active: bool = True
+    description: Optional[str] = Field(default=None, max_length=1000)
+    default_triage_category: Optional[SichtungStufe] = None
+    sort_order: int = 0
+    rules_automation: Optional[dict] = None
+
+class KeywordCreate(KeywordBase):
+    pass
+
+class KeywordUpdate(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    name: Optional[str] = None
+    active: Optional[bool] = None
+    description: Optional[str] = None
+    default_triage_category: Optional[SichtungStufe] = None
+    sort_order: Optional[int] = None
+    rules_automation: Optional[dict] = None
+
+class Keyword(KeywordBase):
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    created_at: datetime = Field(default_factory=now_utc)
+    updated_at: datetime = Field(default_factory=now_utc)
+
 
 
 class ReportVersionCreate(BaseModel):
