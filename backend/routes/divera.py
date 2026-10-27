@@ -2,7 +2,10 @@
 import logging
 from typing import Any, Dict, List
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Depends
+from pydantic import BaseModel, Field
+from typing import Optional
+from services import divera_settings
 
 from core.db import db
 from services import divera
@@ -15,18 +18,18 @@ router = APIRouter(prefix="/api", tags=["divera"])
 async def divera_configured():
     """Whether Divera-API-Key is set up server-side."""
     return {
-        "configured": bool(divera.DIVERA_API_KEY),
-        "poll_interval_seconds": divera.POLL_INTERVAL,
+        "configured": (await divera_settings.public_config())["configured"],
+        "poll_interval_seconds": (await divera_settings.public_config())["poll_interval_seconds"],
     }
 
 
 @router.get("/divera/vehicles", response_model=List[Dict[str, Any]])
 async def divera_vehicles():
     """Live list of all Divera vehicles (for mapping UI)."""
-    if not divera.DIVERA_API_KEY:
+    if not (await divera_settings.public_config())["configured"]:
         raise HTTPException(status_code=503, detail="Divera nicht konfiguriert")
     try:
-        return await divera.fetch_vehicles()
+        return await divera.fetch_vehicles_cached()
     except ValueError as exc:
         raise HTTPException(status_code=502, detail=str(exc))
     except Exception as exc:  # pragma: no cover
@@ -72,8 +75,8 @@ async def divera_start(incident_id: str):
         await divera.start_polling(incident_id)
     except ValueError as exc:
         raise HTTPException(status_code=503, detail=str(exc))
-    # Trigger one immediate sync so the user sees fresh data right away
-    result = await divera.sync_incident(incident_id)
+    # Central loop fetches for every enabled incident; no duplicate first fetch.
+    result = {"ok": True, "pending": True}
     return {"running": True, "first_sync": result}
 
 
@@ -93,4 +96,42 @@ async def divera_sync_now(incident_id: str):
         raise HTTPException(status_code=404, detail="Incident nicht gefunden")
     if not divera.DIVERA_API_KEY:
         raise HTTPException(status_code=503, detail="Divera nicht konfiguriert")
-    return await divera.sync_incident(incident_id)
+    return await divera.sync_all(force=True)
+
+
+class DiveraSettingsUpdate(BaseModel):
+    api_key: Optional[str] = Field(default=None, min_length=1, max_length=1024)
+    interval_seconds: Optional[int] = None
+
+
+class DiveraKeyTest(BaseModel):
+    api_key: str = Field(min_length=1, max_length=1024)
+
+
+@router.get("/settings/divera", dependencies=[Depends(divera_settings.require_admin)])
+async def get_divera_settings():
+    return await divera_settings.public_config()
+
+
+@router.post("/settings/divera/test", dependencies=[Depends(divera_settings.require_admin)])
+async def test_divera_key(payload: DiveraKeyTest):
+    try:
+        vehicles = await divera.fetch_vehicles(api_key=payload.api_key)
+        return {"ok": True, "vehicles_total": len(vehicles)}
+    except Exception:
+        raise HTTPException(422, "DIVERA-Verbindungstest fehlgeschlagen; Key oder Netzwerk prüfen")
+
+
+@router.patch("/settings/divera", dependencies=[Depends(divera_settings.require_admin)])
+async def update_divera_settings(payload: DiveraSettingsUpdate):
+    if payload.api_key is not None:
+        try:
+            await divera.fetch_vehicles(api_key=payload.api_key)
+        except Exception:
+            raise HTTPException(422, "Neuer API-Key konnte nicht erfolgreich geprüft werden")
+    conf = await divera_settings.save_config(
+        api_key=payload.api_key, interval_seconds=payload.interval_seconds
+    )
+    divera.settings_changed()
+    await divera.resume_active_pollings()
+    return conf
