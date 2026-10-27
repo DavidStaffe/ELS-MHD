@@ -86,6 +86,13 @@ const NAV_GROUPS = (
               : null,
       },
       {
+        to: '/patienten/schnell',
+        icon: Users,
+        label: 'Schnellerfassung',
+        testId: 'nav-patienten-schnell',
+        disabled: !hasIncident || isArchived || isPlanned,
+      },
+      {
         to: '/transport',
         icon: Truck,
         label: 'Transport',
