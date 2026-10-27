@@ -236,6 +236,7 @@ async def _record_poll_result(
 _poll_task: Optional[asyncio.Task] = None
 _poll_wakeup = asyncio.Event()
 _fetch_lock = asyncio.Lock()
+_sync_lock = asyncio.Lock()
 _fetch_cache: Optional[List[Dict[str, Any]]] = None
 _fetch_cache_at: float = 0.0
 _last_error: Optional[str] = None
@@ -271,6 +272,11 @@ async def _enabled_incidents() -> list[str]:
 
 
 async def sync_all(force: bool = True) -> dict:
+    async with _sync_lock:
+        return await _sync_all_locked(force)
+
+
+async def _sync_all_locked(force: bool = True) -> dict:
     global _last_error
     ids = await _enabled_incidents()
     if not ids:
