@@ -60,7 +60,7 @@ async def fetch_vehicles(api_key: Optional[str] = None) -> List[Dict[str, Any]]:
 
     Raises httpx.HTTPError on network errors, ValueError on API errors.
     """
-    key = api_key or (await divera_settings.get_config())["api_key"]
+    key = api_key if api_key is not None else (await divera_settings.get_config())["api_key"]
     if not key:
         raise ValueError("DIVERA_API_KEY ist nicht konfiguriert")
     url = f"{DIVERA_BASE_URL}/api/v2/pull/vehicle-status"
@@ -137,7 +137,7 @@ async def sync_incident(incident_id: str, vehicles: Optional[List[Dict[str, Any]
         await _record_poll_result(incident_id, "error", str(exc)[:200], 0)
         return result
     except ValueError as exc:
-        result["error"] = str(exc)
+        result["error"] = "DIVERA-Antwort oder API-Key ungültig"
         await _record_poll_result(incident_id, "error", str(exc)[:200], 0)
         return result
 
