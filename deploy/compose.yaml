@@ -1,0 +1,45 @@
+name: els-mhd
+services:
+  db:
+    image: mongo:8.0
+    restart: unless-stopped
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: elsroot
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_PASSWORD:?Set MONGO_PASSWORD in env file}
+    volumes:
+      - mongodb_data:/data/db
+    networks: [internal]
+    healthcheck:
+      test: ["CMD-SHELL", "mongosh --quiet --username elsroot --password \"$$MONGO_INITDB_ROOT_PASSWORD\" --authenticationDatabase admin --eval 'db.adminCommand({ping:1}).ok' | grep -q 1"]
+      interval: 15s
+      timeout: 10s
+      retries: 12
+      start_period: 45s
+
+  api:
+    build:
+      context: ../backend
+    restart: unless-stopped
+    environment:
+      MONGO_URL: mongodb://elsroot:${MONGO_PASSWORD:?Set MONGO_PASSWORD}@db:27017/?authSource=admin
+      DB_NAME: els_mhd
+      CORS_ORIGINS: http://127.0.0.1:8080
+    depends_on:
+      db:
+        condition: service_healthy
+    networks: [internal]
+
+  web:
+    build:
+      context: ../frontend
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:8080:80"
+    depends_on: [api]
+    networks: [internal]
+
+networks:
+  internal:
+
+volumes:
+  mongodb_data:
