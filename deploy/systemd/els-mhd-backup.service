@@ -2,6 +2,8 @@
 Description=ELS-MHD MongoDB daily backup
 Requires=docker.service
 After=docker.service
+# Start external backup only after a successful local backup.
+OnSuccess=els-mhd-external-backup.service
 
 [Service]
 Type=oneshot
