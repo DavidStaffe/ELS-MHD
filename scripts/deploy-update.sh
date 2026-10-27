@@ -21,6 +21,7 @@ sha=$(git rev-parse --short=12 HEAD)
 api_release="els-mhd-api:release-$sha"
 web_release="els-mhd-web:release-$sha"
 active_override=/opt/els-mhd/rollback/active-images.compose.yaml
+[[ ! -e "$active_override" ]] || { echo "Existing active release override: establish new checkpoint before next deployment" >&2; exit 1; }
 tmp=$(mktemp /opt/els-mhd/rollback/.release-XXXXXXXX.yaml)
 trap 'rm -f "$tmp"' EXIT
 printf 'services:\n  api:\n    image: %s\n  web:\n    image: %s\n' "$api_release" "$web_release" > "$tmp"
