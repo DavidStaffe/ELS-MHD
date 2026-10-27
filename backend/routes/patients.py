@@ -398,11 +398,12 @@ async def delete_patient(patient_id: str):
     existing = await db.patients.find_one(
         {"id": patient_id}, {"_id": 0, "incident_id": 1}
     )
+    if existing:
+        await release_bett_for_patient(patient_id)
     result = await db.patients.delete_one({"id": patient_id})
     if result.deleted_count == 0:
         raise HTTPException(status_code=404, detail="Patient nicht gefunden")
     await db.transports.delete_many({"patient_id": patient_id})
-    await release_bett_for_patient(patient_id)
     await db.resources.update_many({"bound_patient_id": patient_id}, {"$set": {"bound_patient_id": None}})
     if existing and existing.get("incident_id"):
         await publish_patient_event(
