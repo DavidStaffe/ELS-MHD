@@ -158,6 +158,7 @@ const NAV_GROUPS = (
   {
     label: 'Einstellungen',
     items: [
+      { to: '/einstellungen', icon: Settings, label: 'System & Schnittstellen', testId: 'nav-einstellungen' },
       {
         to: '/keywords',
         icon: Settings,
@@ -383,11 +384,11 @@ export function Sidebar({ className }) {
       </nav>
 
       <div className="border-t border-border px-3 py-3">
-        <div className="flex items-center gap-2.5 rounded-md px-2 py-1.5 text-body text-muted-foreground/70">
+        <NavLink to="/einstellungen" className="flex items-center gap-2.5 rounded-md px-2 py-1.5 text-body text-muted-foreground/70 hover:text-foreground">
           <Settings className="h-4 w-4" />
           <span className="flex-1 truncate">Einstellungen</span>
           <span className="font-mono text-[0.65rem]">v0.2</span>
-        </div>
+        </NavLink>
       </div>
     </aside>
   );
