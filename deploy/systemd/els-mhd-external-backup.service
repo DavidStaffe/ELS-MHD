@@ -1,11 +1,12 @@
 [Unit]
 Description=ELS-MHD encrypted backup to external USB drive
 After=local-fs.target
+# Intentional: no RequiresMountsFor; script rejects absent or incorrect UUID.
 
 [Service]
 Type=oneshot
 User=root
 Group=root
 ExecStart=/usr/local/sbin/els-mhd-external-backup
-TimeoutStartSec=30min
+TimeoutStartSec=45min
 NoNewPrivileges=true
