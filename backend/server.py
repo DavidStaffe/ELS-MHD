@@ -20,6 +20,7 @@ from routes.betten import router as betten_router
 from routes.analytics import router as analytics_router
 from routes.divera import router as divera_router
 from routes.keywords import router as keywords_router
+from routes.system_updates import router as system_updates_router
 from services import divera as divera_service
 
 
@@ -50,6 +51,7 @@ for r in (
     analytics_router,
     divera_router,
     keywords_router,
+    system_updates_router,
 ):
     app.include_router(r)
 
