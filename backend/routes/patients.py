@@ -431,6 +431,8 @@ async def create_dummy_patient(incident_id: str, payload: PatientCreate):
     
     payload.is_dummy = True
     payload.sichtung = None
+    payload.status = "wartend"
+    payload.sichtung_bestaetigt = False
     if payload.abschnitt_id:
         a = await db.abschnitte.find_one({"id": payload.abschnitt_id, "incident_id": incident_id, "aktiv": True})
         if not a:
@@ -547,9 +549,12 @@ async def confirm_sichtung(patient_id: str, payload: SichtungBestaetigen):
              "from_sichtung": patient.get("sichtung"), "to_sichtung": payload.sichtung,
              "reported_by": payload.meldende_ressource_id,
              "entered_by": None, "note": payload.bemerkung}
+    confirmed_fields = {"sichtung": payload.sichtung, "sichtung_bestaetigt": True,
+                        "is_dummy": False, "updated_at": now}
+    if not patient.get("sichtung_at"):
+        confirmed_fields["sichtung_at"] = now
     result = await db.patients.find_one_and_update(
-        {"id": patient_id}, {"$set": {"sichtung": payload.sichtung, "sichtung_bestaetigt": True,
-                                      "is_dummy": False, "updated_at": now},
+        {"id": patient_id}, {"$set": confirmed_fields,
                               "$push": {"sichtung_events": event}},
         return_document=True, projection={"_id": 0}
     )
