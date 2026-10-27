@@ -18,6 +18,7 @@ import {
   Bed,
   Archive,
   MapPinned,
+  RefreshCw,
 } from 'lucide-react';
 
 /**
@@ -158,6 +159,12 @@ const NAV_GROUPS = (
   {
     label: 'Einstellungen',
     items: [
+      {
+        to: '/system-updates',
+        icon: RefreshCw,
+        label: 'System & Updates',
+        testId: 'nav-system-updates',
+      },
       {
         to: '/keywords',
         icon: Settings,
