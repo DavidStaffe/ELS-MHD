@@ -89,6 +89,12 @@ class IncidentMetaPatch(BaseModel):
 class PatientBase(BaseModel):
     model_config = ConfigDict(extra="ignore")
     sichtung: Optional[SichtungStufe] = None
+    sichtung_bestaetigt: bool = False
+    abschnitt_id: Optional[str] = None
+    auffindeort: Optional[str] = Field(default=None, max_length=250)
+    auffinde_lat: Optional[float] = Field(default=None, ge=-90, le=90)
+    auffinde_lng: Optional[float] = Field(default=None, ge=-180, le=180)
+    zugewiesene_ressource_id: Optional[str] = None
     status: PatientStatus = "wartend"
     verbleib: PatientVerbleib = "unbekannt"
     behandlung_ressource_id: Optional[str] = None
@@ -108,6 +114,10 @@ class PatientCreate(PatientBase):
 class PatientUpdate(BaseModel):
     model_config = ConfigDict(extra="ignore")
     sichtung: Optional[SichtungStufe] = None
+    abschnitt_id: Optional[str] = None
+    auffindeort: Optional[str] = Field(default=None, max_length=250)
+    auffinde_lat: Optional[float] = Field(default=None, ge=-90, le=90)
+    auffinde_lng: Optional[float] = Field(default=None, ge=-180, le=180)
     status: Optional[PatientStatus] = None
     verbleib: Optional[PatientVerbleib] = None
     behandlung_ressource_id: Optional[str] = None
@@ -126,6 +136,7 @@ class Patient(PatientBase):
     kennung: str
     behandlung_ressource_name: Optional[str] = None
     behandlung_ressource_events: List[dict] = Field(default_factory=list)
+    disposition_events: List[dict] = Field(default_factory=list)
     sichtung_events: List[dict] = Field(default_factory=list)
     created_at: datetime = Field(default_factory=now_utc)
     updated_at: datetime = Field(default_factory=now_utc)
