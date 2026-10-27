@@ -79,7 +79,8 @@ export function PatientDisposition({ patient, resources, onRefresh }) {
           <div><div className="font-medium">{s.name}</div>
             <div className="text-xs text-muted-foreground">
               {s.reason === 'eigener_abschnitt' ? 'Eigener Abschnitt' :
-                s.reason === 'positionsnaehe_ungeprueft' ? 'Positionsnähe (GPS nicht auf Aktualität geprüft)' :
+                s.reason === 'positionsnaehe' ? 'Positionsnähe (GPS ≤ 5 Min. alt)' :
+                s.reason === 'nachbarabschnitt' ? 'Benachbarter Abschnitt (Kartengrenzen)' :
                   'Sonstige freie Ressource'}
               {s.distance_km_airline !== null ? ` · ${s.distance_km_airline} km Luftlinie` : ''}
               {s.abschnitt_name ? ` · ${s.abschnitt_name}` : ''}
