@@ -1,0 +1,12 @@
+[Unit]
+Description=ELS-MHD MongoDB daily backup
+Requires=docker.service
+After=docker.service
+
+[Service]
+Type=oneshot
+User=root
+Group=root
+ExecStart=/usr/local/sbin/els-mhd-backup
+TimeoutStartSec=15min
+NoNewPrivileges=true
