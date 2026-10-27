@@ -136,7 +136,8 @@ async def acknowledge_fms_event(
             )
             divera_sent = True
         except Exception as exc:  # noqa: BLE001 — log + keep going
-            divera_error = str(exc)[:200]
+            # HTTP exceptions may include accesskey query parameters; never persist their text.
+            divera_error = "DIVERA-FMS-Anfrage fehlgeschlagen (Verbindung/API-Antwort)"
             logger.warning(
                 "Divera-Revert fehlgeschlagen fuer event=%s vehicle=%s: %s",
                 event_id, divera_id, exc,
