@@ -2,7 +2,8 @@
 from math import radians, sin, cos, asin, sqrt
 from typing import Optional
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Depends
+from services.divera_settings import require_admin
 from pydantic import BaseModel
 from pymongo import ReturnDocument
 
@@ -96,7 +97,7 @@ async def assign_resource(patient_id: str, payload: AssignRequest):
     return updated
 
 
-@router.post("/resources/{resource_id}/release-from-patient")
+@router.post("/resources/{resource_id}/release-from-patient", dependencies=[Depends(require_admin)])
 async def release_resource(resource_id: str):
     # Authentication/EL-only server authorization must be added with the agreed future login.
     resource = await db.resources.find_one({"id": resource_id}, {"_id": 0})
