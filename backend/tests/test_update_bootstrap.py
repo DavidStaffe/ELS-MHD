@@ -32,6 +32,7 @@ class Response:
 
 
 def test_smoke_stack_is_independent_and_cleaned_on_failure(tmp_path, monkeypatch):
+    monkeypatch.setattr(bootstrap, "share_api_secret", Mock())
     monkeypatch.setattr(bootstrap, "ROOT", tmp_path)
     engine = Mock()
     engine.run.side_effect = [b"", b"0.0.0.0:12345", b""]
@@ -52,6 +53,7 @@ def test_generated_admin_hash_is_memory_hard_and_salted():
 
 
 def test_smoke_accepts_only_local_random_port(tmp_path, monkeypatch):
+    monkeypatch.setattr(bootstrap, "share_api_secret", Mock())
     import json
 
     monkeypatch.setattr(bootstrap, "ROOT", tmp_path)
@@ -84,5 +86,32 @@ def test_smoke_accepts_only_local_random_port(tmp_path, monkeypatch):
     )
     assert captured["services"]["api"]["environment"]["DB_NAME"] == "synthetic_only"
     assert "ELS_UPDATE_SOCKET" not in captured["services"]["api"]["environment"]
+    assert captured["services"]["api"]["group_add"] == ["10001"]
     assert captured["services"]["web"]["ports"] == ["127.0.0.1::80"]
     assert list(tmp_path.iterdir()) == []
+
+
+def test_api_secret_is_readable_only_by_explicit_container_group(monkeypatch):
+    from types import SimpleNamespace
+
+    path = Mock()
+    path.is_symlink.return_value = False
+    path.is_file.return_value = True
+    path.stat.return_value = SimpleNamespace(st_uid=0)
+    chown = Mock()
+    chmod = Mock()
+    monkeypatch.setattr(bootstrap.os, "chown", chown, raising=False)
+    monkeypatch.setattr(bootstrap.os, "chmod", chmod)
+    bootstrap.share_api_secret(path)
+    chown.assert_called_once_with(path, 0, 10001)
+    chmod.assert_called_once_with(path, 0o440)
+
+
+def test_api_secret_rejects_symbolic_links_before_changing_permissions(monkeypatch):
+    path = Mock()
+    path.is_symlink.return_value = True
+    chown = Mock()
+    monkeypatch.setattr(bootstrap.os, "chown", chown, raising=False)
+    with pytest.raises(RuntimeError, match="root-owned"):
+        bootstrap.share_api_secret(path)
+    chown.assert_not_called()

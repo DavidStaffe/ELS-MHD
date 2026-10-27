@@ -50,6 +50,18 @@ def secret(path, value):
         stream.write(value)
 
 
+def share_api_secret(path):
+    """Compose bind-mounted secrets retain host UID/GID/mode.
+
+    Only the API's supplementary group may read these two files. Their parent
+    stays root-only; the separate host update password stays root:root 0600.
+    """
+    if path.is_symlink() or path.stat().st_uid != 0:
+        raise RuntimeError("API secret must be a root-owned regular file.")
+    os.chown(path, 0, 10001)
+    os.chmod(path, 0o440)
+
+
 def password_hash(password):
     salt = secrets.token_bytes(16)
     value = hashlib.scrypt(password.encode(), salt=salt, n=16384, r=8, p=1).hex()
@@ -66,6 +78,8 @@ def smoke(engine, target, db_image):
     secret(
         directory / "cipher", base64.urlsafe_b64encode(secrets.token_bytes(32)).decode()
     )
+    share_api_secret(directory / "admin")
+    share_api_secret(directory / "cipher")
     mongo_password = secrets.token_hex(32)
     config = {
         "services": {
@@ -86,6 +100,7 @@ def smoke(engine, target, db_image):
                     "ELS_CONFIG_ENCRYPTION_KEY_FILE": "/run/secrets/cipher",
                 },
                 "secrets": ["admin", "cipher"],
+                "group_add": ["10001"],
                 "depends_on": ["db"],
             },
             "web": {
@@ -136,7 +151,10 @@ def smoke(engine, target, db_image):
             except HTTPError as error:
                 status, data = error.code, {}
             if status != expected:
-                raise RuntimeError("Synthetic authentication check failed.")
+                raise RuntimeError(
+                    f"Synthetic authentication check failed: {path} "
+                    f"(HTTP {status}, expected {expected})."
+                )
             return data
 
         approval = {
@@ -230,6 +248,8 @@ def main():
             secret(admin, password_hash(first))
         if not cipher.exists():
             secret(cipher, base64.urlsafe_b64encode(secrets.token_bytes(32)).decode())
+        share_api_secret(admin)
+        share_api_secret(cipher)
         encoded = PENDING.read_text().strip()
         if not re.fullmatch(r"scrypt\$[0-9a-f]{32}\$[0-9a-f]{128}", encoded):
             raise RuntimeError("Invalid pending update password hash.")
