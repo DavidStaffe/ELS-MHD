@@ -1,6 +1,7 @@
 [Unit]
 Description=ELS-MHD encrypted backup to external USB drive
 After=local-fs.target
+OnFailure=els-mhd-backup-failure@%n.service
 # Intentional: no RequiresMountsFor; script rejects absent or incorrect UUID.
 
 [Service]
