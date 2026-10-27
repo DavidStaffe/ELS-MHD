@@ -160,6 +160,12 @@ const NAV_GROUPS = (
     label: 'Einstellungen',
     items: [
       {
+        to: '/einstellungen',
+        icon: Settings,
+        label: 'Allgemein & DIVERA',
+        testId: 'nav-einstellungen',
+      },
+      {
         to: '/system-updates',
         icon: RefreshCw,
         label: 'System & Updates',
