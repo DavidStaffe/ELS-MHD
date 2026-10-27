@@ -108,8 +108,15 @@ class Engine:
             log.flush()
             os.fsync(log.fileno())
 
-    def approved(self):
-        release = read(self.root / "config/approved-release.json")
+    def approved(self, required=True):
+        try:
+            release = read(self.root / "config/approved-release.json")
+        except FileNotFoundError:
+            if required:
+                raise Refused(
+                    "Aktuell ist kein Release zur Installation freigegeben."
+                ) from None
+            return None
         if set(release) != {"version", "api", "web", "schema", "notes"}:
             raise Refused("Ungültige Releasefreigabe.")
         if not re.fullmatch(r"[A-Za-z0-9._-]{1,80}", release["version"]):
@@ -137,14 +144,23 @@ class Engine:
         )
 
     def status(self, check=False):
-        release = self.approved() if check else None
+        try:
+            release = self.approved(required=False)
+        except Refused:
+            if check:
+                raise
+            release = None  # Invalid update approval must not hide rollback status.
         active = self.active()
         busy = self.state["state"] in BUSY or self.state["state"] == "recovery_required"
         return {
             "configured": True,
             "state": self.state["state"],
             "operation_id": self.state.get("id"),
-            "message": self.state.get("message", ""),
+            "message": (
+                "Aktuell ist kein Release zur Installation freigegeben."
+                if check and release is None
+                else self.state.get("message", "")
+            ),
             "last_error": self.state.get("error"),
             "running_version": active["version"],
             "available_version": release["version"] if release else None,
@@ -160,8 +176,8 @@ class Engine:
                 else None
             ),
             "notes": release["notes"] if release else "",
-            "update_available": release != active if release else None,
-            "can_install": not busy,
+            "update_available": release != active if release else False,
+            "can_install": not busy and release is not None and release != active,
             "can_rollback": not busy and (self.state_dir / "previous.json").exists(),
         }
 

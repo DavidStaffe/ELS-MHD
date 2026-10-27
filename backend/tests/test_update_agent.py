@@ -312,3 +312,25 @@ def test_rollback_never_pulls_local_checkpoint_from_registry(engine):
         call.args[0][:2] == ["docker", "pull"] for call in engine.run.call_args_list
     )
     engine.run.assert_any_call(["docker", "image", "inspect", previous["api"]])
+
+
+def test_missing_release_approval_is_normal_and_keeps_rollback_available(engine):
+    (engine.root / "config/approved-release.json").unlink()
+    agent.atomic(
+        engine.state_dir / "previous.json", {**engine.active(), "version": "v0"}
+    )
+    for check in (False, True):
+        result = engine.status(check=check)
+        assert result["configured"] is True
+        assert result["update_available"] is False
+        assert result["can_install"] is False
+        assert result["can_rollback"] is True
+    assert "kein Release" in engine.status(check=True)["message"]
+    with pytest.raises(agent.Refused, match="kein Release"):
+        engine.approved()
+
+
+def test_polling_retains_approved_update_availability(engine):
+    assert engine.status(check=True)["can_install"] is True
+    assert engine.status(check=False)["can_install"] is True
+    assert engine.status()["available_version"] == "v2"
