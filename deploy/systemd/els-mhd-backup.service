@@ -4,6 +4,7 @@ Requires=docker.service
 After=docker.service
 # Start external backup only after a successful local backup.
 OnSuccess=els-mhd-external-backup.service
+OnFailure=els-mhd-backup-failure@%n.service
 
 [Service]
 Type=oneshot
