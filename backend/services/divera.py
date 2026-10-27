@@ -133,12 +133,12 @@ async def sync_incident(incident_id: str, vehicles: Optional[List[Dict[str, Any]
             vehicles = await fetch_vehicles_cached()
         result["vehicles_total"] = len(vehicles)
     except httpx.HTTPError as exc:
-        result["error"] = f"HTTP-Fehler: {exc}"
-        await _record_poll_result(incident_id, "error", str(exc)[:200], 0)
+        result["error"] = "DIVERA-Netzwerk- oder HTTP-Fehler"
+        await _record_poll_result(incident_id, "error", result["error"], 0)
         return result
     except ValueError as exc:
         result["error"] = "DIVERA-Antwort oder API-Key ungültig"
-        await _record_poll_result(incident_id, "error", str(exc)[:200], 0)
+        await _record_poll_result(incident_id, "error", result["error"], 0)
         return result
 
     by_id: Dict[str, Dict[str, Any]] = {str(v["id"]): v for v in vehicles}
@@ -175,6 +175,7 @@ async def sync_incident(incident_id: str, vehicles: Optional[List[Dict[str, Any]
                 d_lng = float(d_lng)
                 # Plausibilitaetscheck: 0/0 ist meist "kein Fix"
                 if abs(d_lat) > 0.01 or abs(d_lng) > 0.01:
+                    update["position_updated_at"] = iso(now)
                     if d_lat != resource.get("lat") or d_lng != resource.get("lng"):
                         update["lat"] = d_lat
                         update["lng"] = d_lng
