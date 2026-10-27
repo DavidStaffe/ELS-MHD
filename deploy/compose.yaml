@@ -1,7 +1,7 @@
 name: els-mhd
 services:
   db:
-    image: mongo:8.0
+    image: mongo:7.0.45-jammy
     restart: unless-stopped
     environment:
       MONGO_INITDB_ROOT_USERNAME: elsroot
