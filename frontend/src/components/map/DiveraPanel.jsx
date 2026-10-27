@@ -79,9 +79,7 @@ export function DiveraPanel({ incidentId, disabled = false, onChange }) {
     try {
       if (checked) {
         const r = await startDiveraPolling(incidentId);
-        toast.success(
-          `Divera-Sync gestartet · ${r.first_sync?.matched ?? 0} Fahrzeuge aktualisiert`
-        );
+        toast.success('Divera-Synchronisierung gestartet');
       } else {
         await stopDiveraPolling(incidentId);
         toast.success('Divera-Sync gestoppt');
