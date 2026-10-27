@@ -1,7 +1,10 @@
 FROM node:22-bookworm-slim AS build
 WORKDIR /app
 COPY package.json package-lock.json ./
-RUN npm ci --no-audit --no-fund
+# Temporary compatibility setting for the repository's existing CRA/ESLint
+# and react-day-picker/date-fns peer dependency conflicts.
+# TODO: Align dependencies and regenerate lockfile; remove this flag.
+RUN npm ci --legacy-peer-deps --no-audit --no-fund
 COPY . .
 ENV REACT_APP_BACKEND_URL=""
 ENV CI=false
