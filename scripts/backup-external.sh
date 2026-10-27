@@ -18,12 +18,21 @@ if [[ "$actual_uuid" != "$UUID" ]]; then
   exit 1
 fi
 [[ -s "$PASSWORD_FILE" ]] || { echo "ERROR: missing restic password file" >&2; exit 1; }
-[[ -d "$REPOSITORY" ]] || { echo "ERROR: missing initialized restic repository" >&2; exit 1; }
+[[ -d "$REPOSITORY/config" ]] || { echo "ERROR: missing initialized restic repository" >&2; exit 1; }
 [[ -d "$SOURCE" ]] || { echo "ERROR: missing local backup directory" >&2; exit 1; }
+# Only copy after a successful local backup, never export stale archives silently.
+latest=$(find "$SOURCE" -maxdepth 1 -type f -name 'els-mhd-????????-??????.archive.gz' -printf '%T@ %p\n' | sort -nr | head -n 1)
+[[ -n "$latest" ]] || { echo "ERROR: no MongoDB archive found" >&2; exit 1; }
+latest_file=${latest#* }
+[[ -s "$latest_file" ]] || { echo "ERROR: latest MongoDB archive is empty" >&2; exit 1; }
 
 export RESTIC_REPOSITORY="$REPOSITORY"
 export RESTIC_PASSWORD_FILE="$PASSWORD_FILE"
 
 echo "Starting external encrypted backup"
-restic backup "$SOURCE" --tag els-mhd
+restic backup "$SOURCE" --tag els-mhd --exclude '.backup.lock' --exclude '*.partial'
+echo "Checking restic repository integrity"
+restic check
+echo "Applying snapshot retention (14 daily / 8 weekly / 12 monthly)"
+restic forget --tag els-mhd --keep-daily 14 --keep-weekly 8 --keep-monthly 12 --prune
 echo "External backup completed"
