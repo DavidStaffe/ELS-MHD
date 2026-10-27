@@ -282,7 +282,7 @@ async def get_abschluss_check(incident_id: str) -> dict:
     blockers: list[dict] = []
     warnings: list[dict] = []
 
-    offene = [p for p in patients if p.get("status") in ("wartend", "in_behandlung", "transportbereit")]
+    offene = [p for p in patients if p.get("status") in ("wartend", "in_uhs_waiting_area", "in_behandlung", "transportbereit", "wartet_auf_abholung")]
     if offene:
         blockers.append({
             "id": "offene_patienten",
