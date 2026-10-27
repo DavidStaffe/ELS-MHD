@@ -96,7 +96,7 @@ async def divera_sync_now(incident_id: str):
         raise HTTPException(status_code=404, detail="Incident nicht gefunden")
     if not divera.DIVERA_API_KEY:
         raise HTTPException(status_code=503, detail="Divera nicht konfiguriert")
-    return await divera.sync_all(force=True)
+    return await divera.sync_including(incident_id)
 
 
 class DiveraSettingsUpdate(BaseModel):
