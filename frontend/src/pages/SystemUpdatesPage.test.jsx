@@ -43,4 +43,3 @@ test('cancel clears rollback secrets and never starts an operation', async () =>
   expect(button('Jetzt zurücksetzen').disabled).toBe(true);
   expect(api.post).not.toHaveBeenCalled();
 });
-

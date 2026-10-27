@@ -1,6 +1,8 @@
 # Opt-in after installing and validating the host supervisor.
 services:
   api:
+    # Dockerfile's system group need not share the application's numeric UID.
+    group_add: ["10001"]
     environment:
       ELS_UPDATE_SOCKET: /run/els-mhd-update/agent.sock
       ELS_MAINTENANCE_FILE: /run/els-mhd-maintenance/status.json
