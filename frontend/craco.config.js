@@ -19,6 +19,19 @@ if (config.enableHealthCheck) {
 }
 
 let webpackConfig = {
+  jest: {
+    configure: (jestConfig) => ({
+      ...jestConfig,
+      moduleNameMapper: {
+        ...jestConfig.moduleNameMapper,
+        '^@/(.*)$': '<rootDir>/src/$1',
+        // CRA's Jest 27 does not resolve package exports used by Router 7.
+        '^react-router-dom$': require.resolve('react-router-dom').replace(/\.mjs$/, '.js'),
+        '^react-router/dom$': require.resolve('react-router/dom').replace(/\.mjs$/, '.js'),
+      },
+      testMatch: ['**/src/**/*.{spec,test}.{js,jsx,ts,tsx}'],
+    }),
+  },
   eslint: {
     configure: {
       extends: ['plugin:react-hooks/recommended'],

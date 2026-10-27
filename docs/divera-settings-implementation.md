@@ -15,15 +15,14 @@ Quelle: Vereinbarungen aus dem separaten ELS-MHD-Projektchat, vom Nutzer hier be
 - Lagekarte bleibt operational: Pollingstatus, letzter Abruf, Anzahl Verknüpfungen, manuelle Synchronisation, Start/Stopp. Kein Key-Eingabefeld auf Lagekarte.
 - Administratorauthentifizierung muss serverseitig verifiziert werden, nicht nur Frontend-Rollenauswahl.
 
-## Aktueller Implementierungsstand (Phase 1)
-- `frontend/src/pages/EinstellungenPage.jsx`: read-only zentrale Anzeige für konfigurierte DIVERA-Anbindung, Intervallwerte und Link zur Updateverwaltung.
-- Route und Navigation auf `/einstellungen` vorhanden.
-- Schreiben/Prüfen von API-Keys und Ändern des Intervalls **noch bewusst gesperrt**, damit keine ungeschützte API entsteht.
-- Legacy-Backend `backend/services/divera.py` liest derzeit Key und Intervall beim Import und nutzt pro Incident einen eigenen Polling-Task; die gewünschte zentrale Polling-Architektur ist **noch nicht umgesetzt**.
+## Aktueller Implementierungsstand
+- Die globale Einstellungsseite unterstützt Administratoranmeldung, verdeckte Key-Eingabe, Verbindungstest, geprüfte Speicherung und Intervalländerungen.
+- Serverseitige Anmeldung mit scrypt-Passworthash, kurzlebigen widerrufbaren Bearer-Sitzungen und datenbankgestützter Begrenzung der Anmeldeversuche. Verwaltungsoperationen werden ohne Geheimnisse protokolliert.
+- Fernet-verschlüsselte Konfiguration in MongoDB; Verschlüsselungsschlüssel separat als Secret-Datei. Migration eines vorhandenen Umgebungskeys und dynamische Übernahme aller Änderungen.
+- Gemeinsamer Scheduler mit installationsweiter MongoDB-Lease, Snapshot-Verteilung, festem globalen Intervall und persistierter Wiederholungsfrist. Manuelle Abrufe und Fahrzeugauswahl nutzen denselben Datenbestand.
+- 5 Sekunden bleiben serverseitig und in der Auswahl gesperrt. Für diese Abruffrequenz liegt keine bestätigte Freigabe vor.
+- Die vorhandene Update-/Rollback-Oberfläche ist integriert. Ausführung bleibt bis zur Einrichtung und Prüfung des geschützten Host-Dienstes gesperrt; die Änderungsendpunkte verlangen bereits echte Administratorauthentifizierung.
 
-## Nächste Implementierungsschritte
-1. Gemeinsame, echte Admin-Anmeldung/Step-up-Prüfung für DIVERA-Key und Updates mit Begrenzung von Fehlversuchen, Auditprotokoll, CSRF-Schutz je Sessionmodell.
-2. Verschlüsselte, persistente Konfiguration mit Key-Rotation und Laufzeit-Reload; Fehlerantworten ohne Secret-Leaks.
-3. Zentraler, serialized Fetch mit Incident-Verteilung und dynamischem Intervall, Persistenz, Backoff und Tests.
-4. Aktivierung der Passwort- und Intervall-Controls, Integrationstests (Key ungültig, DIVERA offline, Neustart, mehrere Incidents und Abfragefrequenz).
-5. Sichere Freigabe über kontrolliertes Deployment und Rückrolltest; bis dahin nur synthetische Daten.
+## Bereitstellung und Prüfung
+Die Einzelheiten zu Einrichtung, Verschlüsselung, Betriebsverhalten und Offline-Tests stehen in [divera-global-settings.md](divera-global-settings.md).
+Vor Produktivfreigabe sind Tests mit einer DIVERA-Testeinheit, echten Container-Secrets und MongoDB sowie ein kontrollierter Neustart erforderlich. Es erfolgt kein automatisches Deployment auf den Pi.

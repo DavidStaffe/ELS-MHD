@@ -136,10 +136,11 @@ async def acknowledge_fms_event(
             )
             divera_sent = True
         except Exception as exc:  # noqa: BLE001 — log + keep going
-            divera_error = str(exc)[:200]
+            from services.divera_polling import safe_error
+            divera_error = safe_error(exc)
             logger.warning(
                 "Divera-Revert fehlgeschlagen fuer event=%s vehicle=%s: %s",
-                event_id, divera_id, exc,
+                event_id, divera_id, divera_error,
             )
 
     # Lokale Resource zuruecksetzen (egal ob Divera-Call funktioniert hat —

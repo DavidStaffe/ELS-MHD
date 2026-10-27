@@ -7,9 +7,11 @@ import logging
 import os
 
 from fastapi import FastAPI
+from fastapi.exceptions import RequestValidationError
 from starlette.middleware.cors import CORSMiddleware
 
 from core.db import db, get_client
+from core.validation import validation_error
 from routes.incidents import router as incidents_router
 from routes.patients import router as patients_router
 from routes.transports import router as transports_router
@@ -21,7 +23,8 @@ from routes.analytics import router as analytics_router
 from routes.divera import router as divera_router
 from routes.keywords import router as keywords_router
 from routes.system_updates import router as system_updates_router
-from services import divera as divera_service
+from services import divera_polling as divera_service
+from core.admin import router as admin_router
 
 
 logging.basicConfig(
@@ -31,6 +34,15 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 app = FastAPI(title="ELS MHD API", version="1.0.0")
+app.add_exception_handler(RequestValidationError, validation_error)
+
+
+@app.middleware("http")
+async def management_no_store(request, call_next):
+    response = await call_next(request)
+    if request.url.path.startswith(("/api/admin/", "/api/divera/settings")):
+        response.headers["Cache-Control"] = "no-store"
+    return response
 
 app.add_middleware(
     CORSMiddleware,
@@ -52,6 +64,7 @@ for r in (
     divera_router,
     keywords_router,
     system_updates_router,
+    admin_router,
 ):
     app.include_router(r)
 
@@ -103,4 +116,5 @@ async def resume_divera_polling():
 
 @app.on_event("shutdown")
 async def shutdown_db_client():
+    await divera_service.shutdown()
     get_client().close()

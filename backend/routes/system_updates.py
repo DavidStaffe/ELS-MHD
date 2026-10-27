@@ -4,7 +4,8 @@ The web app must never expose Docker or host commands through FastAPI.
 An independent privileged host agent and real administrator authorization
 are prerequisites for activating update and rollback operations.
 """
-from fastapi import APIRouter, HTTPException, status
+from fastapi import APIRouter, HTTPException, status, Depends
+from core.admin import require_admin
 
 router = APIRouter(prefix="/api/system/updates", tags=["system-updates"])
 
@@ -28,14 +29,14 @@ async def check_updates():
         detail="Sichere Updateprüfung noch nicht eingerichtet.",
     )
 
-@router.post("/apply")
+@router.post("/apply", dependencies=[Depends(require_admin)])
 async def apply_update():
     raise HTTPException(
         status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
         detail="Updateinstallation gesperrt, bis Administratorauthentifizierung und Host-Dienst eingerichtet sind.",
     )
 
-@router.post("/rollback")
+@router.post("/rollback", dependencies=[Depends(require_admin)])
 async def rollback_update():
     raise HTTPException(
         status_code=status.HTTP_503_SERVICE_UNAVAILABLE,

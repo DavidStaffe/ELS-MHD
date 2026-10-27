@@ -1,3 +1,4 @@
+import { Link } from 'react-router-dom';
 import * as React from 'react';
 import { RefreshCw, ShieldAlert, RotateCcw, Download, Lock, Server } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -41,6 +42,7 @@ export default function SystemUpdatesPage() {
   const ready = status?.configured === true;
   return (
     <main className="mx-auto w-full max-w-[900px] space-y-5 px-6 py-6" data-testid="system-updates-page">
+      <Link to="/einstellungen" className="text-primary underline">Zurück zu den Einstellungen</Link>
       <div>
         <p className="text-caption uppercase tracking-wider text-muted-foreground">Einstellungen</p>
         <h1 className="mt-1 text-display flex items-center gap-2"><Server className="h-6 w-6 text-primary" />System & Updates</h1>
