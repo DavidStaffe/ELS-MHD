@@ -18,7 +18,7 @@ if [[ "$actual_uuid" != "$UUID" ]]; then
   exit 1
 fi
 [[ -s "$PASSWORD_FILE" ]] || { echo "ERROR: missing restic password file" >&2; exit 1; }
-[[ -d "$REPOSITORY/config" ]] || { echo "ERROR: missing initialized restic repository" >&2; exit 1; }
+[[ -f "$REPOSITORY/config" ]] || { echo "ERROR: missing initialized restic repository" >&2; exit 1; }
 [[ -d "$SOURCE" ]] || { echo "ERROR: missing local backup directory" >&2; exit 1; }
 # Only copy after a successful local backup, never export stale archives silently.
 latest=$(find "$SOURCE" -maxdepth 1 -type f -name 'els-mhd-????????-??????.archive.gz' -printf '%T@ %p\n' | sort -nr | head -n 1)
