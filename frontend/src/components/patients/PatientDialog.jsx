@@ -108,9 +108,7 @@ export function PatientDialog({
             }
             
             // Disposition follows creation. No reporting unit is mandatory for a dummy.
-            if (isEdit && behandlungRessourceId && behandlungRessourceId !== "none") {
-                payload.behandlung_ressource_id = behandlungRessourceId;
-            }
+
             if (keywordId) payload.keyword_id = keywordId;
 
             await onSubmit(payload, isDummy);
@@ -145,23 +143,6 @@ export function PatientDialog({
 
                 <form onSubmit={handleSubmit} className="space-y-4">
                     
-                    {isDummy && (
-                        <div className="space-y-1.5">
-                            <Label htmlFor="pd-resource">Erzeugende Ressource / Streife *</Label>
-                            <Select value={behandlungRessourceId} onValueChange={setBehandlungRessourceId} required={isDummy}>
-                                <SelectTrigger className="mt-1" id="pd-resource" data-testid="pd-resource">
-                                    <SelectValue placeholder="Ressource wählen" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    {resources.map((r) => (
-                                        <SelectItem key={r.id} value={r.id}>{r.name}</SelectItem>
-                                    ))}
-                                </SelectContent>
-                            </Select>
-                            <div className="text-xs text-muted-foreground mt-1">Ohne Sichtungskategorie wird der Patient automatisch als DUMMY angelegt.</div>
-                        </div>
-                    )}
-
                     <div className="space-y-2">
                       <Label>Einsatzabschnitt</Label>
                       <Select value={abschnittId} onValueChange={setAbschnittId}>
