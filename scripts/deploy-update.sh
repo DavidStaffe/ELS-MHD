@@ -13,6 +13,10 @@ source "$state"
 [[ "$WEB_IMAGE" =~ ^els-mhd-web:rollback-[0-9]{8}-[0-9]{6}$ ]] || exit 1
 [[ -z $(git status --porcelain) ]] || { echo "Dirty working tree" >&2; exit 1; }
 docker image inspect "$API_IMAGE" "$WEB_IMAGE" >/dev/null
+saved_compose="/opt/els-mhd/rollback/compose-${CHECKPOINT}.yaml"
+[[ -f "$saved_compose" ]] || { echo "Saved Compose configuration missing" >&2; exit 1; }
+rollback_compose=(docker compose --project-directory /opt/els-mhd/app/deploy --env-file /opt/els-mhd/config/docker.env -f "$saved_compose")
+"${rollback_compose[@]}" config --quiet
 compose=(docker compose --env-file /opt/els-mhd/config/docker.env -f deploy/compose.yaml)
 deployed=0
 rollback() {
@@ -23,7 +27,7 @@ rollback() {
  docker tag "$WEB_IMAGE" els-mhd-web:latest
  if [[ "$deployed" -eq 1 ]]; then
    echo "Recreating application containers using rollback images" >&2
-   "${compose[@]}" up -d --no-deps --no-build --force-recreate api web || true
+   "${rollback_compose[@]}" up -d --no-deps --no-build --force-recreate api web || true
  fi
  exit "$code"
 }
