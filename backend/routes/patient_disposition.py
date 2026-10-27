@@ -24,6 +24,33 @@ def km(a: tuple[float, float], b: tuple[float, float]) -> float:
                                 cos(lat1)*cos(lat2)*sin((lon2-lon1)/2)**2))
 
 
+def section_neighbors(a: dict | None, b: dict | None) -> bool:
+    """Approximate adjacency from documented section polygons (not guessed names)."""
+    if not a or not b or not a.get("polygon") or not b.get("polygon"):
+        return False
+    pa, pb = a["polygon"], b["polygon"]
+    if len(pa) < 3 or len(pb) < 3:
+        return False
+    # Project to approximate local meters, then calculate vertex-to-segment
+    # boundary separation. Adjacent polygons need not share exact vertices.
+    mid_lat = radians(sum(v[0] for v in pa + pb) / (len(pa) + len(pb)))
+    def xy(point):
+        return (point[1] * 111320 * cos(mid_lat), point[0] * 111320)
+    def point_segment_distance(p, q, r):
+        dx, dy = r[0]-q[0], r[1]-q[1]
+        denom = dx*dx+dy*dy
+        t = max(0, min(1, ((p[0]-q[0])*dx+(p[1]-q[1])*dy)/denom)) if denom else 0
+        return sqrt((p[0]-(q[0]+t*dx))**2+(p[1]-(q[1]+t*dy))**2)
+    aa, bb = list(map(xy, pa)), list(map(xy, pb))
+    for coords, others in ((aa, bb), (bb, aa)):
+        for point in coords:
+            for i, first in enumerate(others):
+                second = others[(i+1) % len(others)]
+                if point_segment_distance(point, first, second) <= 25:
+                    return True
+    return False
+
+
 @router.get("/patients/{patient_id}/resource-suggestions")
 async def resource_suggestions(patient_id: str):
     patient = await db.patients.find_one({"id": patient_id}, {"_id": 0})
@@ -37,19 +64,31 @@ async def resource_suggestions(patient_id: str):
     pos = (patient.get("auffinde_lat"), patient.get("auffinde_lng"))
     has_pos = all(v is not None for v in pos)
     out = []
+    own_section = section_by_id.get(patient_section)
+    from datetime import datetime, timezone
+    now = datetime.now(timezone.utc)
     for res in resources:
         if res.get("bound_patient_id") or res.get("status") != "verfuegbar":
             continue
         same_section = bool(patient_section and patient_section == res.get("abschnitt_id"))
         gps = (res.get("lat"), res.get("lng"))
-        distance = km(pos, gps) if has_pos and all(v is not None for v in gps) else None
-        # GPS estimates can be stale. Never silently describe them as current.
-        tier = 0 if same_section else 1 if distance is not None else 2
+        age = None
+        if res.get("position_updated_at"):
+            try:
+                stamp = datetime.fromisoformat(res["position_updated_at"].replace("Z", "+00:00"))
+                age = (now - stamp).total_seconds()
+            except (TypeError, ValueError):
+                pass
+        fresh_gps = age is not None and 0 <= age <= 300
+        distance = km(pos, gps) if has_pos and fresh_gps and all(v is not None for v in gps) else None
+        neighbor = section_neighbors(own_section, section_by_id.get(res.get("abschnitt_id")))
+        tier = 0 if same_section else 1 if distance is not None else 2 if neighbor else 3
         out.append({"resource_id": res["id"], "name": res.get("name"),
                     "abschnitt_id": res.get("abschnitt_id"),
                     "abschnitt_name": section_by_id.get(res.get("abschnitt_id"), {}).get("name"),
                     "reason": "eigener_abschnitt" if same_section else
-                              "positionsnaehe_ungeprueft" if distance is not None else "sonstige_freie",
+                              "positionsnaehe" if distance is not None else
+                              "nachbarabschnitt" if neighbor else "sonstige_freie",
                     "distance_km_airline": round(distance, 2) if distance is not None else None,
                     "priority": tier})
     out.sort(key=lambda r: (r["priority"], r["distance_km_airline"] if r["distance_km_airline"] is not None else float("inf"), r["name"] or ""))
