@@ -22,6 +22,7 @@ import AbschlussPage from "@/pages/AbschlussPage";
 import AbschnittList from "@/pages/AbschnittList";
 import BettenPage from "@/pages/BettenPage";
 import KeywordsPage from "@/pages/KeywordsPage";
+import SystemUpdatesPage from "@/pages/SystemUpdatesPage";
 
 function App() {
     return (
@@ -44,6 +45,7 @@ function App() {
                                         <Route path="/abschnitte" element={<AbschnittList />} />
                                         <Route path="/betten" element={<BettenPage />} />
                                         <Route path="/keywords" element={<KeywordsPage />} />
+                                        <Route path="/system-updates" element={<SystemUpdatesPage />} />
                                         <Route path="/kommunikation" element={<Funktagebuch />} />
                                         <Route path="/funktagebuch" element={<Funktagebuch />} />
                                         <Route path="/kommunikation-legacy" element={<MessageList />} />
