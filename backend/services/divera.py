@@ -344,3 +344,25 @@ def is_polling(incident_id: str) -> bool:
 async def resume_active_pollings() -> None:
     if (await divera_settings.get_config())["api_key"] and await _enabled_incidents():
         await _ensure_task()
+
+
+async def sync_including(incident_id: str) -> dict:
+    """Manual refresh includes a temporarily selected incident without restarting polling."""
+    async with _sync_lock:
+        ids = await _enabled_incidents()
+        if incident_id not in ids:
+            ids.append(incident_id)
+        try:
+            vehicles = await fetch_vehicles_cached(force=True)
+        except Exception:
+            for target_id in ids:
+                await _record_poll_result(target_id, "error", "DIVERA-Abruf fehlgeschlagen", 0)
+            return {"ok": False, "error": "DIVERA-Abruf fehlgeschlagen",
+                    "matched": 0, "vehicles_total": 0}
+        results = await asyncio.gather(
+            *(sync_incident(target_id, vehicles) for target_id in ids),
+            return_exceptions=True,
+        )
+        return {"ok": all(isinstance(r, dict) and r.get("ok") for r in results),
+                "matched": sum(r.get("matched", 0) for r in results if isinstance(r, dict)),
+                "vehicles_total": len(vehicles)}
