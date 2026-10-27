@@ -413,7 +413,12 @@ class Engine:
                 if actual != pinned:
                     raise Refused("Laufende Images weichen vom Checkpoint ab.")
             for service in ("api", "web"):
-                self.run(["docker", "pull", target[service]], timeout=900)
+                if self.state.get("action") == "apply":
+                    self.run(["docker", "pull", target[service]], timeout=900)
+                else:
+                    # A rollback must work offline, including the initial local
+                    # SHA256 image checkpoint captured during provisioning.
+                    self.run(["docker", "image", "inspect", target[service]])
             self.gate(True)
             self.save(
                 "backup",

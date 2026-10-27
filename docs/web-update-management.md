@@ -100,7 +100,7 @@ Nach Wiederherstellung bleibt Wartung absichtlich aktiv. Daten und passende Imag
 Automatische Tests ohne echte Daten/Netzwerkdienste:
 
 ```bash
-PYTHONPATH=backend python -m pytest backend/tests/test_update_agent.py backend/tests/test_system_updates.py backend/tests/test_divera_global_settings.py -q
+PYTHONPATH=backend python -m pytest backend/tests/test_update_agent.py backend/tests/test_update_bootstrap.py backend/tests/test_system_updates.py backend/tests/test_divera_global_settings.py -q
 cd frontend
 CI=true npm test -- --watch=false --runInBand --testPathPattern='(SystemUpdatesPage|EinstellungenPage).test'
 ```
@@ -116,3 +116,7 @@ CI führt die isolierten Tests zusätzlich unter Linux aus. Die Fehlertests simu
 - Tatsächlichen Backup-Restore mit ausschließlich synthetischen Daten und abweichenden Datenständen prüfen. Auch externe Restic-Wiederherstellung und Konfigurations-/Secretsicherung testen.
 
 Quellen für die verwendeten Optionen: [Docker Compose up](https://docs.docker.com/reference/cli/docker/compose/up/), [MongoDB mongorestore](https://www.mongodb.com/docs/database-tools/mongorestore/).
+
+## Begrenzter interaktiver Erstinstaller
+
+deploy/agent/bootstrap.py unterstützt den einmaligen Wechsel einer bestehenden Installation: ausschließlich aus einem geprüften rootgeschützten Snapshot unter /opt/els-mhd/bootstrap-source (inklusive BOOTSTRAP_REVISION), rootinstalliert neben gent.py, ohne Argumente. Ein vorbereiteter scrypt-Hash unter /opt/els-mhd/config/pending-update-password-hash wird rootgeschützt übernommen; ein fehlender Admin-Zugang wird interaktiv eingerichtet. Der Installer baut lokal, prüft die Images in einem eigenen Compose-Projekt mit ausschließlich synthetischen Daten und separatem Volume, kontrolliert Datenbankimage, Zugangskonfiguration und Volumezuordnung und verwendet anschließend dieselbe Backup-/Deploymenttransaktion. Er verweigert bereits provisionierte Installationen und ändert keine sudoers-Regeln. Sudo- und Admin-Passwörter ausschließlich im lokalen interaktiven Terminal eingeben. Der Erstinstaller ersetzt keine dokumentierte Stromausfall-/Pi-Abnahme. Initiale lokale Image-IDs bleiben als Offline-Rollback verfügbar; Rollback zieht niemals Images aus einer Registry nach.

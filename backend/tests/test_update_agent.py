@@ -299,3 +299,16 @@ def test_release_fingerprint_binds_same_version_to_exact_images(engine):
                 "release_id": agent.release_id(original),
             },
         )
+
+
+def test_rollback_never_pulls_local_checkpoint_from_registry(engine):
+    previous = {**engine.active(), "version": "v0"}
+    prepare(engine)
+    engine.state["action"] = "rollback"
+    engine.mutex.acquire()
+    engine.execute(previous)
+    assert engine.state["state"] == "complete"
+    assert not any(
+        call.args[0][:2] == ["docker", "pull"] for call in engine.run.call_args_list
+    )
+    engine.run.assert_any_call(["docker", "image", "inspect", previous["api"]])
