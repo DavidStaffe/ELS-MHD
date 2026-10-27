@@ -11,5 +11,5 @@ source /opt/els-mhd/rollback/current.env
 docker image inspect "$API_IMAGE" "$WEB_IMAGE" >/dev/null
 docker tag "$API_IMAGE" els-mhd-api:latest
 docker tag "$WEB_IMAGE" els-mhd-web:latest
-docker compose --env-file /opt/els-mhd/config/docker.env -f deploy/compose.yaml up -d --no-build --force-recreate api web
+docker compose --env-file /opt/els-mhd/config/docker.env -f deploy/compose.yaml up -d --no-deps --no-build --force-recreate api web
 echo "Previous images restored; MongoDB data unchanged"
