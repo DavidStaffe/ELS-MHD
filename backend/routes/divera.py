@@ -50,7 +50,7 @@ async def divera_status(incident_id: str):
     )
     return {
         "configured": bool(divera.DIVERA_API_KEY),
-        "running": divera.is_polling(incident_id),
+        "running": bool(inc.get("divera_enabled")) and divera.is_polling(incident_id),
         "enabled": bool(inc.get("divera_enabled")),
         "last_poll_at": inc.get("divera_last_poll_at"),
         "last_status": inc.get("divera_last_poll_status"),
