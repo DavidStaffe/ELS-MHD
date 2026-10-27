@@ -114,7 +114,7 @@ function Prozesszeiten({ patient }) {
   const [now, setNow] = React.useState(Date.now());
   React.useEffect(() => {
     const closed =
-      patient.status === 'uebergeben' || patient.status === 'entlassen' || patient.status === 'wartet_auf_abholung';
+      patient.status === 'uebergeben' || patient.status === 'entlassen';
     if (closed) return undefined;
     const id = setInterval(() => setNow(Date.now()), 30 * 1000);
     return () => clearInterval(id);
