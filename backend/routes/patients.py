@@ -431,6 +431,10 @@ async def create_dummy_patient(incident_id: str, payload: PatientCreate):
     
     payload.is_dummy = True
     payload.sichtung = None
+    if payload.abschnitt_id:
+        a = await db.abschnitte.find_one({"id": payload.abschnitt_id, "incident_id": incident_id, "aktiv": True})
+        if not a:
+            raise HTTPException(422, "Einsatzabschnitt nicht vorhanden oder inaktiv")
     kennung = await next_kennung(incident_id)
     now = now_utc()
     patient = Patient(
