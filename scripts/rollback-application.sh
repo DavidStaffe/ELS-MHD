@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
 umask 077
+[[ ! -f /opt/els-mhd/update-state/active.json ]] || { echo "Host-agent installation: use System & Updates; legacy rollback is disabled" >&2; exit 1; }
 [[ $EUID -eq 0 ]] || exit 1
 cd /opt/els-mhd/app
 exec 9>/opt/els-mhd/rollback/.deploy.lock

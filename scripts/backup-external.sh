@@ -32,7 +32,7 @@ export RESTIC_PASSWORD_FILE="$PASSWORD_FILE"
 echo "Starting external encrypted backup"
 restic backup "$SOURCE" --tag els-mhd --exclude '.backup.lock' --exclude '*.partial'
 echo "Checking restic repository integrity"
-restic check
+restic check --read-data
 echo "Applying snapshot retention (14 daily / 8 weekly / 12 monthly)"
 restic forget --tag els-mhd --keep-daily 14 --keep-weekly 8 --keep-monthly 12 --prune
 echo "External backup completed"

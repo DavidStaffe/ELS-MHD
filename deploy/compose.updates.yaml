@@ -1,0 +1,9 @@
+# Opt-in after installing and validating the host supervisor.
+services:
+  api:
+    environment:
+      ELS_UPDATE_SOCKET: /run/els-mhd-update/agent.sock
+      ELS_MAINTENANCE_FILE: /run/els-mhd-maintenance/status.json
+    volumes:
+      - /run/els-mhd-update:/run/els-mhd-update:ro
+      - /opt/els-mhd/update-public:/run/els-mhd-maintenance:ro

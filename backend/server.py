@@ -3,6 +3,7 @@
 Thin bootstrap: configure FastAPI, CORS, register routes, run migrations.
 All domain logic lives under core/, models.py, routes/ and services/.
 """
+
 import logging
 import os
 
@@ -11,6 +12,8 @@ from fastapi.exceptions import RequestValidationError
 from starlette.middleware.cors import CORSMiddleware
 
 from core.db import db, get_client
+from core.maintenance import in_maintenance
+from fastapi.responses import JSONResponse
 from core.validation import validation_error
 from routes.incidents import router as incidents_router
 from routes.patients import router as patients_router
@@ -26,7 +29,6 @@ from routes.system_updates import router as system_updates_router
 from services import divera_polling as divera_service
 from core.admin import router as admin_router
 
-
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
@@ -39,10 +41,23 @@ app.add_exception_handler(RequestValidationError, validation_error)
 
 @app.middleware("http")
 async def management_no_store(request, call_next):
+    if (
+        in_maintenance()
+        and not request.url.path.startswith(("/api/system/updates/", "/api/admin/"))
+        and request.url.path != "/api/meta"
+    ):
+        return JSONResponse(
+            status_code=503,
+            content={"detail": "Wartung läuft. Bitte warten."},
+            headers={"Retry-After": "5"},
+        )
     response = await call_next(request)
-    if request.url.path.startswith(("/api/admin/", "/api/divera/settings")):
+    if request.url.path.startswith(
+        ("/api/admin/", "/api/divera/settings", "/api/system/updates")
+    ):
         response.headers["Cache-Control"] = "no-store"
     return response
+
 
 app.add_middleware(
     CORSMiddleware,
@@ -72,6 +87,8 @@ for r in (
 @app.on_event("startup")
 async def run_migrations():
     """One-time, idempotent migrations at boot."""
+    if in_maintenance():
+        return  # Web releases must be schema-compatible; migrations require SSH.
     try:
         result = await db.patients.update_many(
             {"sichtung": "S4"}, {"$set": {"sichtung": "S0"}}
@@ -95,9 +112,7 @@ async def run_migrations():
             {"name": {"$regex": "^Radstreife "}}, {"_id": 0, "id": 1, "name": 1}
         ):
             new_name = r["name"].replace("Radstreife ", "EVT ", 1)
-            await db.resources.update_one(
-                {"id": r["id"]}, {"$set": {"name": new_name}}
-            )
+            await db.resources.update_one({"id": r["id"]}, {"$set": {"name": new_name}})
             logger.info(
                 "Migration: Ressource '%s' umbenannt zu '%s'", r["name"], new_name
             )

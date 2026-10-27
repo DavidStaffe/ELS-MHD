@@ -1,9 +1,10 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
 umask 077
+[[ ! -f /opt/els-mhd/update-state/active.json ]] || { echo "Host-agent installation: checkpoints are managed by the host agent" >&2; exit 1; }
 dir=/opt/els-mhd/rollback
 mkdir -p "$dir"
-exec 9>"$dir/.lock"
+exec 9>"$dir/.deploy.lock"
 flock -n 9 || { echo "Another deployment operation is running" >&2; exit 1; }
 if [[ -e "$dir/current.env" ]]; then
   echo "Rollback checkpoint already exists: $dir/current.env" >&2

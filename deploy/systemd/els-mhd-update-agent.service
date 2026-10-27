@@ -1,0 +1,33 @@
+[Unit]
+Description=ELS-MHD restricted local update supervisor
+Requires=docker.service
+After=docker.service network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/python3 /usr/local/lib/els-mhd/agent.py
+User=root
+Group=root
+UMask=0077
+RuntimeDirectory=els-mhd-update
+RuntimeDirectoryMode=0755
+Restart=on-failure
+RestartSec=10
+TimeoutStopSec=30
+KillMode=control-group
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+RestrictSUIDSGID=yes
+LockPersonality=yes
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+ReadWritePaths=/opt/els-mhd/update-state /opt/els-mhd/update-public /opt/els-mhd/rollback /opt/els-mhd/backups /run/els-mhd-update /mnt/els-mhd-backup
+# Docker daemon is privileged: install only reviewed root-owned code/config.
+
+[Install]
+WantedBy=multi-user.target

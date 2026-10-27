@@ -1,4 +1,5 @@
 # ELS-MHD Docker development smoke test (not production)
+For the opt-in secured web update supervisor, installation, release approval and recovery, see [System & Updates](../docs/web-update-management.md). After adopting it, use its pinned start path rather than the build commands below.
 The stack binds the web UI to **127.0.0.1:8080 only**; do not expose it to the LAN. The API currently lacks server-side authentication; use dummy/test data only.
 
 On the Raspberry Pi in the repository's feature branch:

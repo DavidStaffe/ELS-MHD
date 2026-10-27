@@ -14,6 +14,7 @@ import httpx
 from pymongo.errors import DuplicateKeyError
 
 from core.db import db
+from core.maintenance import in_maintenance
 from core.time import iso, now_utc, parse_iso
 from services import divera, divera_settings
 
@@ -80,6 +81,8 @@ async def invalidate():
 
 
 async def _cycle(extra_incident=None):
+    if in_maintenance():
+        raise BusyError("Wartungsfenster aktiv.")
     async with operation():
         config = await divera_settings.settings()
         interval = config.get("interval", 30)
