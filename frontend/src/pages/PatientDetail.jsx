@@ -1,3 +1,4 @@
+import { PatientDisposition } from '@/components/patients/PatientDisposition';
 import * as React from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
@@ -113,7 +114,7 @@ function Prozesszeiten({ patient }) {
   const [now, setNow] = React.useState(Date.now());
   React.useEffect(() => {
     const closed =
-      patient.status === 'uebergeben' || patient.status === 'entlassen' || patient.status === 'wartet_auf_abholung';
+      patient.status === 'uebergeben' || patient.status === 'entlassen';
     if (closed) return undefined;
     const id = setInterval(() => setNow(Date.now()), 30 * 1000);
     return () => clearInterval(id);
@@ -573,6 +574,7 @@ export default function PatientDetail() {
       <div className="grid grid-cols-1 gap-4 xl:grid-cols-[1.2fr_1fr]">
         {/* Linke Spalte: Erfassung */}
         <div className="space-y-4">
+          <PatientDisposition patient={patient} resources={resources} onRefresh={async () => { const latest = await apiGetPatient(patient.id); setPatient(latest); await refresh(); }} />
           <SectionCard
             title="Sichtungsstufe"
             subtitle="Setzen der Sichtung startet die Behandlung (Zeitstempel automatisch)."

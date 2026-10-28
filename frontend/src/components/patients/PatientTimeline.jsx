@@ -40,6 +40,11 @@ export function PatientTimeline({ patient, events = DEFAULT_EVENTS }) {
     .slice()
     .sort((a, b) => new Date(a.ts).getTime() - new Date(b.ts).getTime());
 
+  const dispositionEvents = (patient.disposition_events || [])
+    .filter((e) => e?.ts)
+    .slice()
+    .sort((a,b) => new Date(a.ts).getTime()-new Date(b.ts).getTime());
+
   const sichtungEvents = (patient.sichtung_events || [])
     .filter((e) => e?.ts)
     .slice()
@@ -123,9 +128,26 @@ export function PatientTimeline({ patient, events = DEFAULT_EVENTS }) {
     timelineEntries.push({
       kind: 'sichtung',
       key: `sichtung-event-${idx}-${entry.ts}`,
-      label: `Sichtung geändert: ${fromLabel} → ${toLabel}`,
+      label: entry.action === 'initial_provisional'
+        ? `Sichtung vorläufig: ${toLabel}`
+        : entry.action === 'confirmed' ? `Sichtung bestätigt: ${toLabel}`
+        : entry.action === 'changed' ? `Sichtung bestätigt/geändert: ${fromLabel} → ${toLabel}`
+        : `Sichtung geändert (vorläufig): ${fromLabel} → ${toLabel}`,
       sichtungIndex: idx,
       ts,
+      seq: seq++,
+    });
+  }
+
+  for (let idx = 0; idx < dispositionEvents.length; idx += 1) {
+    const entry = dispositionEvents[idx];
+    const resourceLabel = entry.resource_id || 'unbekannt';
+    timelineEntries.push({
+      kind: 'dispatch',
+      key: `disposition-${idx}-${entry.ts}`,
+      label: entry.type === 'released' ? `Ressource freigemeldet: ${resourceLabel}` :
+        `Ressource disponiert: ${resourceLabel}`,
+      ts: new Date(entry.ts).getTime(),
       seq: seq++,
     });
   }

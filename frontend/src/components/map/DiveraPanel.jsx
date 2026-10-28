@@ -17,6 +17,7 @@ import {
   CheckCircle2,
 } from 'lucide-react';
 import { toast } from 'sonner';
+import { Link } from 'react-router-dom';
 
 /**
  * DiveraPanel – kompakte Status- & Start/Stop-Steuerung pro Incident.
@@ -59,8 +60,7 @@ export function DiveraPanel({ incidentId, disabled = false, onChange }) {
           <RadioTower className="h-3.5 w-3.5" />
           <span className="text-foreground font-medium">Divera 24/7</span>
         </div>
-        Kein API-Key konfiguriert. Setze <code className="font-mono">DIVERA_API_KEY</code>{' '}
-        in der Backend-.env, um FMS-Status automatisch zu pullen.
+        Kein API-Key konfiguriert. <Link to="/einstellungen" className="underline">In Einstellungen hinterlegen</Link>.
       </div>
     );
   }
@@ -79,9 +79,7 @@ export function DiveraPanel({ incidentId, disabled = false, onChange }) {
     try {
       if (checked) {
         const r = await startDiveraPolling(incidentId);
-        toast.success(
-          `Divera-Sync gestartet · ${r.first_sync?.matched ?? 0} Fahrzeuge aktualisiert`
-        );
+        toast.success('Divera-Synchronisierung gestartet');
       } else {
         await stopDiveraPolling(incidentId);
         toast.success('Divera-Sync gestoppt');

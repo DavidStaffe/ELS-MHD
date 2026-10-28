@@ -12,6 +12,7 @@ import LagePage from "@/pages/LagePage";
 import KartePage from "@/pages/KartePage";
 import ArchivPage from "@/pages/ArchivPage";
 import PatientList from "@/pages/PatientList";
+import PatientQuickPage from "@/pages/PatientQuickPage";
 import PatientDetail from "@/pages/PatientDetail";
 import TransportList from "@/pages/TransportList";
 import ResourceList from "@/pages/ResourceList";
@@ -22,6 +23,7 @@ import AbschlussPage from "@/pages/AbschlussPage";
 import AbschnittList from "@/pages/AbschnittList";
 import BettenPage from "@/pages/BettenPage";
 import KeywordsPage from "@/pages/KeywordsPage";
+import EinstellungenPage from "@/pages/EinstellungenPage";
 
 function App() {
     return (
@@ -38,12 +40,14 @@ function App() {
                                         <Route path="/lage" element={<LagePage />} />
                                         <Route path="/karte" element={<KartePage />} />
                                         <Route path="/patienten" element={<PatientList />} />
+                                        <Route path="/patienten/schnell" element={<PatientQuickPage />} />
                                         <Route path="/patienten/:patientId" element={<PatientDetail />} />
                                         <Route path="/transport" element={<TransportList />} />
                                         <Route path="/ressourcen" element={<ResourceList />} />
                                         <Route path="/abschnitte" element={<AbschnittList />} />
                                         <Route path="/betten" element={<BettenPage />} />
                                         <Route path="/keywords" element={<KeywordsPage />} />
+                                        <Route path="/einstellungen" element={<EinstellungenPage />} />
                                         <Route path="/kommunikation" element={<Funktagebuch />} />
                                         <Route path="/funktagebuch" element={<Funktagebuch />} />
                                         <Route path="/kommunikation-legacy" element={<MessageList />} />

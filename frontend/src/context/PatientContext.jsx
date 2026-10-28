@@ -14,7 +14,7 @@ import { useIncidents } from '@/context/IncidentContext';
 
 const PatientContext = React.createContext(null);
 
-const CLOSED_STATES = new Set(['uebergeben', 'entlassen', 'wartet_auf_abholung']);
+const CLOSED_STATES = new Set(['uebergeben', 'entlassen']);
 export const isPatientClosed = (p) => CLOSED_STATES.has(p?.status);
 
 export function usePatients() {

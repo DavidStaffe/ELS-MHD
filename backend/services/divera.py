@@ -24,12 +24,13 @@ from core.db import db
 from core.time import iso, now_utc
 from services.realtime import publish_incident_event
 from services.fms_audit import record_fms_change
+from services import divera_settings
 
 logger = logging.getLogger(__name__)
 
 DIVERA_BASE_URL = os.environ.get("DIVERA_BASE_URL", "https://www.divera247.com")
-DIVERA_API_KEY = os.environ.get("DIVERA_API_KEY", "")
-POLL_INTERVAL = int(os.environ.get("DIVERA_POLL_INTERVAL_SECONDS", "30"))
+DIVERA_API_KEY = os.environ.get("DIVERA_API_KEY", "")  # legacy fallback only
+POLL_INTERVAL = divera_settings.DEFAULT_INTERVAL
 
 # FMS-Status -> ELS-Resource-Status mapping
 # BOS standard: 1/2 = available, 3/4/7/8 = in_einsatz, 5/0 = sprechwunsch, 6 = offline, 9 = wartung
@@ -59,7 +60,7 @@ async def fetch_vehicles(api_key: Optional[str] = None) -> List[Dict[str, Any]]:
 
     Raises httpx.HTTPError on network errors, ValueError on API errors.
     """
-    key = api_key or DIVERA_API_KEY
+    key = api_key if api_key is not None else (await divera_settings.get_config())["api_key"]
     if not key:
         raise ValueError("DIVERA_API_KEY ist nicht konfiguriert")
     url = f"{DIVERA_BASE_URL}/api/v2/pull/vehicle-status"
@@ -116,7 +117,7 @@ async def set_vehicle_status(
     return data if isinstance(data, dict) else {"raw": data}
 
 
-async def sync_incident(incident_id: str) -> Dict[str, Any]:
+async def sync_incident(incident_id: str, vehicles: Optional[List[Dict[str, Any]]] = None) -> Dict[str, Any]:
     """Pull vehicles + update linked resources for given incident.
 
     Returns a result dict: { ok, matched, vehicles_total, timestamp, error? }.
@@ -128,15 +129,16 @@ async def sync_incident(incident_id: str) -> Dict[str, Any]:
         "timestamp": iso(now_utc()),
     }
     try:
-        vehicles = await fetch_vehicles()
+        if vehicles is None:
+            vehicles = await fetch_vehicles_cached()
         result["vehicles_total"] = len(vehicles)
     except httpx.HTTPError as exc:
-        result["error"] = f"HTTP-Fehler: {exc}"
-        await _record_poll_result(incident_id, "error", str(exc)[:200], 0)
+        result["error"] = "DIVERA-Netzwerk- oder HTTP-Fehler"
+        await _record_poll_result(incident_id, "error", result["error"], 0)
         return result
     except ValueError as exc:
-        result["error"] = str(exc)
-        await _record_poll_result(incident_id, "error", str(exc)[:200], 0)
+        result["error"] = "DIVERA-Antwort oder API-Key ungültig"
+        await _record_poll_result(incident_id, "error", result["error"], 0)
         return result
 
     by_id: Dict[str, Dict[str, Any]] = {str(v["id"]): v for v in vehicles}
@@ -173,6 +175,7 @@ async def sync_incident(incident_id: str) -> Dict[str, Any]:
                 d_lng = float(d_lng)
                 # Plausibilitaetscheck: 0/0 ist meist "kein Fix"
                 if abs(d_lat) > 0.01 or abs(d_lng) > 0.01:
+                    update["position_updated_at"] = iso(now)
                     if d_lat != resource.get("lat") or d_lng != resource.get("lng"):
                         update["lat"] = d_lat
                         update["lng"] = d_lng
@@ -229,71 +232,137 @@ async def _record_poll_result(
     )
 
 
-async def start_polling(incident_id: str) -> None:
-    """Start a background polling task for incident_id."""
-    if not _is_configured():
-        raise ValueError("DIVERA_API_KEY nicht konfiguriert")
-    if incident_id in _running_tasks and not _running_tasks[incident_id].done():
-        return  # already running
+# Single process coordinator; one fetch is fanned out to all enabled incidents.
+_poll_task: Optional[asyncio.Task] = None
+_poll_wakeup = asyncio.Event()
+_fetch_lock = asyncio.Lock()
+_sync_lock = asyncio.Lock()
+_fetch_cache: Optional[List[Dict[str, Any]]] = None
+_fetch_cache_at: float = 0.0
+_last_error: Optional[str] = None
 
-    async def loop() -> None:
-        logger.info("Divera-Polling gestartet fuer %s (interval=%ss)", incident_id, POLL_INTERVAL)
+
+async def fetch_vehicles_cached(force: bool = False) -> List[Dict[str, Any]]:
+    """One shared fetch; UI listings reuse the current snapshot."""
+    global _fetch_cache, _fetch_cache_at
+    async with _fetch_lock:
+        conf = await divera_settings.get_config()
+        ttl = max(5, conf["interval_seconds"])
+        if not force and _fetch_cache is not None and asyncio.get_running_loop().time() - _fetch_cache_at < ttl:
+            return _fetch_cache
+        vehicles = await fetch_vehicles()
+        _fetch_cache = vehicles
+        _fetch_cache_at = asyncio.get_running_loop().time()
+        return vehicles
+
+
+def settings_changed() -> None:
+    global _fetch_cache, _fetch_cache_at
+    _fetch_cache = None
+    _fetch_cache_at = 0
+    _poll_wakeup.set()
+
+
+async def _enabled_incidents() -> list[str]:
+    docs = await db.incidents.find(
+        {"divera_enabled": True, "status": {"$nin": ["abgeschlossen", "archiviert"]}},
+        {"_id": 0, "id": 1},
+    ).to_list(2000)
+    return [d["id"] for d in docs]
+
+
+async def sync_all(force: bool = True) -> dict:
+    async with _sync_lock:
+        return await _sync_all_locked(force)
+
+
+async def _sync_all_locked(force: bool = True) -> dict:
+    global _last_error
+    ids = await _enabled_incidents()
+    if not ids:
+        return {"ok": True, "matched": 0, "vehicles_total": 0}
+    try:
+        vehicles = await fetch_vehicles_cached(force=force)
+        _last_error = None
+    except Exception:
+        _last_error = "DIVERA-Abruf fehlgeschlagen"
+        for incident_id in ids:
+            await _record_poll_result(incident_id, "error", _last_error, 0)
+        return {"ok": False, "error": _last_error, "matched": 0, "vehicles_total": 0}
+    results = await asyncio.gather(
+        *(sync_incident(incident_id, vehicles) for incident_id in ids),
+        return_exceptions=True,
+    )
+    matched = sum(item.get("matched", 0) for item in results if isinstance(item, dict))
+    return {"ok": all(isinstance(item, dict) and item.get("ok") for item in results),
+            "matched": matched, "vehicles_total": len(vehicles)}
+
+
+async def _central_loop() -> None:
+    delay_multiplier = 1
+    while True:
+        ids = await _enabled_incidents()
+        if not ids:
+            return
+        result = await sync_all()
+        delay_multiplier = 1 if result["ok"] else min(delay_multiplier * 2, 12)
+        interval = (await divera_settings.get_config())["interval_seconds"]
         try:
-            while True:
-                # Verify incident still wants polling
-                inc = await db.incidents.find_one(
-                    {"id": incident_id}, {"_id": 0, "status": 1, "divera_enabled": 1}
-                )
-                if not inc or not inc.get("divera_enabled") or inc.get("status") == "abgeschlossen":
-                    logger.info("Divera-Polling fuer %s gestoppt (state changed)", incident_id)
-                    break
-                try:
-                    await sync_incident(incident_id)
-                except Exception as exc:  # pragma: no cover
-                    logger.exception("Divera-Sync fehlgeschlagen: %s", exc)
-                await asyncio.sleep(POLL_INTERVAL)
-        except asyncio.CancelledError:
-            logger.info("Divera-Polling fuer %s cancelled", incident_id)
-            raise
-        finally:
-            _running_tasks.pop(incident_id, None)
+            await asyncio.wait_for(_poll_wakeup.wait(), timeout=interval * delay_multiplier)
+        except asyncio.TimeoutError:
+            pass
+        _poll_wakeup.clear()
 
-    task = asyncio.create_task(loop())
-    _running_tasks[incident_id] = task
+
+async def _ensure_task() -> None:
+    global _poll_task
+    if _poll_task is None or _poll_task.done():
+        _poll_task = asyncio.create_task(_central_loop())
+
+
+async def start_polling(incident_id: str) -> None:
+    config = await divera_settings.get_config()
+    if not config["api_key"]:
+        raise ValueError("DIVERA API-Key nicht konfiguriert")
     await db.incidents.update_one(
         {"id": incident_id}, {"$set": {"divera_enabled": True, "updated_at": iso(now_utc())}}
     )
+    await _ensure_task()
 
 
 async def stop_polling(incident_id: str) -> None:
-    """Stop background polling for incident_id and mark divera_enabled=False."""
-    task = _running_tasks.get(incident_id)
-    if task and not task.done():
-        task.cancel()
-        try:
-            await task
-        except asyncio.CancelledError:
-            pass
-    _running_tasks.pop(incident_id, None)
     await db.incidents.update_one(
         {"id": incident_id}, {"$set": {"divera_enabled": False, "updated_at": iso(now_utc())}}
     )
+    _poll_wakeup.set()
 
 
 def is_polling(incident_id: str) -> bool:
-    task = _running_tasks.get(incident_id)
-    return task is not None and not task.done()
+    return _poll_task is not None and not _poll_task.done()
 
 
 async def resume_active_pollings() -> None:
-    """Re-start polling tasks for incidents that were enabled before a restart."""
-    if not _is_configured():
-        return
-    async for inc in db.incidents.find(
-        {"divera_enabled": True, "status": {"$ne": "abgeschlossen"}},
-        {"_id": 0, "id": 1},
-    ):
+    if (await divera_settings.get_config())["api_key"] and await _enabled_incidents():
+        await _ensure_task()
+
+
+async def sync_including(incident_id: str) -> dict:
+    """Manual refresh includes a temporarily selected incident without restarting polling."""
+    async with _sync_lock:
+        ids = await _enabled_incidents()
+        if incident_id not in ids:
+            ids.append(incident_id)
         try:
-            await start_polling(inc["id"])
-        except Exception as exc:  # pragma: no cover
-            logger.warning("Konnte Divera-Polling fuer %s nicht resumen: %s", inc["id"], exc)
+            vehicles = await fetch_vehicles_cached(force=True)
+        except Exception:
+            for target_id in ids:
+                await _record_poll_result(target_id, "error", "DIVERA-Abruf fehlgeschlagen", 0)
+            return {"ok": False, "error": "DIVERA-Abruf fehlgeschlagen",
+                    "matched": 0, "vehicles_total": 0}
+        results = await asyncio.gather(
+            *(sync_incident(target_id, vehicles) for target_id in ids),
+            return_exceptions=True,
+        )
+        return {"ok": all(isinstance(r, dict) and r.get("ok") for r in results),
+                "matched": sum(r.get("matched", 0) for r in results if isinstance(r, dict)),
+                "vehicles_total": len(vehicles)}
