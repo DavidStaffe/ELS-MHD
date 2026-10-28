@@ -1,0 +1,6 @@
+[Unit]
+Description=Record ELS-MHD backup failure of %i
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/logger -p user.err -t ELS-MHD-BACKUP "Backup failed: %i — inspect journalctl -u %i"

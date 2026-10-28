@@ -1,0 +1,15 @@
+[Unit]
+Description=ELS-MHD MongoDB daily backup
+Requires=docker.service
+After=docker.service
+# Start external backup only after a successful local backup.
+OnSuccess=els-mhd-external-backup.service
+OnFailure=els-mhd-backup-failure@%n.service
+
+[Service]
+Type=oneshot
+User=root
+Group=root
+ExecStart=/usr/local/sbin/els-mhd-backup
+TimeoutStartSec=15min
+NoNewPrivileges=true

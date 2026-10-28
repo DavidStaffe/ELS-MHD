@@ -1,0 +1,66 @@
+name: Installation and ARM64 verification
+on: [push, pull_request]
+permissions:
+  contents: read
+jobs:
+  docker-integration:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - run: pip install requests
+      - name: Create disposable TLS and configuration
+        run: |
+          mkdir -p deploy/secrets/tls .cache
+          sudo python3 - <<'PY'
+          import os, pathlib, shutil, subprocess, sys, tempfile
+          sys.path.insert(0, str(pathlib.Path('deploy/agent').resolve()))
+          from migrate_identity import tls
+          class Commands:
+              def run(self, args):
+                  return subprocess.run(args, check=True, capture_output=True).stdout
+          with tempfile.TemporaryDirectory(prefix='els-mhd-test-tls-') as directory:
+              root = pathlib.Path(directory)
+              tls(Commands(), root, '10.0.0.1')
+              for filename in ('server.crt', 'server.key', 'ca.crt'):
+                  target = pathlib.Path('deploy/secrets/tls') / filename
+                  shutil.copyfile(root / 'config/tls' / filename, target)
+                  os.chmod(target, 0o600 if filename.endswith('.key') else 0o644)
+          PY
+          printf 'MONGO_PASSWORD=%s\nELS_HTTPS_ORIGIN=https://localhost:8443\nELS_HTTPS_BIND=127.0.0.1\nELS_HTTPS_PORT=8443\n' "$(openssl rand -hex 32)" > .cache/integration.env
+      - name: Build and start isolated installation
+        run: docker compose -p els-mhd-test-ci --env-file .cache/integration.env -f deploy/compose.yaml -f deploy/compose.https.yaml up -d --build
+      - name: Verify real installation and restart
+        run: python deploy/identity_smoke.py --project els-mhd-test-ci --env-file .cache/integration.env --origin https://localhost:8443 --ca deploy/secrets/tls/ca.crt
+      - name: Remove only disposable project
+        if: always()
+        run: docker compose -p els-mhd-test-ci --env-file .cache/integration.env -f deploy/compose.yaml -f deploy/compose.https.yaml down --volumes
+  arm64-images:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-qemu-action@v3
+      - uses: docker/setup-buildx-action@v3
+      - name: Build ARM64 API and verify native password hashing
+        run: |
+          docker buildx build --platform linux/arm64 --label org.opencontainers.image.revision=${{ github.event.pull_request.head.sha || github.sha }} --load -t els-mhd-api:arm64-test backend
+          docker run --rm --platform linux/arm64 -e MONGO_URL=mongodb://localhost:27017 -e DB_NAME=synthetic els-mhd-api:arm64-test python -c 'from argon2 import PasswordHasher; from server import app; p=PasswordHasher(); assert p.verify(p.hash("synthetic-only"), "synthetic-only"); print("ARM64 API and Argon2id OK")'
+      - name: Build ARM64 web image
+        run: |
+          docker buildx build --platform linux/arm64 --label org.opencontainers.image.revision=${{ github.event.pull_request.head.sha || github.sha }} --load -t els-mhd-web:arm64-test frontend
+          docker run --rm --platform linux/arm64 --add-host api:127.0.0.1 els-mhd-web:arm64-test nginx -t
+      - name: Package verified offline images
+        run: |
+          docker save els-mhd-api:arm64-test els-mhd-web:arm64-test | gzip > els-mhd-arm64.tar.gz
+          sha256sum els-mhd-arm64.tar.gz > els-mhd-arm64.sha256
+      - uses: actions/upload-artifact@v4
+        with:
+          name: els-mhd-arm64-${{ github.event.pull_request.head.sha || github.sha }}
+          path: |
+            els-mhd-arm64.tar.gz
+            els-mhd-arm64.sha256
+          retention-days: 14

@@ -4,6 +4,7 @@ const BACKEND_URL = process.env.REACT_APP_BACKEND_URL || '';
 export const API_BASE = `${BACKEND_URL}/api`;
 
 export const api = axios.create({
+  withCredentials: true,
   baseURL: API_BASE,
   timeout: 15000,
   headers: { 'Content-Type': 'application/json' },
@@ -98,8 +99,8 @@ export async function getDiveraConfigured() {
   return data;
 }
 
-export async function listDiveraVehicles() {
-  const { data } = await api.get('/divera/vehicles');
+export async function listDiveraVehicles(incidentId) {
+  const { data } = await api.get(`/incidents/${incidentId}/divera/vehicles`);
   return data;
 }
 
@@ -258,7 +259,9 @@ export async function getMessage(id) {
   return data;
 }
 export async function updateMessage(id, payload) {
-  const { data } = await api.patch(`/messages/${id}`, payload);
+  const current = await api.get(`/messages/${id}`);
+  const changes = Object.fromEntries(Object.entries(payload).filter(([key]) => ['text','absender','empfaenger','prioritaet','funk_typ','abschnitt_id'].includes(key)));
+  const { data } = await api.post(`/incidents/${current.data.incident_id}/corrections/messages/${id}`, { changes, reason: payload.reason });
   return data;
 }
 export async function ackMessage(id, by) {

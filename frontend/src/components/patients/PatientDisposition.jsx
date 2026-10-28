@@ -14,7 +14,6 @@ export function PatientDisposition({ patient, resources, onRefresh }) {
   const [selectedReporter, setSelectedReporter] = React.useState('none');
   const [sighting, setSighting] = React.useState(patient.sichtung || 'S2');
   const [note, setNote] = React.useState('');
-  const [releasePassword, setReleasePassword] = React.useState('');
   const isOperator = role === 'einsatzleiter' || role === 'fuehrungsassistenz';
   React.useEffect(() => { setSighting(patient.sichtung || 'S2'); }, [patient.id, patient.sichtung]);
   const refreshSuggestions = React.useCallback(async () => {
@@ -63,11 +62,8 @@ export function PatientDisposition({ patient, resources, onRefresh }) {
         <p>Gebunden: <strong>{bound.name}</strong></p>
         <p className="text-xs text-muted-foreground">Auch nach Übergabe oder Fallabschluss bleibt die Ressource gebunden, bis sie ausdrücklich freigemeldet wird.</p>
         {role === 'einsatzleiter' && <>
-          <Input type="password" autoComplete="off" placeholder="Administrator-Passwort für gesicherte Freimeldung"
-            value={releasePassword} onChange={e=>setReleasePassword(e.target.value)} />
-          <Button variant="outline" disabled={loading || !releasePassword} onClick={()=>action(
-            ()=>api.post(`/resources/${bound.id}/release-from-patient`, {},
-              { headers: { 'X-ELS-Admin-Password': releasePassword } }),
+          <Button variant="outline" disabled={loading} onClick={()=>action(
+            ()=>api.post(`/resources/${bound.id}/release-from-patient`, {}),
             'Ressource intern freigemeldet')}>Ressource freimelden (EL)</Button>
         </>}
       </> : <>

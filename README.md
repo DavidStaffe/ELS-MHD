@@ -1,5 +1,13 @@
 # ELS MHD
 
+Für die bestehende Installation auf **10.0.0.1**:
+[Vorprüfung, gesicherte Migration und HTTPS-Einrichtung](docs/installation-10.0.0.1.md).
+
+> Integrationsbranch für persönliche Anmeldung und Einsatz-RBAC: noch keine
+> Produktionsfreigabe. [Rollenmatrix und Umfang](docs/identity-rbac.md),
+> [Migration/TLS/Rollback](docs/identity-migration.md) und
+> [Sicherheitsprüfung mit offenen Releaseblockern](docs/security/review.md).
+
 ELS MHD ist ein Einsatzleitsystem fuer sanitaetsdienstliche Lagen bei Veranstaltungen.
 Lauffähig auf Raspberry Pi 5
 Die Anwendung bildet den operativen Einsatzablauf ab:

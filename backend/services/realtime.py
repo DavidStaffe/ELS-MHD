@@ -53,6 +53,8 @@ def unsubscribe_patients(incident_id: str, q: asyncio.Queue) -> None:
 
 
 async def publish_patient_event(incident_id: str, event: dict) -> None:
+    # Locked workstations receive only an anonymous installation invalidation.
+    await publish_incident_event({"kind": "update"})
     subscribers = _PATIENT_SUBSCRIBERS.get(incident_id)
     if not subscribers:
         return

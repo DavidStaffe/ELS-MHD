@@ -47,6 +47,7 @@ export function PatientProvider({ children }) {
       setPatients(data);
       return data;
     } catch (e) {
+      setPatients([]);
       setError(e?.message || 'Fehler beim Laden der Patienten');
       return [];
     } finally {
@@ -81,7 +82,7 @@ export function PatientProvider({ children }) {
       try {
         es = new EventSource(
           `${API_BASE}/incidents/${incidentId}/patients/stream`,
-        );
+          { withCredentials: true });
       } catch {
         reconnectTimer = window.setTimeout(connect, 2000);
         return;

@@ -2,7 +2,7 @@
 import uuid
 from typing import List, Optional
 
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, HTTPException, Query, Request
 
 from core.db import db
 from core.time import iso, now_utc
@@ -72,7 +72,7 @@ async def list_messages(
 
 
 @router.post("/incidents/{incident_id}/messages", response_model=dict, status_code=201)
-async def create_message(incident_id: str, payload: MessageCreate):
+async def create_message(incident_id: str, payload: MessageCreate, request: Request):
     inc = await db.incidents.find_one({"id": incident_id}, {"_id": 0})
     if not inc:
         raise HTTPException(status_code=404, detail="Incident nicht gefunden")
@@ -87,6 +87,16 @@ async def create_message(incident_id: str, payload: MessageCreate):
     doc.setdefault("funk_typ", "lage")
     doc.setdefault("absender", payload.von or "")
     doc.setdefault("empfaenger", "")
+    section = doc.get("abschnitt_id")
+    if section and not await db.abschnitte.find_one({"id": section, "incident_id": incident_id}):
+        raise HTTPException(422, "Abschnitt gehört nicht zum Einsatz.")
+    from core.identity import role_for
+    doc["abschnitt_id"] = section or None
+    doc["category"] = "section" if section else "central"
+    doc["created_by"] = request.state.user["id"]
+    doc["erfasst_von"] = request.state.user["display_name"]
+    doc["created_role"] = role_for(request.state.user, request.state.incident).get("role")
+    doc["erfasst_rolle"] = doc["created_role"]
     await db.messages.insert_one(doc)
     return {k: v for k, v in doc.items() if k != "_id"}
 
@@ -120,10 +130,10 @@ async def update_message(message_id: str, payload: MessageUpdate):
 
 
 @router.post("/messages/{message_id}/ack", response_model=dict)
-async def ack_message(message_id: str, by: Optional[str] = None):
+async def ack_message(message_id: str, request: Request, by: Optional[str] = None):
     result = await db.messages.find_one_and_update(
         {"id": message_id},
-        {"$set": {"quittiert_at": iso(now_utc()), "quittiert_von": by or "Einsatzleiter"}},
+        {"$set": {"quittiert_at": iso(now_utc()), "quittiert_von": request.state.user["display_name"], "quittiert_user_id": request.state.user["id"]}},
         return_document=True, projection={"_id": 0},
     )
     if not result:
@@ -132,7 +142,7 @@ async def ack_message(message_id: str, by: Optional[str] = None):
 
 
 @router.post("/messages/{message_id}/confirm", response_model=dict)
-async def confirm_message(message_id: str, payload: MessageConfirm):
+async def confirm_message(message_id: str, payload: MessageConfirm, request: Request):
     """Einsatzleitung bestaetigt wichtigen Eintrag (z.B. Lagemeldung gelesen)."""
     existing = await db.messages.find_one({"id": message_id}, {"_id": 0})
     if not existing:
@@ -141,14 +151,15 @@ async def confirm_message(message_id: str, payload: MessageConfirm):
         {"id": message_id},
         {"$set": {
             "bestaetigt_at": iso(now_utc()),
-            "bestaetigt_von": payload.bestaetigt_von or "Einsatzleiter",
+            "bestaetigt_von": request.state.user["display_name"],
+            "bestaetigt_user_id": request.state.user["id"],
         }},
         return_document=True, projection={"_id": 0},
     )
 
 
 @router.post("/messages/{message_id}/finalize", response_model=dict)
-async def finalize_message(message_id: str, by: Optional[str] = None):
+async def finalize_message(message_id: str, request: Request, by: Optional[str] = None):
     """Sperrt Eintrag gegen weitere Aenderungen."""
     existing = await db.messages.find_one({"id": message_id}, {"_id": 0})
     if not existing:
@@ -160,7 +171,8 @@ async def finalize_message(message_id: str, by: Optional[str] = None):
         {"$set": {
             "finalisiert": True,
             "finalisiert_at": iso(now_utc()),
-            "finalisiert_von": by or existing.get("erfasst_von", "System"),
+            "finalisiert_von": request.state.user["display_name"],
+            "finalisiert_user_id": request.state.user["id"],
         }},
         return_document=True, projection={"_id": 0},
     )

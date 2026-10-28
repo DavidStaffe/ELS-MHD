@@ -135,6 +135,7 @@ function EntryCard({ entry, abschnitt, onOpen, onAck, onConfirm, onFinalize, onD
                         {prio.label}
                     </StatusBadge>
                 </div>
+                {entry.corrected && <span className="text-caption">korrigiert · Version {entry.revision}</span>}
                 <p className="mt-1 text-body whitespace-pre-wrap break-words">{entry.text}</p>
                 {(entry.erfasst_von || entry.erfasst_rolle) && (
                     <div className="mt-1 text-[0.65rem] uppercase tracking-wider text-muted-foreground">
@@ -239,17 +240,20 @@ function EntryDialog({ open, onOpenChange, initial, abschnitte, mode, onSave, ro
     }, [initial, role, open]);
 
     const isEdit = mode === "edit";
+    const [reason, setReason] = React.useState('');
+    React.useEffect(() => { setReason(''); }, [open]);
 
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
             <DialogContent className="sm:max-w-lg" data-testid="entry-dialog">
                 <DialogHeader>
-                    <DialogTitle>{isEdit ? "Eintrag bearbeiten" : "Neuer Eintrag"}</DialogTitle>
+                    <DialogTitle>{isEdit ? "Eintrag mit Versionshistorie korrigieren" : "Neuer Eintrag"}</DialogTitle>
                     <DialogDescription>
                         Funktagebuch-Eintrag. Pflichtfelder: Typ, Absender, Empfaenger, Inhalt.
                     </DialogDescription>
                 </DialogHeader>
                 <div className="space-y-3">
+                    {isEdit && <label className="block">Pflichtbegründung<Input value={reason} onChange={e => setReason(e.target.value)} minLength={3} /></label>}
                     <div className="grid grid-cols-2 gap-2">
                         <div>
                             <label className="text-caption text-muted-foreground">Typ *</label>
@@ -335,7 +339,8 @@ function EntryDialog({ open, onOpenChange, initial, abschnitte, mode, onSave, ro
                             if (!form.text.trim()) { toast.error("Inhalt erforderlich"); return; }
                             if (!form.absender.trim()) { toast.error("Absender erforderlich"); return; }
                             if (!form.empfaenger.trim()) { toast.error("Empfaenger erforderlich"); return; }
-                            onSave(form);
+                            if (isEdit && reason.trim().length < 3) { toast.error('Korrekturgrund erforderlich'); return; }
+                            onSave({ ...form, reason });
                         }}
                         data-testid="entry-save"
                     >
@@ -420,6 +425,7 @@ function DetailDialog({ entry, abschnitt, onClose, onEdit, canEdit }) {
                 <div className="rounded-md bg-surface-raised p-3 text-body whitespace-pre-wrap">
                     {entry.text}
                 </div>
+                {entry.versions?.length > 0 && <details><summary>Vollständige Korrekturhistorie</summary>{entry.versions.map((v,i) => <section key={i} className="border p-2 my-2"><p>{v.at} · {v.display_name || v.username} · {v.role || 'Archivkorrektur'} · {v.reason}</p><p>Vorher: {v.before.text}</p><p>Nachher: {v.after.text}</p></section>)}</details>}
                 <DialogFooter>
                     {canEdit && !entry.finalisiert && entry.quelle !== "system" && (
                         <Button variant="outline" onClick={onEdit} data-testid="detail-edit">

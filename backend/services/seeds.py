@@ -50,6 +50,10 @@ async def seed_default_resources(incident_id: str):
 
 
 async def update_resource_status_by_name(incident_id: str, name: str, status: str):
+    if status == "verfuegbar":
+        # Completion/transport automation never releases resources. EL must
+        # explicitly release through the authenticated resource operation.
+        return
     await db.resources.update_one(
         {"incident_id": incident_id, "name": name},
         {"$set": {"status": status, "updated_at": iso(now_utc())}},

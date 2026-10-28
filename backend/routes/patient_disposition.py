@@ -2,8 +2,7 @@
 from math import radians, sin, cos, asin, sqrt
 from typing import Optional
 
-from fastapi import APIRouter, HTTPException, Depends
-from services.divera_settings import require_admin
+from fastapi import APIRouter, HTTPException, Depends, Request
 from pydantic import BaseModel
 from pymongo import ReturnDocument
 
@@ -96,7 +95,7 @@ async def resource_suggestions(patient_id: str):
 
 
 @router.post("/patients/{patient_id}/assign-resource")
-async def assign_resource(patient_id: str, payload: AssignRequest):
+async def assign_resource(patient_id: str, payload: AssignRequest, request: Request):
     patient = await db.patients.find_one({"id": patient_id}, {"_id": 0})
     if not patient:
         raise HTTPException(404, "Patient nicht gefunden")
@@ -125,7 +124,7 @@ async def assign_resource(patient_id: str, payload: AssignRequest):
         {"$set": {"zugewiesene_ressource_id": payload.resource_id, "updated_at": timestamp},
          "$push": {"disposition_events": {"ts": timestamp, "type": "assigned",
                                            "resource_id": payload.resource_id,
-                                           "entered_by": None}}},
+                                           "entered_by": request.state.user["id"]}}},
         return_document=ReturnDocument.AFTER, projection={"_id": 0})
     if not updated:
         await db.resources.update_one({"id": payload.resource_id, "bound_patient_id": patient_id},
@@ -136,8 +135,8 @@ async def assign_resource(patient_id: str, payload: AssignRequest):
     return updated
 
 
-@router.post("/resources/{resource_id}/release-from-patient", dependencies=[Depends(require_admin)])
-async def release_resource(resource_id: str):
+@router.post("/resources/{resource_id}/release-from-patient")
+async def release_resource(resource_id: str, request: Request):
     # Authentication/EL-only server authorization must be added with the agreed future login.
     resource = await db.resources.find_one({"id": resource_id}, {"_id": 0})
     if not resource:
@@ -156,7 +155,7 @@ async def release_resource(resource_id: str):
         {"id": pid, "zugewiesene_ressource_id": resource_id},
         {"$set": {"zugewiesene_ressource_id": None, "updated_at": timestamp},
          "$push": {"disposition_events": {"ts": timestamp, "type": "released",
-                                           "resource_id": resource_id, "entered_by": None}}})
+                                           "resource_id": resource_id, "entered_by": request.state.user["id"]}}})
     await publish_patient_event(resource["incident_id"], {"kind": "patient", "action": "resource_released",
                                                             "patient_id": pid, "ts": timestamp})
     return {"released": True, "patient_id": pid}

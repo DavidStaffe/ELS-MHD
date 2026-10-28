@@ -1,0 +1,11 @@
+[Unit]
+Description=Run ELS-MHD encrypted external backup daily
+
+[Timer]
+OnCalendar=*-*-* 03:20:00
+Persistent=true
+AccuracySec=1min
+Unit=els-mhd-external-backup.service
+
+[Install]
+WantedBy=timers.target
