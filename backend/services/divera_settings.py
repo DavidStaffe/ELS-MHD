@@ -18,11 +18,25 @@ def cipher():
 
 
 async def settings():
-    return await db.system_settings.find_one({"_id": "divera"}) or {"interval": 30}
+    current = await db.system_settings.find_one({"_id": "divera"})
+    if current:
+        return current
+    legacy = await db.global_settings.find_one({"_id": "divera"})
+    if legacy:
+        # PR #6 used another collection and encryption-key setting. Read it
+        # without overwriting or deleting the original rollback-compatible copy.
+        return {"interval": legacy.get("interval_seconds", 30), "legacy_encrypted_key": legacy.get("api_key_encrypted")}
+    return {"interval": 30}
 
 
 async def current_key():
     config = await settings()
+    if config.get("legacy_encrypted_key"):
+        try:
+            key = secret_setting("ELS_SETTINGS_ENCRYPTION_KEY")
+            return Fernet(key.encode()).decrypt(config["legacy_encrypted_key"].encode()).decode()
+        except (ValueError, InvalidToken, OSError, UnicodeDecodeError):
+            raise ValueError("Alter DIVERA-Key nicht entschlüsselbar; Legacy-Verschlüsselung prüfen.") from None
     encrypted = config.get("encrypted_key")
     if encrypted:
         try:
@@ -37,11 +51,12 @@ async def current_key():
 
 async def initialize():
     # Idempotent migration: never overwrite a key set through the web interface.
-    legacy = secret_setting("DIVERA_API_KEY")
+    config = await settings()
+    legacy = await current_key()
     if legacy:
         encrypted = cipher().encrypt(legacy.encode()).decode()
         await db.system_settings.update_one(
-            {"_id": "divera"}, {"$setOnInsert": {"interval": 30}}, upsert=True
+            {"_id": "divera"}, {"$setOnInsert": {"interval": config.get("interval", 30)}}, upsert=True
         )
         await db.system_settings.update_one(
             {"_id": "divera", "encrypted_key": {"$exists": False}},

@@ -129,6 +129,11 @@ async def divera_vehicles():
         raise HTTPException(status_code=502, detail="DIVERA derzeit nicht verfügbar.")
 
 
+@router.get("/incidents/{incident_id}/divera/vehicles")
+async def incident_divera_vehicles(incident_id: str):
+    return await divera_vehicles()
+
+
 @router.get("/incidents/{incident_id}/divera/status", response_model=Dict[str, Any])
 async def divera_status(incident_id: str):
     inc = await db.incidents.find_one(

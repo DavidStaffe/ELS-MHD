@@ -9,6 +9,7 @@ from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import StreamingResponse
 
 from core.db import db
+from core.identity import incident_access, stream_authorized, audit, present_incident
 from core.time import iso, now_utc, serialize_datetimes
 from core.types import IncidentStatus
 from models import Incident, IncidentCreate, IncidentUpdate, IncidentMetaPatch
@@ -46,6 +47,7 @@ async def meta():
 
 @router.get("/incidents", response_model=List[dict])
 async def list_incidents(
+    request: Request,
     status: Optional[IncidentStatus] = None, demo: Optional[bool] = None
 ):
     query: dict = {}
@@ -54,7 +56,15 @@ async def list_incidents(
     if demo is not None:
         query["demo"] = demo
     cursor = db.incidents.find(query, {"_id": 0}).sort("created_at", -1)
-    return await cursor.to_list(500)
+    result = []
+    for inc in await cursor.to_list(500):
+        if await incident_access(request.state.user, inc):
+            result.append(present_incident(request.state.user, inc))
+        elif inc.get("status") != "abgeschlossen":
+            result.append({"id": inc["id"], "name": inc.get("name"), "status": inc.get("status"), "restricted": True})
+        elif present_incident(request.state.user, inc).get("can_reopen"):
+            result.append({"id": inc["id"], "name": inc.get("name"), "status": inc.get("status"), "restricted": True, "can_reopen": True})
+    return result
 
 
 @router.get("/incidents/stream")
@@ -69,7 +79,10 @@ async def stream_incidents(request: Request):
                     break
                 try:
                     evt = await asyncio.wait_for(q.get(), timeout=20.0)
-                    payload = json.dumps(evt)
+                    if not await stream_authorized(request):
+                        yield 'event: locked\ndata: {"message":"Neue Ereignisse vorhanden"}\n\n'
+                        break
+                    payload = json.dumps({"changed": True})
                     yield f"event: incident\ndata: {payload}\n\n"
                 except asyncio.TimeoutError:
                     # Keep connection alive through proxies/load balancers.
@@ -89,13 +102,21 @@ async def stream_incidents(request: Request):
 
 
 @router.post("/incidents", response_model=dict, status_code=201)
-async def create_incident(payload: IncidentCreate):
+async def create_incident(payload: IncidentCreate, request: Request):
+    user = request.state.user
+    leader = await db.users.find_one({"id": payload.el_user_id, "active": True, "eligible": "EL"})
+    if not leader or payload.status == "abgeschlossen":
+        raise HTTPException(422, "Aktive geeignete EL und offener Anfangsstatus erforderlich.")
     obj = Incident(**payload.model_dump(exclude_none=True))
     if obj.status == "geplant":
         obj.start_at = None
     elif payload.start_at is None:
         obj.start_at = now_utc()
     doc = obj.model_dump()
+    doc["created_by"] = user["id"]
+    doc["assignments"] = {payload.el_user_id: {"role": "EL"}}
+    doc["security_version"] = 1
+    doc["security_history"] = [{"action": "incident.create", "user_id": user["id"], "el_user_id": payload.el_user_id, "at": iso(now_utc())}]
     for k in _INC_DATES:
         if isinstance(doc.get(k), datetime):
             doc[k] = iso(doc[k])
@@ -114,8 +135,11 @@ async def create_incident(payload: IncidentCreate):
 
 
 @router.post("/incidents/demo", response_model=dict, status_code=201)
-async def create_demo_incident():
-    out = await _svc_create_demo()
+async def create_demo_incident(request: Request):
+    user = request.state.user
+    if "EL" not in user.get("eligible", []):
+        raise HTTPException(422, "Der Demo-Schnellstart benötigt eine geeignete eigene Initial-EL.")
+    out = await _svc_create_demo(created_by=user["id"], el_user_id=user["id"])
     await publish_incident_event(
         {
             "kind": "incident",
@@ -128,11 +152,11 @@ async def create_demo_incident():
 
 
 @router.get("/incidents/{incident_id}", response_model=dict)
-async def get_incident(incident_id: str):
+async def get_incident(incident_id: str, request: Request):
     doc = await db.incidents.find_one({"id": incident_id}, {"_id": 0})
     if not doc:
         raise HTTPException(status_code=404, detail="Incident nicht gefunden")
-    return doc
+    return present_incident(request.state.user, doc)
 
 
 @router.patch("/incidents/{incident_id}", response_model=dict)

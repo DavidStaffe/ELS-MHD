@@ -30,7 +30,8 @@ test('installation needs release check, both passwords and explicit confirmation
   await fill(inputs[0], 'test-admin'); await fill(inputs[1], 'test-update');
   await act(async () => container.querySelector('input[type="checkbox"]').click());
   await act(async () => container.querySelector('form').dispatchEvent(new Event('submit', { bubbles: true, cancelable: true })));
-  expect(api.post).toHaveBeenCalledWith('/system/updates/apply', { password: 'test-update', version: 'v2', release_id: 'a'.repeat(64) }, { headers: { Authorization: 'Bearer test-token' } });
+  expect(api.post).toHaveBeenCalledWith('/auth/reauth', { password: 'test-admin' });
+  expect(api.post).toHaveBeenCalledWith('/system/updates/apply', { password: 'test-update', version: 'v2', release_id: 'a'.repeat(64) });
   expect(container.querySelector('form')).toBeNull();
   expect(localStorage.length).toBe(0);
 });

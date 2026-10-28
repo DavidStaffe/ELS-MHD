@@ -10,6 +10,7 @@ from pydantic import BaseModel
 from fastapi.responses import StreamingResponse
 
 from core.db import db
+from core.identity import stream_authorized
 from core.time import iso, now_utc
 from models import Patient, PatientCreate, PatientUpdate
 from services.seeds import (
@@ -29,6 +30,7 @@ router = APIRouter(prefix="/api", tags=["patients"])
 
 @router.get("/incidents/{incident_id}/patients", response_model=List[dict])
 async def list_patients(
+    request: Request,
     incident_id: str,
     sichtung: Optional[str] = None,
     status: Optional[str] = None,
@@ -50,6 +52,11 @@ async def list_patients(
         vals = [v.strip() for v in verbleib.split(",") if v.strip()]
         if vals:
             query["verbleib"] = {"$in": vals}
+    from core.identity import role_for
+    assignment = role_for(request.state.user, request.state.incident)
+    if assignment.get("role") == "Helfer":
+        resource = await db.resources.find_one({"id": assignment.get("resource_id"), "incident_id": incident_id})
+        query["id"] = resource.get("bound_patient_id") if resource else "__denied__"
     return await db.patients.find(query, {"_id": 0}).sort("created_at", 1).to_list(2000)
 
 
@@ -68,7 +75,10 @@ async def stream_patients(incident_id: str, request: Request):
                     break
                 try:
                     evt = await asyncio.wait_for(q.get(), timeout=20.0)
-                    payload = json.dumps(evt)
+                    if not await stream_authorized(request, incident_id):
+                        yield 'event: locked\ndata: {"message":"Neue Ereignisse vorhanden"}\n\n'
+                        break
+                    payload = json.dumps({"changed": True})
                     yield f"event: patient\ndata: {payload}\n\n"
                 except asyncio.TimeoutError:
                     yield ": keepalive\n\n"
@@ -87,7 +97,7 @@ async def stream_patients(incident_id: str, request: Request):
 
 
 @router.post("/incidents/{incident_id}/patients", response_model=dict, status_code=201)
-async def create_patient(incident_id: str, payload: PatientCreate):
+async def create_patient(incident_id: str, payload: PatientCreate, request: Request):
     inc = await db.incidents.find_one({"id": incident_id}, {"_id": 0})
     if not inc:
         raise HTTPException(status_code=404, detail="Incident nicht gefunden")
@@ -138,7 +148,7 @@ async def create_patient(incident_id: str, payload: PatientCreate):
         patient.sichtung_at = now
         patient.sichtung_events = [{"ts": iso(now), "action": "initial_provisional",
                                    "from_sichtung": None, "to_sichtung": patient.sichtung,
-                                   "reported_by": None, "entered_by": None}]
+                                   "reported_by": None, "entered_by": request.state.user["id"]}]
     patient.status = "wartend"
     doc = patient.model_dump()
     for k in (
@@ -183,7 +193,7 @@ async def get_patient(patient_id: str):
 
 
 @router.patch("/patients/{patient_id}", response_model=dict)
-async def update_patient(patient_id: str, payload: PatientUpdate):
+async def update_patient(patient_id: str, payload: PatientUpdate, request: Request):
     existing = await db.patients.find_one({"id": patient_id}, {"_id": 0})
     if not existing:
         raise HTTPException(status_code=404, detail="Patient nicht gefunden")
@@ -219,7 +229,7 @@ async def update_patient(patient_id: str, payload: PatientUpdate):
                 "from_sichtung": existing.get("sichtung"),
                 "to_sichtung": update["sichtung"],
                 "action": "changed_provisional",
-                "reported_by": None, "entered_by": None,
+                "reported_by": None, "entered_by": request.state.user["id"],
             }
         )
         update["sichtung_events"] = sichtung_history
@@ -472,9 +482,9 @@ async def create_dummy_patient(incident_id: str, payload: PatientCreate):
 
 
 @router.post("/patients/{patient_id}/complete", response_model=dict)
-async def complete_patient(patient_id: str, payload: PatientUpdate):
+async def complete_patient(patient_id: str, payload: PatientUpdate, request: Request):
     payload.is_dummy = False
-    return await update_patient(patient_id, payload)
+    return await update_patient(patient_id, payload, request)
 
 
 @router.post("/patients/{patient_id}/waiting-area", response_model=dict)
@@ -528,7 +538,7 @@ class SichtungBestaetigen(BaseModel):
 
 
 @router.post("/patients/{patient_id}/sichtung-confirm")
-async def confirm_sichtung(patient_id: str, payload: SichtungBestaetigen):
+async def confirm_sichtung(patient_id: str, payload: SichtungBestaetigen, request: Request):
     """Record every wireless triage confirmation, including unchanged categories.
 
     User attribution is deliberately unavailable until a trusted login is introduced.
@@ -548,7 +558,7 @@ async def confirm_sichtung(patient_id: str, payload: SichtungBestaetigen):
     event = {"ts": now, "action": "confirmed" if patient.get("sichtung") == payload.sichtung else "changed",
              "from_sichtung": patient.get("sichtung"), "to_sichtung": payload.sichtung,
              "reported_by": payload.meldende_ressource_id,
-             "entered_by": None, "note": payload.bemerkung}
+             "entered_by": request.state.user["id"], "note": payload.bemerkung}
     confirmed_fields = {"sichtung": payload.sichtung, "sichtung_bestaetigt": True,
                         "is_dummy": False, "updated_at": now}
     if not patient.get("sichtung_at"):

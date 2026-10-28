@@ -1,4 +1,5 @@
 import * as React from 'react';
+import { LifecycleDialog } from '@/components/incidents/LifecycleDialog';
 import {
   API_BASE,
   listIncidents as apiList,
@@ -23,6 +24,7 @@ export function useIncidents() {
 }
 
 export function IncidentProvider({ children }) {
+  const [pending, setPending] = React.useState(null);
   const [incidents, setIncidents] = React.useState([]);
   const [loading, setLoading] = React.useState(true);
   const [error, setError] = React.useState(null);
@@ -36,6 +38,7 @@ export function IncidentProvider({ children }) {
     try {
       if (id) localStorage.setItem(ACTIVE_KEY, id);
       else localStorage.removeItem(ACTIVE_KEY);
+      window.dispatchEvent(new Event('els-incident-changed'));
     } catch {
       /* noop */
     }
@@ -79,7 +82,7 @@ export function IncidentProvider({ children }) {
     const connect = () => {
       if (disposed) return;
       try {
-        es = new EventSource(`${API_BASE}/incidents/stream`);
+        es = new EventSource(`${API_BASE}/incidents/stream`, { withCredentials: true });
       } catch {
         reconnectTimer = window.setTimeout(connect, 2000);
         return;
@@ -161,17 +164,17 @@ export function IncidentProvider({ children }) {
   );
 
   const closeIncident = React.useCallback(
-    (id) => update(id, { status: 'abgeschlossen' }),
-    [update],
+    (id) => new Promise((resolve, reject) => setPending({id, action:'close', resolve, reject})),
+    [],
   );
 
   const reopenIncident = React.useCallback(
-    (id) => update(id, { status: 'operativ', end_at: null }),
-    [update],
+    (id) => new Promise((resolve, reject) => setPending({id, action:'reopen', resolve, reject})),
+    [],
   );
 
   const activeIncident = React.useMemo(
-    () => incidents.find((i) => i.id === activeId) || null,
+    () => incidents.find((i) => i.id === activeId && !i.restricted) || null,
     [incidents, activeId],
   );
 
@@ -210,6 +213,11 @@ export function IncidentProvider({ children }) {
 
   return (
     <IncidentContext.Provider value={value}>
+      <LifecycleDialog pending={pending} onDone={async success => {
+        const current = pending; setPending(null);
+        if (success) { await refresh(); window.dispatchEvent(new Event('els-incident-changed')); current.resolve(); }
+        else current.reject(new Error('Vorgang abgebrochen.'));
+      }} />
       {children}
     </IncidentContext.Provider>
   );

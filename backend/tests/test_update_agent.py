@@ -9,6 +9,24 @@ from unittest.mock import Mock
 
 import pytest
 
+
+def test_identity_floor_refuses_legacy_install_even_offline(engine):
+    obj = engine
+    (obj.root / "config/identity-required").write_text("2")
+    with pytest.raises(agent.Refused):
+        agent.Engine.install(obj)
+
+
+def test_identity_floor_requires_explicit_migrated_release_schema(engine):
+    obj = engine
+    (obj.root / "config/identity-required").write_text("2")
+    with pytest.raises(agent.Refused):
+        obj.approved()
+    release = agent.read(obj.root / "config/approved-release.json")
+    release["schema"] = 2
+    agent.atomic(obj.root / "config/approved-release.json", release)
+    assert obj.approved()["schema"] == 2
+
 spec = importlib.util.spec_from_file_location(
     "host_agent", Path(__file__).resolve().parents[2] / "deploy/agent/agent.py"
 )

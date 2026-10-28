@@ -18,7 +18,7 @@ import {
   CheckCircle2,
 } from 'lucide-react';
 import { toast } from 'sonner';
-import { Link } from 'react-router-dom';
+
 
 /**
  * DiveraPanel – kompakte Status- & Start/Stop-Steuerung pro Incident.

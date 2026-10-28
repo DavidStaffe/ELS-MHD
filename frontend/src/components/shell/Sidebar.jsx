@@ -77,7 +77,7 @@ const NAV_GROUPS = (
         label: 'Patienten',
         testId: 'nav-patienten',
         badge: unassignedPatientCount,
-        disabled: !hasIncident || isArchived || isPlanned,
+        disabled: !hasIncident || isPlanned,
         hint: !hasIncident
           ? 'inaktiv'
           : isArchived
@@ -91,7 +91,7 @@ const NAV_GROUPS = (
         icon: Users,
         label: 'Schnellerfassung',
         testId: 'nav-patienten-schnell',
-        disabled: !hasIncident || isArchived || isPlanned,
+        disabled: !hasIncident || isPlanned,
       },
       {
         to: '/transport',
@@ -99,7 +99,7 @@ const NAV_GROUPS = (
         label: 'Transport',
         testId: 'nav-transport',
         badges: transportBadges,
-        disabled: !hasIncident || isArchived || isPlanned,
+        disabled: !hasIncident || isPlanned,
         hint: !hasIncident
           ? 'inaktiv'
           : isArchived
@@ -113,7 +113,7 @@ const NAV_GROUPS = (
         icon: Boxes,
         label: 'Ressourcen',
         testId: 'nav-ressourcen',
-        disabled: !hasIncident || isArchived,
+        disabled: !hasIncident,
         hint: !hasIncident ? 'inaktiv' : isArchived ? 'gesperrt' : null,
       },
       {
@@ -121,7 +121,7 @@ const NAV_GROUPS = (
         icon: Layers,
         label: 'Abschnitte',
         testId: 'nav-abschnitte',
-        disabled: !hasIncident || isArchived,
+        disabled: !hasIncident,
         hint: !hasIncident ? 'inaktiv' : isArchived ? 'gesperrt' : null,
       },
       {
@@ -129,7 +129,7 @@ const NAV_GROUPS = (
         icon: Bed,
         label: 'Behandlungsplaetze',
         testId: 'nav-betten',
-        disabled: !hasIncident || isArchived,
+        disabled: !hasIncident,
         hint: !hasIncident ? 'inaktiv' : isArchived ? 'gesperrt' : null,
       },
       {
@@ -137,7 +137,7 @@ const NAV_GROUPS = (
         icon: Radio,
         label: 'Funktagebuch',
         testId: 'nav-kommunikation',
-        disabled: !hasIncident || isArchived,
+        disabled: !hasIncident,
         hint: !hasIncident ? 'inaktiv' : isArchived ? 'gesperrt' : null,
       },
       {
@@ -145,7 +145,7 @@ const NAV_GROUPS = (
         icon: AlertOctagon,
         label: 'Konflikte',
         testId: 'nav-konflikte',
-        disabled: !hasIncident || isArchived,
+        disabled: !hasIncident,
         hint: !hasIncident ? 'inaktiv' : isArchived ? 'gesperrt' : null,
       },
     ],

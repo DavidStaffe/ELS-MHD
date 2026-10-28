@@ -122,7 +122,7 @@ class Engine:
         if not re.fullmatch(r"[A-Za-z0-9._-]{1,80}", release["version"]):
             raise Refused("Ungültige Version.")
         if (
-            release["schema"] != 1
+            release["schema"] != (2 if (self.root / "config/identity-required").exists() else 1)
             or not isinstance(release["notes"], str)
             or len(release["notes"]) > 4000
         ):
@@ -135,6 +135,10 @@ class Engine:
 
     def active(self):
         return read(self.state_dir / "active.json")
+
+    def identity_floor(self, release):
+        if (self.root / "config/identity-required").exists() and release.get("schema") != 2:
+            raise Refused("Version ohne persönliche Zugriffskontrolle gesperrt; geprüften Identity-Checkpoint verwenden.")
 
     def gate(self, enabled):
         atomic(
@@ -348,6 +352,7 @@ class Engine:
         self.run(["/usr/local/lib/els-mhd/backup-external.sh"], timeout=1800)
 
     def install(self):
+        self.identity_floor(self.active())
         self.compose(
             "up",
             "-d",
@@ -398,6 +403,7 @@ class Engine:
 
     def execute(self, target):
         try:
+            self.identity_floor(target)
             self.save("verify", message="Release und laufendes System prüfen.")
             expected = read(self.state_dir / "bundle.json")
             if (
@@ -484,6 +490,7 @@ class Engine:
                 if action == "apply"
                 else read(self.state_dir / "previous.json")
             )
+            self.identity_floor(target)
             if (
                 request["version"] != target["version"]
                 or request["release_id"] != release_id(target)

@@ -109,7 +109,12 @@ async def login(payload: Login):
     return {"token": token, "expires_in": 600}
 
 
-async def require_admin(credentials: HTTPAuthorizationCredentials = Depends(bearer)):
+async def require_admin(request: Request, credentials: HTTPAuthorizationCredentials = Depends(bearer)):
+    from core.identity import COOKIE, identity, require
+    if request.cookies.get(COOKIE):
+        user = await identity(request)
+        require(user, "settings.manage")
+        return user["id"]
     if not credentials or credentials.scheme.lower() != "bearer":
         raise HTTPException(401, "Administratoranmeldung erforderlich.")
     digest = hashlib.sha256(credentials.credentials.encode()).hexdigest()

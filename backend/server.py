@@ -7,7 +7,12 @@ All domain logic lives under core/, models.py, routes/ and services/.
 import logging
 import os
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Depends
+from core.access import authorize
+from core.body_limit import RequestBodyLimit
+from core.identity import indexes
+from routes.identity import router as identity_router
+from routes.governance import router as governance_router
 from fastapi.exceptions import RequestValidationError
 from starlette.middleware.cors import CORSMiddleware
 
@@ -36,7 +41,7 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-app = FastAPI(title="ELS MHD API", version="1.0.0")
+app = FastAPI(title="ELS MHD API", version="1.0.0", dependencies=[Depends(authorize)])
 app.add_exception_handler(RequestValidationError, validation_error)
 
 
@@ -46,6 +51,7 @@ async def management_no_store(request, call_next):
         in_maintenance()
         and not request.url.path.startswith(("/api/system/updates/", "/api/admin/"))
         and request.url.path != "/api/meta"
+        and request.url.path not in {"/api/auth/me", "/api/auth/login", "/api/auth/logout", "/api/auth/lock", "/api/auth/unlock", "/api/auth/reauth"}
     ):
         return JSONResponse(
             status_code=503,
@@ -53,6 +59,8 @@ async def management_no_store(request, call_next):
             headers={"Retry-After": "5"},
         )
     response = await call_next(request)
+    response.headers["Cache-Control"] = "no-store"
+    response.headers["X-Content-Type-Options"] = "nosniff"
     if request.url.path.startswith(
         ("/api/admin/", "/api/divera/settings", "/api/system/updates")
     ):
@@ -63,12 +71,15 @@ async def management_no_store(request, call_next):
 app.add_middleware(
     CORSMiddleware,
     allow_credentials=True,
-    allow_origins=os.environ.get("CORS_ORIGINS", "*").split(","),
+    allow_origins=[o.strip() for o in os.environ.get("CORS_ORIGINS", "").split(",") if o.strip() and o.strip() != "*"],
     allow_methods=["*"],
     allow_headers=["*"],
 )
+app.add_middleware(RequestBodyLimit)
 
 for r in (
+    identity_router,
+    governance_router,
     incidents_router,
     patients_router,
     transports_router,
@@ -89,6 +100,7 @@ for r in (
 @app.on_event("startup")
 async def run_migrations():
     """One-time, idempotent migrations at boot."""
+    await indexes()  # Fail startup closed if the identity database is unavailable.
     if in_maintenance():
         return  # Web releases must be schema-compatible; migrations require SSH.
     try:

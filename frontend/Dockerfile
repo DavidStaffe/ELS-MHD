@@ -4,10 +4,10 @@ COPY package.json package-lock.json ./
 # Temporary compatibility setting for the repository's existing CRA/ESLint
 # and react-day-picker/date-fns peer dependency conflicts.
 # TODO: Align dependencies and regenerate lockfile; remove this flag.
-RUN npm install --legacy-peer-deps --no-audit --no-fund
+RUN npm ci --legacy-peer-deps --no-audit --no-fund
 COPY . .
 ENV REACT_APP_BACKEND_URL=""
-ENV CI=false
+ENV CI=true
 RUN npm run build
 
 FROM nginx:1.27-alpine

@@ -3,7 +3,7 @@ from datetime import datetime
 from typing import List, Optional
 import uuid
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel, Field
 
 from core.db import db
@@ -29,11 +29,15 @@ class FmsAcknowledgePayload(BaseModel):
 
 
 @router.get("/incidents/{incident_id}/resources", response_model=List[dict])
-async def list_resources(incident_id: str, typ: Optional[str] = None, status: Optional[str] = None):
+async def list_resources(incident_id: str, request: Request, typ: Optional[str] = None, status: Optional[str] = None):
     inc = await db.incidents.find_one({"id": incident_id}, {"_id": 0})
     if not inc:
         raise HTTPException(status_code=404, detail="Incident nicht gefunden")
     query: dict = {"incident_id": incident_id}
+    from core.identity import role_for
+    assignment = role_for(request.state.user, request.state.incident)
+    if assignment.get("role") == "Helfer":
+        query["id"] = assignment.get("resource_id")
     if typ:
         query["typ"] = {"$in": [v.strip() for v in typ.split(",") if v.strip()]}
     if status:
@@ -125,15 +129,17 @@ async def list_fms_events(
 
 
 @router.post("/fms-events/{event_id}/acknowledge")
-async def acknowledge_fms(event_id: str, payload: FmsAcknowledgePayload):
+async def acknowledge_fms(event_id: str, payload: FmsAcknowledgePayload, request: Request):
     """Quittiert ein FMS-5/0-Alert-Event. Nur EL/FA duerfen quittieren."""
-    if payload.role not in FMS_ACK_ROLES:
+    from core.identity import role_for
+    server_role = role_for(request.state.user, request.state.incident).get("role")
+    if server_role not in {"EL", "FueAss"}:
         raise HTTPException(
             status_code=403,
             detail="Nur Einsatzleiter oder Fuehrungsassistenz duerfen quittieren.",
         )
     try:
-        updated = await acknowledge_fms_event(event_id, payload.role, payload.name)
+        updated = await acknowledge_fms_event(event_id, "einsatzleiter" if server_role == "EL" else "fuehrungsassistenz", request.state.user["display_name"])
     except ValueError as exc:
         raise HTTPException(status_code=409, detail=str(exc))
     if updated is None:

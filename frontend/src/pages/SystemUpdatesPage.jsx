@@ -37,20 +37,17 @@ export default function SystemUpdatesPage() {
   };
   const perform = async (event) => {
     event.preventDefault(); setBusy(true); setError('');
-    let token;
     try {
-      const login = await api.post('/admin/login', { password });
-      token = login.data.token;
+      await api.post('/auth/reauth', { password });
       const version = action === 'apply' ? release.available_version : status.rollback_version;
       const release_id = action === 'apply' ? release.release_id : status.rollback_id;
-      const { data } = await api.post('/system/updates/' + action, { password: updatePassword, version, release_id }, { headers: { Authorization: 'Bearer ' + token } });
+      const { data } = await api.post('/system/updates/' + action, { password: updatePassword, version, release_id });
       setStatus(data); setAction(''); setRelease(null);
     } catch (e) {
       const detail = e?.response?.data?.detail;
       setError(typeof detail === 'string' ? detail : 'Freigabe fehlgeschlagen. Status prüfen, bevor Sie erneut starten.');
     } finally {
       setPassword(''); setUpdatePassword(''); setConfirmed(false); setBusy(false);
-      if (token) api.post('/admin/logout', {}, { headers: { Authorization: 'Bearer ' + token } }).catch(() => {});
     }
   };
   const running = busyPhases.includes(status?.state);

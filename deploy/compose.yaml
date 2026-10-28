@@ -24,6 +24,9 @@ services:
       MONGO_URL: mongodb://elsroot:${MONGO_PASSWORD:?Set MONGO_PASSWORD}@db:27017/?authSource=admin
       DB_NAME: els_mhd
       CORS_ORIGINS: http://127.0.0.1:8080
+      ELS_IDENTITY_STATE_FILE: /var/lib/els/identity-state.json
+    volumes:
+      - identity_state:/var/lib/els
     depends_on:
       db:
         condition: service_healthy
@@ -43,3 +46,4 @@ networks:
 
 volumes:
   mongodb_data:
+  identity_state:
