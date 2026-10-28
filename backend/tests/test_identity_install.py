@@ -135,3 +135,18 @@ def test_supervisor_code_is_replaced_as_a_complete_file(tmp_path):
     target.write_text("old complete code")
     migration.copy_atomic(source, target)
     assert target.read_text() == "new reviewed code"
+
+
+def test_offline_image_must_match_reviewed_commit_and_architecture():
+    metadata = {
+        "Os": "linux",
+        "Architecture": "arm64",
+        "Id": "sha256:" + "a" * 64,
+        "Config": {"Labels": {"org.opencontainers.image.revision": "b" * 40}},
+    }
+    assert migration.verified_image(metadata, "b" * 40) == metadata["Id"]
+    with pytest.raises(ValueError, match="Quellcommit"):
+        migration.verified_image(metadata, "c" * 40)
+    metadata["Architecture"] = "amd64"
+    with pytest.raises(ValueError, match="ARM64"):
+        migration.verified_image(metadata, "b" * 40)

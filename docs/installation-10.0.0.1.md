@@ -81,6 +81,11 @@ Bei Fehlern nicht Dateien/Collections löschen und nicht den Schutz umgehen.
 
 ## 3. Bewusste Installation im Wartungsfenster
 
+Der Standardweg baut auf dem Pi und benötigt einmalig Zugriff auf die
+Image-/Paketregistries. Der spätere LAN-Betrieb und Rückfall auf vorhandene
+geprüfte Images benötigen diesen Zugriff nicht. Für einen vollständig offline
+installierten Pi ist unten ein Weg mit vorgebauten ARM64-Images beschrieben.
+
 ```bash
 sudo python3 /opt/els-mhd/bootstrap-source/deploy/agent/migrate_identity.py --hostname 10.0.0.1 --apply
 ```
@@ -110,6 +115,38 @@ Zur Bestätigung muss lokal `INSTALLIEREN` eingegeben werden. Der Ablauf:
 
 Keinen dieser Befehle mit `tee` in eine ungeschützte Datei oder Chatnachricht
 protokollieren: Der letzte Schritt zeigt einen einmaligen Setup-Code.
+
+### Alternative: Images auf einem PC laden, auf dem Pi offline installieren
+
+Nach dem Merge den erfolgreichen **Main-Lauf** „Installation and ARM64
+verification“ für genau den geprüften Main-Commit öffnen. Dessen Artefakt
+`els-mhd-arm64-COMMIT` herunterladen und entpacken. Es enthält
+`els-mhd-arm64.tar.gz` und `els-mhd-arm64.sha256`. Nur Artefakte dieses
+Repositorys, dieses Commits und eines erfolgreichen Laufs verwenden; ein
+beliebiges gleichnamiges Image ist keine vertrauenswürdige Releasequelle.
+
+Beide Dateien auf den Pi übertragen. Im entsprechenden Verzeichnis:
+
+```bash
+sha256sum -c els-mhd-arm64.sha256
+sudo docker load -i els-mhd-arm64.tar.gz
+sudo python3 /opt/els-mhd/bootstrap-source/deploy/agent/migrate_identity.py --hostname 10.0.0.1 --api-image els-mhd-api:arm64-test --web-image els-mhd-web:arm64-test
+sudo python3 /opt/els-mhd/bootstrap-source/deploy/agent/migrate_identity.py --hostname 10.0.0.1 --api-image els-mhd-api:arm64-test --web-image els-mhd-web:arm64-test --apply
+```
+
+Der Installer kontrolliert Architektur, unveränderliche Image-ID und den
+eingebetteten Quellcommit beider Images. Passt der Commit nicht zum
+rootgeschützten Quellsnapshot, bricht er ab. In diesem Modus wird kein Image
+gezogen oder gebaut. Die Prüfsumme sichert den Transfer; die Herkunft muss
+zusätzlich anhand des GitHub-Laufs geprüft werden.
+
+Ist auch `git fetch` auf dem Pi nicht möglich, den identischen Quellcommit
+auf dem PC mit `git archive --format=tar --output=els-mhd-source.tar COMMIT`
+exportieren, ebenfalls übertragen und im neuen rootgeschützten Snapshotordner
+entpacken. `BOOTSTRAP_REVISION` muss genau diesen geprüften Commit enthalten.
+Danach gelten Eigentumsprüfung und Snapshotwechsel aus Abschnitt 1 unverändert.
+Artefakte werden 14 Tage aufbewahrt; bei Bedarf den passenden Workflow erneut
+ausführen. CA-Vertrauen ist auch bei Offlineinstallation erforderlich.
 
 ## 4. Zertifikat auf den Arbeitsplätzen vertrauen
 

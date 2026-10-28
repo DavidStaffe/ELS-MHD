@@ -54,6 +54,22 @@ def hostname(value):
     return value
 
 
+def verified_image(metadata, revision):
+    if metadata.get("Os") != "linux" or metadata.get("Architecture") != "arm64":
+        raise ValueError("Offline-Images müssen für Linux/ARM64 gebaut sein.")
+    if (
+        metadata.get("Config", {})
+        .get("Labels", {})
+        .get("org.opencontainers.image.revision")
+        != revision
+    ):
+        raise ValueError("Offline-Image gehört nicht zum geprüften Quellcommit.")
+    identifier = metadata.get("Id", "")
+    if not re.fullmatch(r"sha256:[0-9a-f]{64}", identifier):
+        raise ValueError("Ungültige Image-ID.")
+    return identifier
+
+
 def bundle(previous, root, host, images):
     result = copy.deepcopy(previous)
     api, web = result["services"]["api"], result["services"]["web"]
@@ -255,7 +271,11 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--hostname", type=hostname, default="10.0.0.1")
     parser.add_argument("--apply", action="store_true")
+    parser.add_argument("--api-image")
+    parser.add_argument("--web-image")
     args = parser.parse_args()
+    if bool(args.api_image) != bool(args.web_image):
+        parser.error("Beide Offline-Images gemeinsam angeben.")
     if os.geteuid() != 0:
         raise SystemExit(
             "Lokal mit sudo ausführen. Ohne --apply wird nichts installiert."
@@ -334,6 +354,15 @@ def main():
     revision = (SOURCE / "BOOTSTRAP_REVISION").read_text().strip()
     if not re.fullmatch(r"[0-9a-f]{40}", revision):
         raise RuntimeError("Geprüfte Commit-ID fehlt.")
+    images = {}
+    if args.api_image:
+        for name, image in (("api", args.api_image), ("web", args.web_image)):
+            if not re.fullmatch(r"[a-zA-Z0-9][a-zA-Z0-9./:@_-]{1,250}", image):
+                raise ValueError("Ungültiger Image-Name.")
+            images[name] = verified_image(
+                json.loads(engine.run(["docker", "image", "inspect", image]))[0],
+                revision,
+            )
     bundle(previous, ROOT, args.hostname, {"api": active["api"], "web": active["web"]})
     if not args.apply:
         print(
@@ -353,11 +382,21 @@ def main():
     ):
         raise RuntimeError("Abgebrochen.")
     tls(engine, ROOT, args.hostname)
-    images = {}
-    for name, folder in (("api", "backend"), ("web", "frontend")):
+    for name, folder in (() if images else (("api", "backend"), ("web", "frontend"))):
         tag = f"els-mhd-{name}:identity-{revision[:12]}"
         print("Baue geprüftes Image:", name, flush=True)
-        engine.run(["docker", "build", "-t", tag, str(SOURCE / folder)], timeout=3600)
+        engine.run(
+            [
+                "docker",
+                "build",
+                "--label",
+                "org.opencontainers.image.revision=" + revision,
+                "-t",
+                tag,
+                str(SOURCE / folder),
+            ],
+            timeout=3600,
+        )
         images[name] = (
             engine.run(["docker", "image", "inspect", "--format", "{{.Id}}", tag])
             .decode()
