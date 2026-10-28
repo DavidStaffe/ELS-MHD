@@ -180,6 +180,8 @@ def main():
         raise SystemExit("Run this reviewed installer with sudo, without arguments.")
     os.umask(0o077)
     check_source()
+    if (SOURCE / "backend/core/identity.py").exists():
+        raise RuntimeError("Persönliche Identität benötigt migrate_identity.py; der Legacy-Shared-Passwort-Bootstrap ist gesperrt.")
     for name in ("update-state", "rollback", "runtime", "backups", "config"):
         (ROOT / name).mkdir(mode=0o700, exist_ok=True)
     public = ROOT / "update-public"

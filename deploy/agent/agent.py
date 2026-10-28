@@ -268,14 +268,25 @@ class Engine:
             raise Refused("Aktive Einsätze: Vorgang gesperrt.")
 
     def health(self):
+        identity_enabled = (self.root / "config/identity-required").exists()
+        context = None
+        base = "http://127.0.0.1:8080"
+        if identity_enabled:
+            import ssl
+            from urllib.parse import urlparse
+            base = (self.root / "config/identity-origin").read_text().strip()
+            parsed = urlparse(base)
+            if parsed.scheme != "https" or not parsed.hostname or parsed.path or parsed.username:
+                raise Refused("Ungültige geschützte HTTPS-Konfiguration.")
+            context = ssl.create_default_context(cafile=str(self.root / "config/tls/ca.crt"))
         for _ in range(30):
             try:
-                with urlopen("http://127.0.0.1:8080/api/meta", timeout=3) as response:
+                with urlopen(base + "/api/meta", timeout=3, context=context) as response:
                     if (
                         response.status == 200
                         and json.load(response).get("app") == "ELS MHD"
                     ):
-                        with urlopen("http://127.0.0.1:8080/", timeout=3) as web:
+                        with urlopen(base + "/", timeout=3, context=context) as web:
                             if web.status == 200:
                                 self.db(
                                     'if (!db.getSiblingDB("els_mhd").runCommand({ping:1}).ok) quit(1)'
