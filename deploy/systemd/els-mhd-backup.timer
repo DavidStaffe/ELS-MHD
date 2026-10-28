@@ -1,0 +1,11 @@
+[Unit]
+Description=Run ELS-MHD MongoDB backup each night
+
+[Timer]
+OnCalendar=*-*-* 03:00:00
+Persistent=true
+AccuracySec=1min
+Unit=els-mhd-backup.service
+
+[Install]
+WantedBy=timers.target

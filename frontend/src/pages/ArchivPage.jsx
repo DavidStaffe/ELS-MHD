@@ -69,13 +69,12 @@ export default function ArchivPage() {
         remove
     } = useIncidents();
     const navigate = useNavigate();
-    const { can, role } = useRole();
+    const { role } = useRole();
 
     const [query, setQuery] = React.useState("");
     const [confirmDelete, setConfirmDelete] = React.useState(null);
 
     const canDelete = role === "einsatzleiter";
-    const canReopen = can("incident.close"); // einsatzleiter only
 
     const archived = React.useMemo(() => {
         const q = query.trim().toLowerCase();
@@ -100,7 +99,7 @@ export default function ArchivPage() {
 
     const handleReopen = React.useCallback(
         async (incident) => {
-            if (!canReopen) return;
+            if (!incident.can_reopen) return;
             try {
                 await reopenIncident(incident.id);
                 toast.success("Incident reaktiviert");
@@ -110,7 +109,7 @@ export default function ArchivPage() {
                 toast.error("Reaktivieren fehlgeschlagen");
             }
         },
-        [canReopen, reopenIncident, setActive, navigate]
+        [reopenIncident, setActive, navigate]
     );
 
     const handleDelete = React.useCallback(async () => {
@@ -218,7 +217,7 @@ export default function ArchivPage() {
                             variant="archive"
                             openLabel="Lesen"
                             showDelete={canDelete}
-                            showReopen={canReopen}
+                            showReopen={i.can_reopen}
                             onOpen={handleOpen}
                             onReopen={handleReopen}
                             onDelete={(x) => setConfirmDelete(x)}

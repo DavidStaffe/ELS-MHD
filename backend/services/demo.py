@@ -16,7 +16,7 @@ from services.seeds import (
 logger = logging.getLogger(__name__)
 
 
-async def create_demo_incident() -> dict:
+async def create_demo_incident(*, created_by: str, el_user_id: str) -> dict:
     orte = [
         "Festplatz Sued", "Stadtpark West", "Messehalle 3",
         "Marathon KM 21", "Stadion Ost-Kurve",
@@ -38,6 +38,10 @@ async def create_demo_incident() -> dict:
         start_at=start,
     )
     doc = obj.model_dump()
+    doc["created_by"] = created_by
+    doc["assignments"] = {el_user_id: {"role": "EL"}}
+    doc["security_version"] = 1
+    doc["security_history"] = [{"action": "demo.create", "user_id": created_by, "el_user_id": el_user_id, "at": iso(now_utc())}]
     for k in ("start_at", "end_at", "created_at", "updated_at"):
         if isinstance(doc.get(k), datetime):
             doc[k] = iso(doc[k])

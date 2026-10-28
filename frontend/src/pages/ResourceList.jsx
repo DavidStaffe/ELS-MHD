@@ -623,12 +623,12 @@ export default function ResourceList() {
 
     const loadVehicles = React.useCallback(async () => {
         try {
-            const v = await listDiveraVehicles();
+            const v = await listDiveraVehicles(activeIncident?.id);
             setVehicles(Array.isArray(v) ? v : []);
         } catch {
             setVehicles([]);
         }
-    }, []);
+    }, [activeIncident?.id]);
 
     React.useEffect(() => {
         loadAbschnitte();

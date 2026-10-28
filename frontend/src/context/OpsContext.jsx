@@ -108,7 +108,7 @@ export function OpsProvider({ children }) {
         const connect = () => {
             if (disposed) return;
             try {
-                es = new EventSource(`${API_BASE}/incidents/stream`);
+                es = new EventSource(`${API_BASE}/incidents/stream`, { withCredentials: true });
             } catch {
                 reconnectTimer = window.setTimeout(connect, 2000);
                 return;

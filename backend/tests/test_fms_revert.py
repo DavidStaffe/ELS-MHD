@@ -408,7 +408,7 @@ class TestSetVehicleStatusUnit:
         sys.path.insert(0, "/app/backend")
         from services import divera as divera_module
 
-        monkeypatch.setattr(divera_module, "DIVERA_API_KEY", "DUMMYKEY")
+        monkeypatch.setattr(divera_module, "current_key", AsyncMock(return_value="DUMMYKEY"))
         monkeypatch.setattr(divera_module, "DIVERA_BASE_URL", "https://divera247.com")
         monkeypatch.setattr(divera_module.httpx, "AsyncClient", _FakeAsyncClient)
         _FakeAsyncClient.last_url = None
@@ -431,7 +431,7 @@ class TestSetVehicleStatusUnit:
         sys.path.insert(0, "/app/backend")
         from services import divera as divera_module
 
-        monkeypatch.setattr(divera_module, "DIVERA_API_KEY", "DUMMYKEY")
+        monkeypatch.setattr(divera_module, "current_key", AsyncMock(return_value="DUMMYKEY"))
         monkeypatch.setattr(divera_module.httpx, "AsyncClient", _FakeAsyncClient)
         _FakeAsyncClient.response_payload = {"success": False, "message": "Invalid vehicle"}
 
@@ -439,14 +439,15 @@ class TestSetVehicleStatusUnit:
             asyncio.run(divera_module.set_vehicle_status(
                 divera_id="V123", status_id=4, status_note="SPRECHEN SIE",
             ))
-        assert "Invalid vehicle" in str(exc_info.value)
+        assert "abgelehnt" in str(exc_info.value)
+        assert "Invalid vehicle" not in str(exc_info.value)
 
     def test_set_vehicle_status_missing_divera_id_raises(self, monkeypatch):
         import sys
         sys.path.insert(0, "/app/backend")
         from services import divera as divera_module
 
-        monkeypatch.setattr(divera_module, "DIVERA_API_KEY", "DUMMYKEY")
+        monkeypatch.setattr(divera_module, "current_key", AsyncMock(return_value="DUMMYKEY"))
         with pytest.raises(ValueError):
             asyncio.run(divera_module.set_vehicle_status(
                 divera_id="", status_id=4,

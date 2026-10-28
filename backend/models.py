@@ -43,6 +43,7 @@ class IncidentBase(BaseModel):
 
 
 class IncidentCreate(IncidentBase):
+    el_user_id: str
     start_at: Optional[datetime] = None
     status: IncidentStatus = "operativ"
     demo: bool = False

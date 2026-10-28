@@ -23,7 +23,10 @@ import AbschlussPage from "@/pages/AbschlussPage";
 import AbschnittList from "@/pages/AbschnittList";
 import BettenPage from "@/pages/BettenPage";
 import KeywordsPage from "@/pages/KeywordsPage";
+import SystemUpdatesPage from "@/pages/SystemUpdatesPage";
 import EinstellungenPage from "@/pages/EinstellungenPage";
+import UsersPage from "@/pages/UsersPage";
+import GovernancePage from "@/pages/GovernancePage";
 
 function App() {
     return (
@@ -47,7 +50,10 @@ function App() {
                                         <Route path="/abschnitte" element={<AbschnittList />} />
                                         <Route path="/betten" element={<BettenPage />} />
                                         <Route path="/keywords" element={<KeywordsPage />} />
+                                        <Route path="/system-updates" element={<SystemUpdatesPage />} />
                                         <Route path="/einstellungen" element={<EinstellungenPage />} />
+                                        <Route path="/benutzer" element={<UsersPage />} />
+                                        <Route path="/einsatzrechte" element={<GovernancePage />} />
                                         <Route path="/kommunikation" element={<Funktagebuch />} />
                                         <Route path="/funktagebuch" element={<Funktagebuch />} />
                                         <Route path="/kommunikation-legacy" element={<MessageList />} />
