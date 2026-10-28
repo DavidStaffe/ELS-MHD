@@ -15,12 +15,26 @@ jobs:
       - name: Create disposable TLS and configuration
         run: |
           mkdir -p deploy/secrets/tls .cache
-          openssl req -x509 -newkey rsa:2048 -nodes -days 1 -subj /CN=localhost -addext 'subjectAltName=DNS:localhost,IP:127.0.0.1' -keyout deploy/secrets/tls/server.key -out deploy/secrets/tls/server.crt 2>/dev/null
+          sudo python3 - <<'PY'
+          import os, pathlib, shutil, subprocess, sys, tempfile
+          sys.path.insert(0, str(pathlib.Path('deploy/agent').resolve()))
+          from migrate_identity import tls
+          class Commands:
+              def run(self, args):
+                  return subprocess.run(args, check=True, capture_output=True).stdout
+          with tempfile.TemporaryDirectory(prefix='els-mhd-test-tls-') as directory:
+              root = pathlib.Path(directory)
+              tls(Commands(), root, '10.0.0.1')
+              for filename in ('server.crt', 'server.key', 'ca.crt'):
+                  target = pathlib.Path('deploy/secrets/tls') / filename
+                  shutil.copyfile(root / 'config/tls' / filename, target)
+                  os.chmod(target, 0o600 if filename.endswith('.key') else 0o644)
+          PY
           printf 'MONGO_PASSWORD=%s\nELS_HTTPS_ORIGIN=https://localhost:8443\nELS_HTTPS_BIND=127.0.0.1\nELS_HTTPS_PORT=8443\n' "$(openssl rand -hex 32)" > .cache/integration.env
       - name: Build and start isolated installation
         run: docker compose -p els-mhd-test-ci --env-file .cache/integration.env -f deploy/compose.yaml -f deploy/compose.https.yaml up -d --build
       - name: Verify real installation and restart
-        run: python deploy/identity_smoke.py --project els-mhd-test-ci --env-file .cache/integration.env --origin https://localhost:8443 --ca deploy/secrets/tls/server.crt
+        run: python deploy/identity_smoke.py --project els-mhd-test-ci --env-file .cache/integration.env --origin https://localhost:8443 --ca deploy/secrets/tls/ca.crt
       - name: Remove only disposable project
         if: always()
         run: docker compose -p els-mhd-test-ci --env-file .cache/integration.env -f deploy/compose.yaml -f deploy/compose.https.yaml down --volumes

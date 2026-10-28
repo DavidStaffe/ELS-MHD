@@ -114,3 +114,24 @@ def test_legacy_bootstrap_refuses_identity_source_before_touching_runtime(
     with pytest.raises(RuntimeError, match="migrate_identity"):
         bootstrap.main()
     engine.assert_not_called()
+
+
+def test_interrupted_supervisor_copy_preserves_existing_code(tmp_path, monkeypatch):
+    source, target = tmp_path / "reviewed.py", tmp_path / "installed.py"
+    source.write_text("new reviewed code")
+    target.write_text("old complete code")
+    monkeypatch.setattr(
+        migration.os, "replace", Mock(side_effect=OSError("synthetic interruption"))
+    )
+    with pytest.raises(OSError):
+        migration.copy_atomic(source, target)
+    assert target.read_text() == "old complete code"
+    assert sorted(p.name for p in tmp_path.iterdir()) == ["installed.py", "reviewed.py"]
+
+
+def test_supervisor_code_is_replaced_as_a_complete_file(tmp_path):
+    source, target = tmp_path / "reviewed.py", tmp_path / "installed.py"
+    source.write_text("new reviewed code")
+    target.write_text("old complete code")
+    migration.copy_atomic(source, target)
+    assert target.read_text() == "new reviewed code"

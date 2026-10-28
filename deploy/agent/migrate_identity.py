@@ -16,10 +16,33 @@ from pathlib import Path
 import re
 import secrets
 import shutil
+import socket
 import time
+import tempfile
 
 from agent import Engine, ROOT, BUSY, atomic, read
 from bootstrap import SOURCE, check_source, secret, share_api_secret
+
+
+def copy_atomic(source, target):
+    temporary = None
+    try:
+        with tempfile.NamedTemporaryFile(dir=target.parent, delete=False) as stream:
+            temporary = Path(stream.name)
+            stream.write(source.read_bytes())
+            stream.flush()
+            os.fsync(stream.fileno())
+        os.chmod(temporary, 0o644)
+        os.replace(temporary, target)
+        if os.name == "posix":
+            directory = os.open(target.parent, os.O_RDONLY | os.O_DIRECTORY)
+            try:
+                os.fsync(directory)
+            finally:
+                os.close(directory)
+    finally:
+        if temporary:
+            temporary.unlink(missing_ok=True)
 
 
 def hostname(value):
@@ -239,7 +262,12 @@ def main():
         )
     os.umask(0o077)
     check_source()
-    for directory in (ROOT / "config", ROOT / "runtime", ROOT / "update-state"):
+    for directory in (
+        ROOT / "config",
+        ROOT / "runtime",
+        ROOT / "update-state",
+        Path("/usr/local/lib/els-mhd"),
+    ):
         for path in (directory, *directory.rglob("*")):
             info = path.lstat()
             if path.is_symlink() or info.st_uid != 0 or info.st_mode & 0o022:
@@ -256,6 +284,22 @@ def main():
     if engine.state["state"] in BUSY | {"recovery_required"}:
         raise RuntimeError("Laufenden/unterbrochenen Updatevorgang zuerst klären.")
     engine.safe()
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as listener:
+        try:
+            listener.bind(("0.0.0.0", 443))
+        except OSError:
+            raise RuntimeError(
+                "Port 443 ist belegt. Vor der Migration vorhandenen HTTPS-Dienst lokal klären."
+            ) from None
+    for service in ("api", "web"):
+        actual_image = engine.run(
+            ["docker", "inspect", "--format", "{{.Image}}", f"els-mhd-{service}-1"]
+        ).strip()
+        pinned_image = engine.run(
+            ["docker", "image", "inspect", "--format", "{{.Id}}", active[service]]
+        ).strip()
+        if actual_image != pinned_image:
+            raise RuntimeError("Laufende Images weichen vom geprüften Checkpoint ab.")
     if shutil.disk_usage(ROOT).free < 8 * 1024**3:
         raise RuntimeError("Mindestens 8 GiB freier Speicher erforderlich.")
     if _is_ip(args.hostname):
@@ -355,6 +399,11 @@ def main():
             SOURCE / "frontend/deploy/nginx-https.conf",
             ROOT / "runtime/nginx-identity.conf",
         )
+        # Install the schema-2-aware reboot supervisor before setting the floor.
+        for path in sorted(
+            (SOURCE / "deploy/agent").glob("*.py"), key=lambda p: p.name == "agent.py"
+        ):
+            copy_atomic(path, Path("/usr/local/lib/els-mhd") / path.name)
         secret(ROOT / "config/identity-origin", "https://" + args.hostname)
         secret(ROOT / "config/identity-required", "2\n")
         target = {
@@ -379,6 +428,14 @@ def main():
         atomic(archive / "identity-compose.json", updated)
         engine.run(["/usr/local/lib/els-mhd/backup-external.sh"], timeout=1800)
         atomic(journal, {"phase": "install", "revision": revision})
+        engine.save(
+            "deploy",
+            action="identity-migration",
+            before=target,
+            before_previous=target,
+            target_version=target["version"],
+            error=None,
+        )
         engine.install()
         engine.health()
         code = (
@@ -388,8 +445,11 @@ def main():
             .decode()
             .strip()
         )
-        for path in (SOURCE / "deploy/agent").glob("*.py"):
-            shutil.copyfile(path, Path("/usr/local/lib/els-mhd") / path.name)
+        engine.save(
+            "complete",
+            message="Identitätsmigration abgeschlossen; persönliche Ersteinrichtung vorbereiten.",
+            error=None,
+        )
         atomic(journal, {"phase": "complete", "revision": revision})
         engine.gate(False)
     engine.run(["systemctl", "daemon-reload"])
