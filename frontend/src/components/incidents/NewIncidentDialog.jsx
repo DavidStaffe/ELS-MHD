@@ -21,6 +21,8 @@ import {
 } from '@/components/ui/select';
 import { MapPicker } from '@/components/map/MapPicker';
 import { toLocalInput, fromLocalInput } from '@/lib/time';
+import { api } from '@/lib/api';
+import { useRole } from '@/context/RoleContext';
 
 const TYPEN = [
   { value: 'veranstaltung', label: 'Veranstaltung' },
@@ -35,6 +37,16 @@ function defaultStart() {
 }
 
 export function NewIncidentDialog({ open, onOpenChange, onCreate }) {
+  const { user } = useRole();
+  const [leaders, setLeaders] = React.useState([]);
+  const [leaderId, setLeaderId] = React.useState('');
+  React.useEffect(() => {
+    if (!open) return;
+    api.get('/leadership-candidates').then(({ data }) => {
+      setLeaders(data);
+      setLeaderId(data.some(u => u.id === user.id) ? user.id : '');
+    }).catch(() => setLeaders([]));
+  }, [open, user.id]);
   const [name, setName] = React.useState('');
   const [typ, setTyp] = React.useState('veranstaltung');
   const [ort, setOrt] = React.useState('');
@@ -70,6 +82,7 @@ export function NewIncidentDialog({ open, onOpenChange, onCreate }) {
     setError(null);
     try {
       const payload = {
+        el_user_id: leaderId,
         name: name.trim(),
         typ,
         ort: ort.trim(),
@@ -111,6 +124,12 @@ export function NewIncidentDialog({ open, onOpenChange, onCreate }) {
         </DialogHeader>
 
         <form onSubmit={handleSubmit} className="space-y-4">
+          <label className="block">Einsatzleitung (erforderlich)
+            <select className="w-full bg-background border rounded-md p-2" required value={leaderId} onChange={e => setLeaderId(e.target.value)}>
+              <option value="">Geeignete EL auswählen</option>
+              {leaders.map(u => <option key={u.id} value={u.id}>{u.display_name}</option>)}
+            </select>
+          </label>
           <div className="space-y-1.5">
             <Label htmlFor="nin-name">
               Name <span className="text-status-red">*</span>

@@ -1,3 +1,4 @@
+import { Link } from 'react-router-dom';
 import * as React from 'react';
 import {
   getDiveraStatus,
@@ -17,7 +18,7 @@ import {
   CheckCircle2,
 } from 'lucide-react';
 import { toast } from 'sonner';
-import { Link } from 'react-router-dom';
+
 
 /**
  * DiveraPanel – kompakte Status- & Start/Stop-Steuerung pro Incident.
@@ -60,7 +61,7 @@ export function DiveraPanel({ incidentId, disabled = false, onChange }) {
           <RadioTower className="h-3.5 w-3.5" />
           <span className="text-foreground font-medium">Divera 24/7</span>
         </div>
-        Kein API-Key konfiguriert. <Link to="/einstellungen" className="underline">In Einstellungen hinterlegen</Link>.
+        Kein API-Key konfiguriert. <Link to="/einstellungen" className="underline">Globale Einstellungen öffnen</Link>.
       </div>
     );
   }
@@ -79,7 +80,9 @@ export function DiveraPanel({ incidentId, disabled = false, onChange }) {
     try {
       if (checked) {
         const r = await startDiveraPolling(incidentId);
-        toast.success('Divera-Synchronisierung gestartet');
+        toast.success(
+          r.first_sync?.ok ? 'Synchronisierung aktiviert · Abruf erfolgreich' : 'Synchronisierung aktiviert · Abruf noch nicht erfolgreich'
+        );
       } else {
         await stopDiveraPolling(incidentId);
         toast.success('Divera-Sync gestoppt');
@@ -134,7 +137,7 @@ export function DiveraPanel({ incidentId, disabled = false, onChange }) {
           </div>
         </div>
         <Switch
-          checked={status.running}
+          checked={status.enabled}
           onCheckedChange={handleToggle}
           disabled={busy || disabled}
           data-testid="divera-toggle"
@@ -156,7 +159,7 @@ export function DiveraPanel({ incidentId, disabled = false, onChange }) {
         )}
         {!lastOk && !lastError && (
           <StatusBadge tone="gray" variant="soft" size="sm">
-            inaktiv
+            {status.enabled ? 'aktiviert · wartet auf Abruf' : 'inaktiv'}
           </StatusBadge>
         )}
         <span className="font-mono text-[10px] truncate">

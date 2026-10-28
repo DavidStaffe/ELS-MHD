@@ -1,77 +1,107 @@
-"""Installation-wide, encrypted DIVERA configuration.
-
-A Fernet key and a separate admin password are provisioned once by the operator.
-Never return stored credentials through an API response or log them.
-"""
-import hmac
-import os
+"""Encrypted installation settings. Encryption key is held outside MongoDB."""
 
 from cryptography.fernet import Fernet, InvalidToken
-from fastapi import HTTPException, Header
-
+from core.admin import secret_setting
 from core.db import db
 from core.time import iso, now_utc
 
-ALLOWED_INTERVALS = (5, 10, 20, 30, 60, 120, 300)
-DOCUMENT_ID = "divera"
-DEFAULT_INTERVAL = int(os.environ.get("DIVERA_POLL_INTERVAL_SECONDS", "30"))
-if DEFAULT_INTERVAL not in ALLOWED_INTERVALS:
-    DEFAULT_INTERVAL = 30
+INTERVALS = (5, 10, 20, 30, 60, 120, 300)
 
 
-def require_admin(x_els_admin_password: str = Header(default="", alias="X-ELS-Admin-Password")) -> None:
-    """Temporary independent admin credential until authenticated users exist."""
-    configured = os.environ.get("ELS_ADMIN_PASSWORD", "")
-    if not configured:
-        raise HTTPException(503, "Administrator-Passwort ist noch nicht eingerichtet")
-    if not hmac.compare_digest(x_els_admin_password.encode(), configured.encode()):
-        raise HTTPException(403, "Administrator-Passwort ungültig")
-
-
-def _cipher() -> Fernet:
-    secret = os.environ.get("ELS_SETTINGS_ENCRYPTION_KEY", "")
-    if not secret:
-        raise HTTPException(503, "ELS_SETTINGS_ENCRYPTION_KEY muss einmalig eingerichtet werden")
+def cipher():
     try:
-        return Fernet(secret.encode())
-    except (ValueError, TypeError):
-        raise HTTPException(503, "ELS_SETTINGS_ENCRYPTION_KEY ist ungültig")
+        return Fernet(secret_setting("ELS_CONFIG_ENCRYPTION_KEY").encode())
+    except (ValueError, OSError):
+        raise ValueError(
+            "Konfigurationsverschlüsselung ist nicht eingerichtet."
+        ) from None
 
 
-async def get_config() -> dict:
-    doc = await db.global_settings.find_one({"_id": DOCUMENT_ID})
-    key = os.environ.get("DIVERA_API_KEY", "")
-    interval = DEFAULT_INTERVAL
-    if doc:
-        interval = doc.get("interval_seconds", interval)
-        encrypted = doc.get("api_key_encrypted")
-        if encrypted:
-            try:
-                key = _cipher().decrypt(encrypted.encode()).decode()
-            except (InvalidToken, UnicodeDecodeError):
-                raise HTTPException(503, "Gespeicherter DIVERA-Key kann nicht entschlüsselt werden")
-    return {"api_key": key, "interval_seconds": interval}
+async def settings():
+    current = await db.system_settings.find_one({"_id": "divera"})
+    if current:
+        return current
+    legacy = await db.global_settings.find_one({"_id": "divera"})
+    if legacy:
+        # PR #6 used another collection and encryption-key setting. Read it
+        # without overwriting or deleting the original rollback-compatible copy.
+        return {"interval": legacy.get("interval_seconds", 30), "legacy_encrypted_key": legacy.get("api_key_encrypted")}
+    return {"interval": 30}
 
 
-async def public_config() -> dict:
-    config = await get_config()
-    return {"configured": bool(config["api_key"]),
-            "poll_interval_seconds": config["interval_seconds"]}
+async def current_key():
+    config = await settings()
+    if config.get("legacy_encrypted_key"):
+        try:
+            key = secret_setting("ELS_SETTINGS_ENCRYPTION_KEY")
+            return Fernet(key.encode()).decrypt(config["legacy_encrypted_key"].encode()).decode()
+        except (ValueError, InvalidToken, OSError, UnicodeDecodeError):
+            raise ValueError("Alter DIVERA-Key nicht entschlüsselbar; Legacy-Verschlüsselung prüfen.") from None
+    encrypted = config.get("encrypted_key")
+    if encrypted:
+        try:
+            return cipher().decrypt(encrypted.encode()).decode()
+        except InvalidToken:
+            raise ValueError(
+                "Gespeicherter DIVERA-Key kann nicht entschlüsselt werden."
+            ) from None
+    # Compatibility fallback until an administrator saves a replacement.
+    return secret_setting("DIVERA_API_KEY")
 
 
-async def save_config(*, api_key: str | None = None, interval_seconds: int | None = None) -> dict:
-    changes = {"updated_at": iso(now_utc())}
-    if interval_seconds is not None:
-        if interval_seconds not in ALLOWED_INTERVALS:
-            raise HTTPException(422, "Unzulässiges Abrufintervall")
-        changes["interval_seconds"] = interval_seconds
-    if api_key is not None:
-        if not api_key.strip():
-            raise HTTPException(422, "API-Key darf nicht leer sein")
-        changes["api_key_encrypted"] = _cipher().encrypt(api_key.strip().encode()).decode()
-    if len(changes) < 2:
-        raise HTTPException(400, "Keine Änderung angegeben")
-    await db.global_settings.update_one(
-        {"_id": DOCUMENT_ID}, {"$set": changes}, upsert=True
+async def initialize():
+    # Idempotent migration: never overwrite a key set through the web interface.
+    config = await settings()
+    legacy = await current_key()
+    if legacy:
+        encrypted = cipher().encrypt(legacy.encode()).decode()
+        await db.system_settings.update_one(
+            {"_id": "divera"}, {"$setOnInsert": {"interval": config.get("interval", 30)}}, upsert=True
+        )
+        await db.system_settings.update_one(
+            {"_id": "divera", "encrypted_key": {"$exists": False}},
+            {"$set": {"encrypted_key": encrypted}},
+        )
+
+
+async def public_settings():
+    config = await settings()
+    try:
+        configured = bool(await current_key())
+        error = None
+    except (ValueError, OSError):
+        configured = False
+        error = (
+            "Gespeicherter Key nicht lesbar; Verschlüsselung prüfen oder Key ersetzen."
+        )
+    return {
+        "configured": configured,
+        "poll_interval_seconds": config.get("interval", 30),
+        "intervals": INTERVALS,
+        "five_seconds_allowed": False,
+        "configuration_error": error,
+        "key_verified_at": config.get("key_verified_at"),
+    }
+
+
+async def save(*, key=None, interval=None):
+    changes = {}
+    if interval is not None:
+        if interval not in INTERVALS or interval == 5:
+            raise ValueError(
+                "Intervall unzulässig; 5 Sekunden sind bis zur DIVERA-Limitprüfung gesperrt."
+            )
+        changes["interval"] = interval
+    if key is not None:
+        changes.update(
+            encrypted_key=cipher().encrypt(key.encode()).decode(),
+            key_verified_at=iso(now_utc()),
+        )
+    await db.system_settings.update_one(
+        {"_id": "divera"},
+        {
+            "$set": changes,
+            "$setOnInsert": {} if interval is not None else {"interval": 30},
+        },
+        upsert=True,
     )
-    return await public_config()
