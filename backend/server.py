@@ -24,6 +24,7 @@ from routes.abschnitte import router as abschnitte_router
 from routes.betten import router as betten_router
 from routes.analytics import router as analytics_router
 from routes.divera import router as divera_router
+from routes.patient_disposition import router as patient_disposition_router
 from routes.keywords import router as keywords_router
 from routes.system_updates import router as system_updates_router
 from services import divera_polling as divera_service
@@ -77,6 +78,7 @@ for r in (
     betten_router,
     analytics_router,
     divera_router,
+    patient_disposition_router,
     keywords_router,
     system_updates_router,
     admin_router,

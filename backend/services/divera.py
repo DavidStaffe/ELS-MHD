@@ -138,6 +138,7 @@ async def apply_vehicles(incident_id: str, vehicles: List[Dict[str, Any]]) -> Di
                 d_lng = float(d_lng)
                 # Plausibilitaetscheck: 0/0 ist meist "kein Fix"
                 if abs(d_lat) > 0.01 or abs(d_lng) > 0.01:
+                    update["position_updated_at"] = iso(now)
                     if d_lat != resource.get("lat") or d_lng != resource.get("lng"):
                         update["lat"] = d_lat
                         update["lng"] = d_lng

@@ -27,7 +27,7 @@ import {
     PATIENT_STATUS,
     PATIENT_VERBLEIB
 } from "@/lib/patient-meta";
-import { listKeywords } from "@/lib/api";
+import { listKeywords, listAbschnitte } from "@/lib/api";
 
 export function PatientDialog({
     open,
@@ -48,6 +48,9 @@ export function PatientDialog({
     const [error, setError] = React.useState(null);
     const [keywords, setKeywords] = React.useState([]);
     const [resources, setResources] = React.useState([]);
+    const [abschnitte, setAbschnitte] = React.useState([]);
+    const [abschnittId, setAbschnittId] = React.useState(initial?.abschnitt_id || "none");
+    const [auffindeort, setAuffindeort] = React.useState(initial?.auffindeort || "");
     const [loadingResources, setLoadingResources] = React.useState(false);
     
     const isDummy = !sichtung;
@@ -57,6 +60,8 @@ export function PatientDialog({
     React.useEffect(() => {
         if (!open) return;
         setSichtung(initial?.sichtung ?? "");
+        setAbschnittId(initial?.abschnitt_id || "none");
+        setAuffindeort(initial?.auffindeort || "");
         setStatus(initial?.status ?? "wartend");
         setVerbleib(initial?.verbleib ?? "unbekannt");
         setNotiz(initial?.notiz ?? "");
@@ -67,6 +72,7 @@ export function PatientDialog({
         
         listKeywords(true).then(data => setKeywords(data)).catch(() => {});
         if (activeIncident) {
+            listAbschnitte(activeIncident.id, { aktiv: true }).then(setAbschnitte).catch(() => setAbschnitte([]));
             setLoadingResources(true);
             require('@/lib/api').listResources(activeIncident.id).then(data => setResources(data)).catch(() => {}).finally(() => setLoadingResources(false));
         }
@@ -91,7 +97,9 @@ export function PatientDialog({
             const payload = {
                 status,
                 verbleib,
-                notiz: notiz.trim()
+                notiz: notiz.trim(),
+                abschnitt_id: abschnittId === "none" ? null : abschnittId,
+                auffindeort: auffindeort.trim() || null
             };
             if (sichtung) {
                 payload.sichtung = sichtung;
@@ -99,16 +107,8 @@ export function PatientDialog({
                 payload.sichtung = null;
             }
             
-            if (isDummy) {
-                if (!behandlungRessourceId || behandlungRessourceId === "none") {
-                    throw new Error("Erzeugende Ressource (Streife) ist bei Dummy-Patienten erforderlich.");
-                }
-                const selectedRes = resources.find(r => r.id === behandlungRessourceId);
-                payload.behandlung_ressource_id = behandlungRessourceId;
-                payload.created_by_resource = selectedRes ? selectedRes.name : createdByResource;
-            } else {
-                payload.behandlung_ressource_id = (behandlungRessourceId && behandlungRessourceId !== "none") ? behandlungRessourceId : null;
-            }
+            // Disposition follows creation. No reporting unit is mandatory for a dummy.
+
             if (keywordId) payload.keyword_id = keywordId;
 
             await onSubmit(payload, isDummy);
@@ -143,22 +143,18 @@ export function PatientDialog({
 
                 <form onSubmit={handleSubmit} className="space-y-4">
                     
-                    {isDummy && (
-                        <div className="space-y-1.5">
-                            <Label htmlFor="pd-resource">Erzeugende Ressource / Streife *</Label>
-                            <Select value={behandlungRessourceId} onValueChange={setBehandlungRessourceId} required={isDummy}>
-                                <SelectTrigger className="mt-1" id="pd-resource" data-testid="pd-resource">
-                                    <SelectValue placeholder="Ressource wählen" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    {resources.map((r) => (
-                                        <SelectItem key={r.id} value={r.id}>{r.name}</SelectItem>
-                                    ))}
-                                </SelectContent>
-                            </Select>
-                            <div className="text-xs text-muted-foreground mt-1">Ohne Sichtungskategorie wird der Patient automatisch als DUMMY angelegt.</div>
-                        </div>
-                    )}
+                    <div className="space-y-2">
+                      <Label>Einsatzabschnitt</Label>
+                      <Select value={abschnittId} onValueChange={setAbschnittId}>
+                        <SelectTrigger><SelectValue placeholder="Abschnitt auswählen" /></SelectTrigger>
+                        <SelectContent><SelectItem value="none">Unbekannt / noch offen</SelectItem>
+                          {abschnitte.map(a => <SelectItem key={a.id} value={a.id}>{a.name}</SelectItem>)}
+                        </SelectContent>
+                      </Select>
+                      <Label htmlFor="pd-auffindeort">Genauer Auffindeort (optional)</Label>
+                      <Input id="pd-auffindeort" value={auffindeort} maxLength={250}
+                        onChange={e => setAuffindeort(e.target.value)} placeholder="z.B. Eingang Nord, Block A" />
+                    </div>
 
                     <div className="space-y-2">
                         <Label>Sichtungsstufe {isDummy ? "(Optional)" : ""}</Label>

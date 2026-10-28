@@ -6,6 +6,7 @@ import json
 from typing import List, Optional
 
 from fastapi import APIRouter, HTTPException, Request
+from pydantic import BaseModel
 from fastapi.responses import StreamingResponse
 
 from core.db import db
@@ -103,6 +104,13 @@ async def create_patient(incident_id: str, payload: PatientCreate):
         kennung=kennung,
     )
     patient.is_dummy = not bool(patient.sichtung)
+    patient.sichtung_bestaetigt = False
+    if patient.abschnitt_id:
+        a = await db.abschnitte.find_one({"id": patient.abschnitt_id, "incident_id": incident_id, "aktiv": True})
+        if not a:
+            raise HTTPException(422, "Einsatzabschnitt nicht vorhanden oder inaktiv")
+    if patient.zugewiesene_ressource_id:
+        raise HTTPException(422, "Ressource bitte nach Erstellung separat disponieren")
     resource_change_ts = iso(now)
     if patient.behandlung_ressource_id:
         resource = await db.resources.find_one(
@@ -128,8 +136,10 @@ async def create_patient(incident_id: str, payload: PatientCreate):
         ]
     if patient.sichtung:
         patient.sichtung_at = now
-        if payload.status == "wartend":
-            patient.status = "in_behandlung"
+        patient.sichtung_events = [{"ts": iso(now), "action": "initial_provisional",
+                                   "from_sichtung": None, "to_sichtung": patient.sichtung,
+                                   "reported_by": None, "entered_by": None}]
+    patient.status = "wartend"
     doc = patient.model_dump()
     for k in (
         "created_at",
@@ -201,15 +211,23 @@ async def update_patient(patient_id: str, payload: PatientUpdate):
         update["sichtung_at"] = iso(now)
 
     if "sichtung" in update and existing.get("sichtung") != update["sichtung"]:
+        update["sichtung_bestaetigt"] = False
         sichtung_history = list(existing.get("sichtung_events") or [])
         sichtung_history.append(
             {
                 "ts": iso(now),
                 "from_sichtung": existing.get("sichtung"),
                 "to_sichtung": update["sichtung"],
+                "action": "changed_provisional",
+                "reported_by": None, "entered_by": None,
             }
         )
         update["sichtung_events"] = sichtung_history
+
+    if "abschnitt_id" in update and update["abschnitt_id"]:
+        a = await db.abschnitte.find_one({"id": update["abschnitt_id"], "incident_id": existing["incident_id"], "aktiv": True})
+        if not a:
+            raise HTTPException(422, "Einsatzabschnitt nicht vorhanden oder inaktiv")
 
     if "behandlung_ressource_id" in update:
         old_resource_id = existing.get("behandlung_ressource_id")
@@ -380,10 +398,13 @@ async def delete_patient(patient_id: str):
     existing = await db.patients.find_one(
         {"id": patient_id}, {"_id": 0, "incident_id": 1}
     )
+    if existing:
+        await release_bett_for_patient(patient_id)
     result = await db.patients.delete_one({"id": patient_id})
     if result.deleted_count == 0:
         raise HTTPException(status_code=404, detail="Patient nicht gefunden")
     await db.transports.delete_many({"patient_id": patient_id})
+    await db.resources.update_many({"bound_patient_id": patient_id}, {"$set": {"bound_patient_id": None}})
     if existing and existing.get("incident_id"):
         await publish_patient_event(
             existing["incident_id"],
@@ -409,6 +430,13 @@ async def create_dummy_patient(incident_id: str, payload: PatientCreate):
         )
     
     payload.is_dummy = True
+    payload.sichtung = None
+    payload.status = "wartend"
+    payload.sichtung_bestaetigt = False
+    if payload.abschnitt_id:
+        a = await db.abschnitte.find_one({"id": payload.abschnitt_id, "incident_id": incident_id, "aktiv": True})
+        if not a:
+            raise HTTPException(422, "Einsatzabschnitt nicht vorhanden oder inaktiv")
     kennung = await next_kennung(incident_id)
     now = now_utc()
     patient = Patient(
@@ -490,4 +518,46 @@ async def move_to_waiting_area(patient_id: str):
             "ts": iso(now_utc()),
         },
     )
+    return result
+
+
+class SichtungBestaetigen(BaseModel):
+    sichtung: str
+    meldende_ressource_id: Optional[str] = None
+    bemerkung: Optional[str] = None
+
+
+@router.post("/patients/{patient_id}/sichtung-confirm")
+async def confirm_sichtung(patient_id: str, payload: SichtungBestaetigen):
+    """Record every wireless triage confirmation, including unchanged categories.
+
+    User attribution is deliberately unavailable until a trusted login is introduced.
+    Never accept user identity or role from an untrusted client payload.
+    """
+    if payload.sichtung not in ("S0", "S1", "S2", "S3"):
+        raise HTTPException(422, "Ungültige Sichtung")
+    patient = await db.patients.find_one({"id": patient_id}, {"_id": 0})
+    if not patient:
+        raise HTTPException(404, "Patient nicht gefunden")
+    if payload.meldende_ressource_id:
+        r = await db.resources.find_one({"id": payload.meldende_ressource_id,
+                                         "incident_id": patient["incident_id"]})
+        if not r:
+            raise HTTPException(422, "Meldende Ressource nicht gefunden")
+    now = iso(now_utc())
+    event = {"ts": now, "action": "confirmed" if patient.get("sichtung") == payload.sichtung else "changed",
+             "from_sichtung": patient.get("sichtung"), "to_sichtung": payload.sichtung,
+             "reported_by": payload.meldende_ressource_id,
+             "entered_by": None, "note": payload.bemerkung}
+    confirmed_fields = {"sichtung": payload.sichtung, "sichtung_bestaetigt": True,
+                        "is_dummy": False, "updated_at": now}
+    if not patient.get("sichtung_at"):
+        confirmed_fields["sichtung_at"] = now
+    result = await db.patients.find_one_and_update(
+        {"id": patient_id}, {"$set": confirmed_fields,
+                              "$push": {"sichtung_events": event}},
+        return_document=True, projection={"_id": 0}
+    )
+    await publish_patient_event(patient["incident_id"], {"kind": "patient", "action": "sichtung_confirmed",
+                                                           "patient_id": patient_id, "ts": now})
     return result

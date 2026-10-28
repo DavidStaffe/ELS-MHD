@@ -617,7 +617,7 @@ export default function PatientList() {
       </div>
 
       {/* Schnellerfassung sticky bottom */}
-      <QuickEntryBar onQuickCreate={handleQuickCreate} onOpenDialog={openNew} />
+      <div className="sticky bottom-0 border-t border-border bg-background p-3 flex justify-center gap-3"><Button onClick={() => navigate("/patienten/schnell")}>Schnellerfassung nach Abschnitt</Button><Button variant="outline" onClick={openNew}>Detaillierte Einzelanlage</Button></div>
 
       <PatientDialog
         open={dialogOpen}
