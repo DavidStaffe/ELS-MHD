@@ -1,4 +1,10 @@
 # ELS-MHD Docker development smoke test (not production)
+
+**Aktueller persönlicher Login und Installation für 10.0.0.1:**
+Die folgende historische Smoke-Anleitung ist keine Installationsanleitung für
+den abgesicherten Stand. Verwende [den geprüften Migrationsweg](../docs/installation-10.0.0.1.md).
+Der alte Shared-Admin-Bootstrap ist für Identity-Images gesperrt. Die API besitzt
+in diesem Stand serverseitige Authentifizierung; Secure-Cookies benötigen HTTPS.
 For the opt-in secured web update supervisor, installation, release approval and recovery, see [System & Updates](../docs/web-update-management.md). After adopting it, use its pinned start path rather than the build commands below.
 The stack binds the web UI to **127.0.0.1:8080 only**; do not expose it to the LAN. The API currently lacks server-side authentication; use dummy/test data only.
 

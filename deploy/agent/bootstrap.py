@@ -174,14 +174,13 @@ def smoke(engine, target, db_image):
 
 
 def main():
-    import fcntl
-
     if os.geteuid() != 0 or len(sys.argv) != 1:
         raise SystemExit("Run this reviewed installer with sudo, without arguments.")
     os.umask(0o077)
     check_source()
     if (SOURCE / "backend/core/identity.py").exists():
         raise RuntimeError("Persönliche Identität benötigt migrate_identity.py; der Legacy-Shared-Passwort-Bootstrap ist gesperrt.")
+    import fcntl
     for name in ("update-state", "rollback", "runtime", "backups", "config"):
         (ROOT / name).mkdir(mode=0o700, exist_ok=True)
     public = ROOT / "update-public"

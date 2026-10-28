@@ -36,4 +36,6 @@ jobs:
           docker buildx build --platform linux/arm64 --load -t els-mhd-api:arm64-test backend
           docker run --rm --platform linux/arm64 -e MONGO_URL=mongodb://localhost:27017 -e DB_NAME=synthetic els-mhd-api:arm64-test python -c 'from argon2 import PasswordHasher; from server import app; p=PasswordHasher(); assert p.verify(p.hash("synthetic-only"), "synthetic-only"); print("ARM64 API and Argon2id OK")'
       - name: Build ARM64 web image
-        run: docker buildx build --platform linux/arm64 --load -t els-mhd-web:arm64-test frontend
+        run: |
+          docker buildx build --platform linux/arm64 --load -t els-mhd-web:arm64-test frontend
+          docker run --rm --platform linux/arm64 --add-host api:127.0.0.1 els-mhd-web:arm64-test nginx -t

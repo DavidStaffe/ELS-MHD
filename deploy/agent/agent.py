@@ -182,7 +182,12 @@ class Engine:
             "notes": release["notes"] if release else "",
             "update_available": release != active if release else False,
             "can_install": not busy and release is not None and release != active,
-            "can_rollback": not busy and (self.state_dir / "previous.json").exists(),
+            "can_rollback": not busy and (self.state_dir / "previous.json").exists() and (
+                not (self.root / "config/identity-required").exists() or (
+                    read(self.state_dir / "previous.json").get("schema") == 2
+                    and read(self.state_dir / "previous.json") != active
+                )
+            ),
         }
 
     def authenticate(self, password):
