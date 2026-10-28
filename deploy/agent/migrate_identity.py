@@ -177,13 +177,15 @@ def tls(engine, root, host):
     directory.mkdir(mode=0o700, parents=True, exist_ok=True)
     names = [directory / n for n in ("ca.key", "ca.crt", "server.key", "server.crt")]
     if not any(p.exists() for p in names):
+        ca_config = directory / "ca.cnf"
+        secret(ca_config, "[req]\nprompt=no\ndistinguished_name=dn\nx509_extensions=ca_extensions\n[dn]\nCN=ELS-MHD local CA\n[ca_extensions]\nbasicConstraints=critical,CA:TRUE\nkeyUsage=critical,keyCertSign,cRLSign\nsubjectKeyIdentifier=hash\nauthorityKeyIdentifier=keyid:always\n")
         san = ("IP:" if _is_ip(host) else "DNS:") + host
         ext = directory / "server.ext"
         secret(
             ext,
             "subjectAltName="
             + san
-            + ",DNS:localhost,IP:127.0.0.1\nextendedKeyUsage=serverAuth\n",
+            + ",DNS:localhost,IP:127.0.0.1\nbasicConstraints=critical,CA:FALSE\nkeyUsage=critical,digitalSignature,keyEncipherment\nextendedKeyUsage=serverAuth\nsubjectKeyIdentifier=hash\nauthorityKeyIdentifier=keyid:always,issuer\n",
         )
         engine.run(
             [
@@ -195,6 +197,8 @@ def tls(engine, root, host):
                 "-nodes",
                 "-days",
                 "3650",
+                "-config",
+                str(ca_config),
                 "-subj",
                 "/CN=ELS-MHD local CA",
                 "-keyout",
@@ -242,7 +246,7 @@ def tls(engine, root, host):
         p.is_file() and not p.is_symlink() and p.stat().st_uid == 0 for p in names
     ):
         raise RuntimeError("TLS-Konfiguration unvollständig oder nicht rootgeschützt.")
-    engine.run(["openssl", "verify", "-CAfile", str(names[1]), str(names[3])])
+    engine.run(["openssl", "verify", "-x509_strict", "-purpose", "sslserver", "-CAfile", str(names[1]), str(names[3])])
     engine.run(
         ["openssl", "x509", "-in", str(names[3]), "-noout", "-checkend", "2592000"]
     )
