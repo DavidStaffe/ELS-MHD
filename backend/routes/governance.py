@@ -19,6 +19,7 @@ from core.identity import (
     ROLES,
 )
 from core.time import now_utc, iso
+from services.realtime import publish_incident_event
 
 router = APIRouter(prefix="/api", tags=["governance"])
 
@@ -367,6 +368,14 @@ async def close(incident_id: str, payload: Close, request: Request):
             changes,
         ),
     )
+    await publish_incident_event(
+        {
+            "kind": "incident",
+            "action": "closed",
+            "incident_id": incident_id,
+            "ts": iso(now_utc()),
+        }
+    )
     return {"closed": True, "open": snapshot}
 
 
@@ -410,6 +419,14 @@ async def reopen(incident_id: str, payload: Reopen, request: Request):
             {"status": inc["status"]},
             changes,
         ),
+    )
+    await publish_incident_event(
+        {
+            "kind": "incident",
+            "action": "reopened",
+            "incident_id": incident_id,
+            "ts": iso(now_utc()),
+        }
     )
     return {"reopened": True, "el_user_id": el_id}
 

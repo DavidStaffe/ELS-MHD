@@ -208,6 +208,9 @@ def present_incident(user, incident):
         "_id",
     }
     result = {k: v for k, v in incident.items() if k not in hidden}
+    result["can_close"] = incident.get("status") != "abgeschlossen" and (
+        has(user, "incidents.close") or role_for(user, incident).get("role") == "EL"
+    )
     result["can_reopen"] = incident.get("status") == "abgeschlossen" and (
         has(user, "incidents.reopen")
         or (
