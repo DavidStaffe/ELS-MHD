@@ -1,5 +1,8 @@
 # ELS-MHD Docker development smoke test (not production)
 
+Für die separate öffentliche CA-Einrichtung am Hotspot siehe
+[Zertifikats-Onboarding mit QR-Code](../docs/certificate-onboarding.md).
+
 **Aktueller persönlicher Login und Installation für 10.0.0.1:**
 Die folgende historische Smoke-Anleitung ist keine Installationsanleitung für
 den abgesicherten Stand. Verwende [den geprüften Migrationsweg](../docs/installation-10.0.0.1.md).

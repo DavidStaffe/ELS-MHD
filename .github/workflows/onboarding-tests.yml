@@ -1,0 +1,20 @@
+name: Certificate onboarding
+on:
+  pull_request:
+  push:
+    branches: [main]
+permissions:
+  contents: read
+jobs:
+  isolated-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Use distribution Python packages (same dependency model as Pi)
+        run: sudo apt-get update && sudo apt-get install -y python3-pytest python3-cryptography python3-qrcode
+      - name: Synthetic certificate and HTTP boundary tests
+        run: /usr/bin/python3 -m pytest backend/tests/test_certificate_onboarding.py -q
+      - name: Installer syntax and systemd units
+        run: |
+          sh -n deploy/onboarding/install.sh
+          systemd-analyze verify deploy/systemd/els-mhd-onboarding.service deploy/systemd/els-mhd-onboarding.socket
