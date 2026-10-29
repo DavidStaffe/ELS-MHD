@@ -11,6 +11,7 @@ jobs:
         with:
           python-version: '3.11'
       - run: pip install -r backend/requirements.txt -r backend/tests/requirements-offline.txt
+      - run: python -m unittest discover -s tests -p test_release_workflow.py -v
       - run: python -m pytest backend/tests/test_identity_install.py backend/tests/test_identity_access.py backend/tests/test_update_agent.py backend/tests/test_update_bootstrap.py backend/tests/test_system_updates.py backend/tests/test_divera_global_settings.py backend/tests/test_dispatch_geometry_unit.py -q
         env:
           PYTHONPATH: backend

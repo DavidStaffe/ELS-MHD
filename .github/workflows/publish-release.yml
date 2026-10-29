@@ -1,0 +1,88 @@
+name: Publish reviewed schema-2 images
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'New release version (max 64 characters; never reuse for changed content)'
+        required: true
+        type: string
+      revision:
+        description: 'Exact full 40-character main commit SHA with successful push CI'
+        required: true
+        type: string
+      schema2_confirmed:
+        description: 'I reviewed schema-2 compatibility, identity protection and migration-free image rollback'
+        required: true
+        default: false
+        type: boolean
+
+permissions:
+  contents: read
+
+concurrency:
+  group: manual-schema2-publication
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    if: github.repository == 'DavidStaffe/ELS-MHD' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    permissions:
+      contents: read
+      actions: read
+      packages: write
+    env:
+      VERSION: ${{ inputs.version }}
+      REVISION: ${{ inputs.revision }}
+      SCHEMA2_CONFIRMED: ${{ inputs.schema2_confirmed }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Require exact main commit and successful CI
+        id: gate
+        run: python scripts/release_images.py verify-ci
+        env:
+          GH_TOKEN: ${{ github.token }}
+      - name: Download only the verified installation run's ARM64 artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: els-mhd-arm64-${{ github.sha }}
+          path: release-input
+          github-token: ${{ github.token }}
+          run-id: ${{ steps.gate.outputs.installation_run }}
+      - name: Verify archive checksum before loading
+        run: python scripts/release_images.py verify-archive
+      - uses: docker/setup-qemu-action@v3
+      - name: Load and smoke-test the exact CI images
+        run: |
+          docker load --input release-input/els-mhd-arm64.tar.gz
+          docker run --rm --platform linux/arm64 -e MONGO_URL=mongodb://localhost:27017 -e DB_NAME=synthetic els-mhd-api:arm64-test python -c 'from argon2 import PasswordHasher; from server import app; p=PasswordHasher(); assert p.verify(p.hash("synthetic-only"), "synthetic-only")'
+          docker run --rm --platform linux/arm64 --add-host api:127.0.0.1 els-mhd-web:arm64-test nginx -t
+      - name: Log in to GHCR with the temporary workflow token
+        run: printf '%s' "$GH_TOKEN" | docker login ghcr.io --username "$GITHUB_ACTOR" --password-stdin
+        env:
+          GH_TOKEN: ${{ github.token }}
+      - name: Publish, pull back by digest and generate schema-2 manifest
+        run: python scripts/release_images.py publish
+        env:
+          INSTALLATION_RUN: ${{ steps.gate.outputs.installation_run }}
+      - name: Save release approval candidate and provenance
+        uses: actions/upload-artifact@v4
+        with:
+          name: schema2-release-${{ github.run_id }}-${{ github.run_attempt }}
+          path: release-output/
+          if-no-files-found: error
+          retention-days: 90
+      - name: Explain operator handoff
+        run: |
+          printf '%s\n' '## Images published; no installation changed' 'Download the schema2-release artifact. Review both digests, provenance and SHA256SUMS before separately approving it on the Pi.' 'This workflow does not sign a release, connect to the Pi, alter runtime Compose or restore any database.' >> "$GITHUB_STEP_SUMMARY"
+      - name: Remove registry login
+        if: always()
+        run: docker logout ghcr.io

@@ -63,6 +63,12 @@ Der Dienst muss für Laufzeitverzeichnis und Socket zuständig bleiben; nicht de
 
 ## Releases bauen und bewusst freigeben
 
+Für Schema-2-Installationen steht der ausschließlich manuell startbare
+[Release-Workflow](manual-release.md) bereit. Er übernimmt geprüfte ARM64-CI-Images,
+veröffentlicht sie nach GHCR und erzeugt eine Freigabedatei mit festen Digests.
+Er führt keinen Pi-Deploy aus. Das folgende Schema-1-Beispiel gilt nur für nicht
+auf persönliche Identitäten migrierte Altinstallationen.
+
 In einer vertrauenswürdigen Buildumgebung einen geprüften Commit auschecken, Tests ausführen und für den Pi bauen. Beispiel mit bewusst gewähltem Release-Tag, kein automatischer Installationsbefehl:
 
 ```bash

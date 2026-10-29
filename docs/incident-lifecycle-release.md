@@ -79,7 +79,7 @@ alle gespeicherten Lifecycle-Felder bereits.
 Kein Release wird durch diesen PR veröffentlicht oder produktiv installiert.
 Nach Merge nur Images des geprüften Commits für linux/arm64 bauen; API/Web-Digests,
 CI-Ergebnisse und Releasekennung festhalten. Schema-2-Freigabe gemäß
-[Updateverwaltung](web-update-management.md) und bestehendem Offline-/Signaturprozess
+[Updateverwaltung](web-update-management.md) und dem [manuellen Releaseprozess](manual-release.md)
 vorbereiten. Keine Platzhalter-Digests freigeben. Vorhandene Sicherheitsblocker aus
 [Security Review](security/review.md) bleiben separate Freigabebedingungen.
 
@@ -87,7 +87,7 @@ vorbereiten. Keine Platzhalter-Digests freigeben. Vorhandene Sicherheitsblocker 
 
 1. Wartungsfenster ohne aktiven realen Einsatz wählen, zuerst mit synthetischen
    Daten auf separater Testinstallation. Exakten Ausgangscommit, API/Web-Digests,
-   Agentversion, signierten Schema-2-Release und verfügbares Offline-Rollbackziel
+   Agentversion, geprüften Schema-2-Release und verfügbares Offline-Rollbackziel
    dokumentieren. Keine Zugangsdaten oder Patientendaten in Protokolle übernehmen.
 2. Vorhandene Sicherung und Wiederherstellbarkeit prüfen. Rootgeschützte
    Runtime-Compose, Konfiguration und Identitätsmaterial gesichert halten.
