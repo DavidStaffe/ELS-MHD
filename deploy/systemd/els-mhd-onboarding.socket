@@ -1,0 +1,13 @@
+[Unit]
+Description=ELS-MHD public CA onboarding on hotspot only
+After=network-online.target
+Wants=network-online.target
+
+[Socket]
+ListenStream=10.0.0.1:8081
+BindToDevice=wlan0
+FreeBind=no
+NoDelay=true
+
+[Install]
+WantedBy=sockets.target

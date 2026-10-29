@@ -1,0 +1,33 @@
+[Unit]
+Description=ELS-MHD isolated public certificate onboarding
+Requires=els-mhd-onboarding.socket
+After=els-mhd-onboarding.socket
+
+[Service]
+ExecStart=/usr/bin/python3 /usr/local/lib/els-mhd-onboarding/server.py
+DynamicUser=yes
+LoadCredential=ca.crt:/opt/els-mhd/config/tls/ca.crt
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+PrivateDevices=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+ProtectClock=yes
+ProtectHostname=yes
+RestrictSUIDSGID=yes
+RestrictRealtime=yes
+LockPersonality=yes
+MemoryDenyWriteExecute=yes
+CapabilityBoundingSet=
+RestrictAddressFamilies=AF_INET
+IPAddressDeny=any
+IPAddressAllow=10.0.0.0/24
+InaccessiblePaths=/opt -/run/docker.sock -/run/els-mhd
+StandardOutput=null
+StandardError=journal
+MemoryMax=96M
+TasksMax=8
+UMask=0077

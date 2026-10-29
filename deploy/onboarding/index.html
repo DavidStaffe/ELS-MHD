@@ -1,0 +1,21 @@
+<!doctype html>
+<html lang="de"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>ELS-MHD – Zertifikat einrichten</title>
+<style>body{font:18px system-ui;max-width:760px;margin:2rem auto;padding:0 1rem;line-height:1.6}code{overflow-wrap:anywhere}img{width:220px;height:220px}a{color:#12529a}section{border-top:1px solid #ccc;margin-top:2rem}</style>
+<h1>ELS-MHD sicher öffnen</h1>
+<p>Mit dem WLAN <strong>ELS-MHD</strong> verbinden und für diese Einrichtung verbunden bleiben, auch wenn kein Internet verfügbar ist. Diese HTTP-Seite dient ausschließlich der Einrichtung. Hier niemals Passwörter oder Einsatz-, Patienten- oder Benutzerdaten eingeben.</p>
+<img src="/qr.svg" alt="QR-Code zur Einrichtungsseite http://10.0.0.1:8081/">
+<p>Einrichtungsadresse: <strong>http://10.0.0.1:8081/</strong></p>
+<h2>1. Fingerabdruck unabhängig vergleichen</h2>
+<p>Die öffentliche Zertifizierungsstelle (CA) erlaubt Ihrem Gerät, ELS-MHD zu vertrauen. Installieren Sie sie nur mit Zustimmung der verantwortlichen Administration. Sie kann grundsätzlich auch andere Zertifikate beglaubigen.</p>
+<p>SHA-256 des Zertifikats:<br><code>{{FINGERPRINT}}</code></p>
+<p>Vergleichen Sie diesen Wert mit dem direkt am Raspberry Pi ermittelten oder von der Administration persönlich übergebenen Ausdruck. Der Wert auf dieser unverschlüsselten Seite allein ist kein Echtheitsnachweis. Bei Abweichungen abbrechen und die Administration kontaktieren.</p>
+<h2>2. Öffentliche CA herunterladen und installieren</h2>
+<p><a href="/ca.crt">ELS-MHD CA herunterladen (.crt)</a> – enthält ausschließlich das öffentliche Zertifikat. Die Installation und die Vertrauensfreigabe erfolgen bewusst am Gerät, nicht automatisch.</p>
+<section><h3>iOS / iPadOS</h3><p>Diese Seite in Safari öffnen, Zertifikat laden und das Laden des Profils erlauben. In Einstellungen → Allgemein → VPN und Geräteverwaltung das geladene Profil öffnen, Zertifikatdetails prüfen und installieren. Anschließend Einstellungen → Allgemein → Info → Zertifikatsvertrauenseinstellungen: volles Vertrauen für genau diese geprüfte CA aktivieren. Bei verwalteten Geräten die Administration einbeziehen.</p></section>
+<section><h3>Android</h3><p>Zertifikat herunterladen. In den Einstellungen nach „CA-Zertifikat installieren“ suchen (je nach Hersteller unter Sicherheit und Datenschutz → Weitere Sicherheitseinstellungen → Verschlüsselung und Anmeldedaten → Zertifikat installieren → CA-Zertifikat). Die heruntergeladene Datei wählen, Details prüfen und mit Gerätesperre bestätigen. Kein WLAN- oder Client-Zertifikat wählen. Menünamen variieren; bei gesperrter Installation die Administration kontaktieren. Manche Apps vertrauen benutzerinstallierten CAs nicht.</p></section>
+<section><h3>Windows</h3><p>Heruntergeladene Datei öffnen, Details und SHA-256 vergleichen. „Zertifikat installieren“ → Aktueller Benutzer → Alle Zertifikate in folgendem Speicher speichern → Vertrauenswürdige Stammzertifizierungsstellen. Nur die geprüfte CA bestätigen. Auf verwalteten Geräten die Administration einbeziehen; keine systemweite Installation ohne deren Freigabe.</p></section>
+<section><h3>Chromium / Chrome / Edge</h3><p>Zuerst die Anleitung für das Betriebssystem befolgen und den Browser vollständig neu starten. Unter Einstellungen → Datenschutz und Sicherheit → Sicherheit → Zertifikate verwalten die lokalen Zertifikate prüfen. Unter Linux gegebenenfalls die geprüfte CA dort als lokale vertrauenswürdige Zertifizierungsstelle importieren. Verwaltete Browser können den Import sperren. Bei fortbestehender Warnung anhalten und IP-Adresse, Datum, Zertifikat und Richtlinien von der Administration prüfen lassen.</p></section>
+<h2>3. Anwendung öffnen</h2><p><a href="https://10.0.0.1">ELS-MHD über HTTPS öffnen</a>. Es darf keine Zertifikatswarnung erscheinen. Warnungen niemals übergehen, Zertifikatsprüfung niemals abschalten.</p>
+<p>Nach Ende der Nutzung kann die CA über die Profil- bzw. Zertifikatsverwaltung des Geräts wieder entfernt werden. Dabei ausschließlich die anhand des Fingerabdrucks identifizierte ELS-MHD-CA entfernen.</p>
+</html>
