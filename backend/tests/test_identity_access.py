@@ -643,3 +643,145 @@ async def test_demo_has_initial_el_before_seed(env, monkeypatch):
     record = await db.incidents.find_one({"id": response.json()["id"]})
     assert record["created_by"] == "el"
     assert record["assignments"] == {"el": {"role": "EL"}}
+
+
+@pytest.mark.asyncio
+async def test_lifecycle_realtime_audit_and_preserved_operational_documents(
+    env, monkeypatch
+):
+    from routes import governance
+
+    db, c = env
+    publish = AsyncMock()
+    monkeypatch.setattr(governance, "publish_incident_event", publish)
+    await db.incidents.update_one(
+        {"id": "i"},
+        {
+            "$set": {
+                "assignments": {"el": {"role": "EL"}, "doc": {"role": "Dokumentar"}},
+                "start_at": "2026-10-29T08:00:00+00:00",
+            }
+        },
+    )
+    await db.resources.insert_one(
+        {"id": "r", "incident_id": "i", "bound_patient_id": "p", "status": "im_einsatz"}
+    )
+    await db.transports.insert_one(
+        {"id": "t", "incident_id": "i", "status": "unterwegs"}
+    )
+    before = {
+        name: await db[name].find({}, {"_id": 0}).to_list(None)
+        for name in ("patients", "resources", "transports")
+    }
+    await login(c, "el")
+    for reason in ("", "   "):
+        assert (
+            await c.post(
+                "/api/incidents/i/close", json={"reason": reason, "confirm_open": True}
+            )
+        ).status_code == 422
+    assert (
+        await c.post("/api/incidents/i/close", json={"reason": "Einsatzende"})
+    ).status_code == 409
+    publish.assert_not_awaited()
+    assert (
+        await c.post(
+            "/api/incidents/i/close",
+            json={"reason": "Einsatzende", "confirm_open": True},
+        )
+    ).status_code == 200
+    assert publish.await_args.args[0]["action"] == "closed"
+    closed = await db.incidents.find_one({"id": "i"})
+    assert closed["assignments"] == {}
+    assert closed["closure_open_snapshot"]["resources"][0]["id"] == "r"
+    assert (
+        await c.post(
+            "/api/incidents/i/close", json={"reason": "Doppelt", "confirm_open": True}
+        )
+    ).status_code == 403
+    assert publish.await_count == 1
+    assert (
+        await c.post("/api/incidents/i/reopen", json={"reason": "Fortführung"})
+    ).status_code == 200
+    assert publish.await_args.args[0]["action"] == "reopened"
+    incident = await db.incidents.find_one({"id": "i"})
+    assert incident["assignments"] == {"el": {"role": "EL"}}
+    assert incident["start_at"] == "2026-10-29T08:00:00+00:00"
+    assert incident["end_at"] is None
+    assert [
+        (e["action"], e["user_id"], e["reason"]) for e in incident["security_history"]
+    ] == [
+        ("incident.close", "el", "Einsatzende"),
+        ("incident.reopen", "el", "Fortführung"),
+    ]
+    assert all(e["at"] and e["display_name"] for e in incident["security_history"])
+    for name, documents in before.items():
+        assert await db[name].find({}, {"_id": 0}).to_list(None) == documents
+    assert publish.await_count == 2
+
+
+@pytest.mark.asyncio
+async def test_global_close_capability_on_restricted_list_without_content_access(env):
+    db, c = env
+    await db.users.update_one(
+        {"id": "other"}, {"$set": {"permissions": ["incidents.close"]}}
+    )
+    await login(c, "other")
+    listing = (await c.get("/api/incidents")).json()
+    assert listing == [
+        {
+            "id": "i",
+            "name": "Einsatz",
+            "status": "operativ",
+            "restricted": True,
+            "can_close": True,
+        }
+    ]
+    assert (await c.get("/api/incidents/i")).status_code == 403
+    assert (
+        await c.post(
+            "/api/incidents/i/close",
+            json={"reason": "Globaler Abschluss", "confirm_open": True},
+        )
+    ).status_code == 200
+    assert (
+        await c.post("/api/incidents/i/reopen", json={"reason": "Keine Berechtigung"})
+    ).status_code == 403
+
+
+@pytest.mark.asyncio
+async def test_reopen_checks_previous_el_eligibility_and_requires_explicit_global_replacement(
+    env,
+):
+    db, c = env
+    await login(c, "el")
+    assert (
+        await c.post(
+            "/api/incidents/i/close",
+            json={"reason": "Einsatzende", "confirm_open": True},
+        )
+    ).status_code == 200
+    await db.users.update_one({"id": "el"}, {"$set": {"eligible": []}})
+    assert (
+        await c.post("/api/incidents/i/reopen", json={"reason": "Fortführung"})
+    ).status_code == 403
+    assert (await db.incidents.find_one({"id": "i"}))["status"] == "abgeschlossen"
+    await db.users.update_one(
+        {"id": "other"},
+        {
+            "$set": {
+                "permissions": ["incidents.reopen", "incidents.roles.assign"],
+                "eligible": ["EL"],
+            }
+        },
+    )
+    await login(c, "other")
+    assert (
+        await c.post(
+            "/api/incidents/i/reopen",
+            json={"reason": "Fortführung", "el_user_id": "other"},
+        )
+    ).status_code == 200
+    assert (await db.incidents.find_one({"id": "i"}))["assignments"] == {
+        "other": {"role": "EL"}
+    }

@@ -87,7 +87,7 @@ export function IncidentCard({
       ? showDelete
       : incident.demo || incident.status === 'geplant';
   // Show reopen: explicit prop override for archive; legacy default = any closed
-  const canShowReopen = showReopen !== undefined ? showReopen : isClosed;
+  const canShowReopen = showReopen !== undefined ? showReopen : Boolean(incident.can_reopen);
 
   return (
     <article
@@ -244,7 +244,7 @@ export function IncidentCard({
               Auf Operativ
             </Button>
           )}
-          {!isArchive && incident.status === 'operativ' && (
+          {!isArchive && !isClosed && incident.can_close && (
             <Button
               type="button"
               size="sm"

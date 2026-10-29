@@ -61,9 +61,29 @@ async def list_incidents(
         if await incident_access(request.state.user, inc):
             result.append(present_incident(request.state.user, inc))
         elif inc.get("status") != "abgeschlossen":
-            result.append({"id": inc["id"], "name": inc.get("name"), "status": inc.get("status"), "restricted": True})
+            result.append(
+                {
+                    "id": inc["id"],
+                    "name": inc.get("name"),
+                    "status": inc.get("status"),
+                    "restricted": True,
+                    **(
+                        {"can_close": True}
+                        if present_incident(request.state.user, inc).get("can_close")
+                        else {}
+                    ),
+                }
+            )
         elif present_incident(request.state.user, inc).get("can_reopen"):
-            result.append({"id": inc["id"], "name": inc.get("name"), "status": inc.get("status"), "restricted": True, "can_reopen": True})
+            result.append(
+                {
+                    "id": inc["id"],
+                    "name": inc.get("name"),
+                    "status": inc.get("status"),
+                    "restricted": True,
+                    "can_reopen": True,
+                }
+            )
     return result
 
 

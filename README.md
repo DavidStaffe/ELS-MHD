@@ -22,6 +22,8 @@ Die Anwendung bildet den operativen Einsatzablauf ab:
 - UHS/Behandlungsbetten
 - Abschlussauswertung und Report-Versionen
 
+Abnahme des nächsten Lifecycle-Updates: [Incident-Abschluss und Wiedereröffnung](docs/incident-lifecycle-release.md).
+
 ## Architektur
 
 - Backend: FastAPI + Motor (MongoDB, async)
