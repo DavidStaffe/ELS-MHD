@@ -67,6 +67,7 @@ class Erstbefund(StrictSection):
 
 
 class Vitalwert(StrictSection):
+    datum: Optional[date] = None
     zeit: str = Field(min_length=5, max_length=5, pattern=r"^\d{2}:\d{2}$")
     rr_sys: Optional[int] = Field(default=None, ge=30, le=300)
     rr_dia: Optional[int] = Field(default=None, ge=20, le=220)
@@ -95,6 +96,7 @@ class Verlauf(StrictSection):
 
 
 class Massnahme(StrictSection):
+    datum: Optional[date] = None
     zeit: str = Field(min_length=5, max_length=5, pattern=r"^\d{2}:\d{2}$")
     typ: Literal["allgemein", "atemweg", "beatmung", "kreislauf", "medikament", "immobilisation", "sonstiges"] = "allgemein"
     beschreibung: str = Field(min_length=1, max_length=500)
@@ -116,6 +118,7 @@ class Massnahmen(StrictSection):
 
 
 class Uebergabe(StrictSection):
+    datum: Optional[date] = None
     art: Literal["offen", "transport", "entlassen", "transportverweigerung", "uebergeben"] = "offen"
     zeit: str = Field(default="", max_length=5, pattern=r"^$|^\d{2}:\d{2}$")
     ziel: str = Field(default="", max_length=160)
