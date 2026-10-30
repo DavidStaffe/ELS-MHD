@@ -96,14 +96,22 @@ export function PatientProtocol({ patient, onUpdate }) {
   const [reason, setReason] = React.useState('');
   const protocol = patient.protokoll || {};
   const version = protocol.version || 0;
+  const [loadedVersion, setLoadedVersion] = React.useState(version);
+  const currentTab = React.useRef({ id: patient.id, section });
   const completed = ['uebergeben', 'entlassen'].includes(patient.status);
 
   React.useEffect(() => {
-    setDraft(protocol[section] || {});
-    setDirty(false);
-    setReason('');
-    setError('');
-  // A newer protocol version or a tab change must update the working copy.
+    const changedTab = currentTab.current.id !== patient.id || currentTab.current.section !== section;
+    currentTab.current = { id: patient.id, section };
+    // Do not discard unsaved clinical notes when SSE reports an external update.
+    if (changedTab || !dirty) {
+      setDraft(protocol[section] || {});
+      setLoadedVersion(version);
+      setDirty(false);
+      setReason('');
+      setError('');
+    }
+  // Unsaved changes keep their original loadedVersion until explicitly reloaded.
   }, [patient.id, version, section]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const edit = (key, value) => {
@@ -124,7 +132,7 @@ export function PatientProtocol({ patient, onUpdate }) {
       const { data } = await api.patch('/patients/' + patient.id + '/protocol', {
         section,
         data: draft,
-        expected_version: version,
+        expected_version: loadedVersion,
         reason,
       });
       onUpdate?.(data);
@@ -138,6 +146,19 @@ export function PatientProtocol({ patient, onUpdate }) {
         setError(typeof detail === 'string' ? detail : 'Eingaben konnten nicht gespeichert werden. Bitte prüfen.');
       }
     } finally { setSaving(false); }
+  };
+  const reload = async () => {
+    if (dirty && !window.confirm('Ungespeicherte Protokolleingaben wirklich verwerfen?')) return;
+    try {
+      const { data } = await api.get('/patients/' + patient.id);
+      onUpdate?.(data);
+      setDraft(data.protokoll?.[section] || {});
+      setLoadedVersion(data.protokoll?.version || 0);
+      setDirty(false);
+      setError('');
+    } catch {
+      setError('Aktueller Protokollstand konnte nicht geladen werden.');
+    }
   };
   const entries = draft.eintraege || [];
   const rows = draft.werte || [];
@@ -309,14 +330,22 @@ export function PatientProtocol({ patient, onUpdate }) {
             value={reason} onChange={setReason} />
         </div>
       )}
+      {dirty && version !== loadedVersion && (
+        <p role="alert" className="mt-4 text-sm text-destructive">
+          Eine neue Protokollversion liegt vor. Dein Entwurf wurde beibehalten; bitte die Änderungen abgleichen.
+        </p>
+      )}
       {error && <p role="alert" className="mt-4 text-sm text-destructive">{error}</p>}
       {success && <p role="status" className="mt-4 text-sm text-status-green">{success}</p>}
       <div className="mt-4 flex flex-wrap items-center justify-between gap-2 border-t border-border pt-4">
         <span className="text-xs text-muted-foreground">
           {dirty ? 'Nicht gespeicherte Eingaben' : 'Alle angezeigten Eingaben gespeichert'}
         </span>
+        <div className="flex gap-2">
+          <Button variant="outline" type="button" onClick={reload} disabled={saving}>Neu laden</Button>
         <Button onClick={save} type="button" disabled={!dirty || saving || (completed && reason.trim().length < 10)}
           data-testid="protocol-save">{saving ? 'Speichert …' : 'Abschnitt speichern'}</Button>
+        </div>
       </div>
     </section>
   );
