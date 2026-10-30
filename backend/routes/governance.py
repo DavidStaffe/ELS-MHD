@@ -505,21 +505,12 @@ async def correct(
             role.get("role") == "Dokumentar" and record.get("created_by") == user["id"]
         ):
             raise HTTPException(403, "Korrektur nicht erlaubt.")
+    # Patienteneinträge enthalten keine Klardatenfelder. Auch die
+    # Archivkorrektur darf nicht nachträglich Namen/Identifikatoren erzeugen.
     allowed = (
         {"text", "absender", "empfaenger", "prioritaet", "funk_typ"}
         if kind == "messages"
-        else {
-            "name",
-            "vorname",
-            "nachname",
-            "geburtsdatum",
-            "sichtung",
-            "notiz",
-            "auffindeort",
-            "bemerkung",
-            "diagnose",
-            "massnahmen",
-        }
+        else {"sichtung", "notiz", "auffindeort", "bemerkung", "diagnose", "massnahmen"}
     )
     if kind == "incidents":
         allowed = {"name", "ort", "beschreibung"}
