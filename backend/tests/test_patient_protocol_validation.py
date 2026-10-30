@@ -3,6 +3,11 @@
 Run with: cd backend && pytest tests/test_patient_protocol_validation.py
 """
 from datetime import date, timedelta
+import os
+
+# The model-only tests do not connect to MongoDB, but core.db initializes a client.
+os.environ.setdefault('MONGO_URL', 'mongodb://127.0.0.1:27017')
+os.environ.setdefault('DB_NAME', 'els_protocol_unit_test')
 
 import pytest
 from pydantic import ValidationError
