@@ -44,6 +44,7 @@ WRITES = frozenset(
         "create_patient",
         "create_dummy_patient",
         "update_patient",
+        "update_patient_protocol",
         "reopen_patient",
         "complete_patient",
         "move_to_waiting_area",
@@ -75,6 +76,7 @@ WRITES = frozenset(
 MEDICAL_MODULES = {
     "patients",
     "patient_disposition",
+    "patient_protocol",
     "transports",
     "betten",
     "analytics",
@@ -173,7 +175,7 @@ async def _authorize(request: Request):
         and not (
             role == "Helfer"
             and name
-            in {"list_patients", "get_patient", "update_patient", "create_patient"}
+            in {"list_patients", "get_patient", "update_patient", "update_patient_protocol", "create_patient"}
         )
     ):
         raise HTTPException(403, "Medizinische Leseberechtigung fehlt.")
@@ -268,12 +270,12 @@ async def _authorize(request: Request):
             raise HTTPException(403, "Abschnittswechsel nicht erlaubt.")
     elif role == "Dokumentar" and name == "create_message":
         pass
-    elif role == "Helfer" and name in {"update_patient", "create_patient"}:
+    elif role == "Helfer" and name in {"update_patient", "update_patient_protocol", "create_patient"}:
         require(
             user,
             (
                 "helpers.patients.update"
-                if name == "update_patient"
+                if name in {"update_patient", "update_patient_protocol"}
                 else "helpers.patients.create"
             ),
         )
@@ -281,7 +283,7 @@ async def _authorize(request: Request):
             {"id": assignment.get("resource_id"), "incident_id": incident_id}
         )
         if not resource or (
-            name == "update_patient"
+            name in {"update_patient", "update_patient_protocol"}
             and resource.get("bound_patient_id") != params.get("patient_id")
         ):
             raise HTTPException(403, "Aktuelle Ressourcenbindung fehlt.")
@@ -294,7 +296,7 @@ async def _authorize(request: Request):
             "auffinde_lng",
             "keyword_id",
         }
-        if set(body) - allowed:
+        if name != "update_patient_protocol" and set(body) - allowed:
             raise HTTPException(
                 403,
                 "Helfer dürfen nur ausdrücklich freigegebene Patientendaten bearbeiten.",
