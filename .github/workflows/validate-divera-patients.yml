@@ -17,6 +17,11 @@ jobs:
         run: python -m compileall -q backend
       - name: Test dispatch geometry
         run: python -m unittest discover -s backend/tests -p test_dispatch_geometry_unit.py -v
+      - name: Install patient protocol unit-test dependencies
+        run: python -m pip install -q "fastapi>=0.115" "pydantic>=2.6" "motor>=3.7" "python-dotenv>=1" "argon2-cffi>=23" "pytest>=8"
+      - name: Test patient protocol validation
+        working-directory: backend
+        run: python -m pytest -q tests/test_patient_protocol_validation.py
   frontend-build:
     runs-on: ubuntu-latest
     steps:

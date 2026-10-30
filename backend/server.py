@@ -22,6 +22,7 @@ from fastapi.responses import JSONResponse
 from core.validation import validation_error
 from routes.incidents import router as incidents_router
 from routes.patients import router as patients_router
+from routes.patient_protocol import router as patient_protocol_router
 from routes.transports import router as transports_router
 from routes.resources import router as resources_router
 from routes.messages import router as messages_router
@@ -82,6 +83,7 @@ for r in (
     governance_router,
     incidents_router,
     patients_router,
+    patient_protocol_router,
     transports_router,
     resources_router,
     messages_router,

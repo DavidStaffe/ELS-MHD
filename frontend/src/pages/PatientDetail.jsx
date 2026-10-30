@@ -1,4 +1,5 @@
 import { PatientDisposition } from '@/components/patients/PatientDisposition';
+import { PatientProtocol } from '@/components/patients/PatientProtocol';
 import * as React from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
@@ -569,6 +570,10 @@ export default function PatientDetail() {
       {/* Prozesszeiten */}
       <div className="mb-4">
         <Prozesszeiten patient={patient} />
+      </div>
+
+      <div className="mb-4">
+        <PatientProtocol patient={patient} onUpdate={async (updated) => { setPatient(updated); await refresh(); }} />
       </div>
 
       <div className="grid grid-cols-1 gap-4 xl:grid-cols-[1.2fr_1fr]">
