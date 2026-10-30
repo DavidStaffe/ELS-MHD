@@ -3,7 +3,7 @@
 ## Umfang
 
 Erweiterung der vorhandenen Patientenakte, **kein neuer Patientendatensatz**.
-Referenz: \`7.1_DIVI_NFEP_Protokoll.pdf\`, Seite 1 (Befund, Maßnahmen,
+Referenz: `7.1_DIVI_NFEP_Protokoll.pdf`, Seite 1 (Befund, Maßnahmen,
 Verlauf, Transport) und Seite 2 (xABCDE, SAMPLER(S), NEWS2, BEFAST, SINNHAFT).
 Das PDF wird **nicht** als Original-DIVI-Dokument nachgebildet.
 
@@ -14,7 +14,7 @@ bleiben unverändert.
 
 ## Datenschutz und Berechtigungen
 
-- **Zulässige persönliche Stammdaten:** \`geburtsdatum\`, \`geschlecht\`.
+- **Zulässige persönliche Stammdaten:** `geburtsdatum`, `geschlecht`.
 - Kein Datenmodell für Patientenname, Adresse, Krankenkasse,
   Versichertennummer, Telefonnummer, Unterschrift oder Zeugenklardaten.
 - Medizinische Freitextfelder können unerlaubte personenbezogene
@@ -23,7 +23,7 @@ bleiben unverändert.
 - Geburtsdatum + medizinischer Kontext erlauben unter Umständen
   Reidentifikation. Das Verfahren ist datensparsam/pseudonymisiert,
   **nicht garantiert anonym** nach DSGVO.
-- Route: \`PATCH /api/patients/{patient_id}/protocol\`.
+- Route: `PATCH /api/patients/{patient_id}/protocol`.
 - Nutzt den bestehenden globalen Default-Deny-Zugriffsgate. EL, FueAss,
   berechtigte AL sowie ausdrücklich berechtigte Helfer für das eigene
   gebundene Patientenobjekt; die Archivsicht bleibt unverändert.
@@ -50,16 +50,16 @@ Transportverweigerung.
 
 ## Speicherung und Konflikte
 
-Der gesamte aktuelle Stand liegt unter \`patients.protokoll\` mit
-\`version\` und \`updated_at\`. Jede Änderung schreibt atomar eine
+Der gesamte aktuelle Stand liegt unter `patients.protokoll` mit
+`version` und `updated_at`. Jede Änderung schreibt atomar eine
 Append-only-Protokollversion innerhalb des Patientendokuments unter
-\`patients.protokoll_history\` mit:
-\`version\`, \`at\`, \`actor_id\`, \`section\`, \`before\`, \`after\`,
-\`reason\`. Zusätzlich: nicht-medizinischer Sicherheits-Auditeintrag
+`patients.protokoll_history` mit:
+`version`, `at`, `actor_id`, `section`, `before`, `after`,
+`reason`. Zusätzlich: nicht-medizinischer Sicherheits-Auditeintrag
 und anonymisierte SSE-Invalidierung.
 
 Die UI speichert **abschnittsweise**, nicht jede Tastatureingabe. Ungespeicherte Entwürfe werden bei fremden Live-Änderungen nicht verworfen.
-Optimistisches Locking (\`expected_version\`) ergibt HTTP 409 bei
+Optimistisches Locking (`expected_version`) ergibt HTTP 409 bei
 konkurrierender Änderung. Dies verhindert stilles Überschreiben; die
 Benutzerin/der Benutzer muss neu laden und die Änderung prüfen.
 Durch Einbettung bleibt die Dokumentation Bestandteil der bestehenden
@@ -67,7 +67,7 @@ Patienten-Archiv- und Exportdaten.
 
 ## Tests und Abnahme
 
-Unit-Tests in \`backend/tests/test_patient_protocol_validation.py\`.
+Unit-Tests in `backend/tests/test_patient_protocol_validation.py`.
 Vor produktivem Update im Staging prüfen:
 
 1. Protokoll für einen aktiven Patienten öffnen und alle sechs Tabs speichern.
