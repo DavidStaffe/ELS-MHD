@@ -38,9 +38,9 @@ bleiben unverändert.
 | stammdaten | Geburtsdatum, Geschlecht |
 | anamnese | Leitsymptom, SAMPLER(S) |
 | erstbefund | xABCDE, BEFAST |
-| verlauf | Reihen von Uhrzeit, RR, Puls, AF, SpO2, Temperatur, GCS, BZ, NRS, O2-Gabe, SpO2-Skala |
-| massnahmen | Zeit, Maßnahmen-/Medikamententyp, Inhalt, Dosis, Weg, Wirkung |
-| uebergabe | Art, Zeit, Ziel, empfangende **Funktion**, SINNHAFT, Verweigerungsvermerk |
+| verlauf | Reihen von Datum/Uhrzeit, RR, Puls, AF, SpO2, Temperatur, GCS, BZ, NRS, O2-Gabe, SpO2-Skala |
+| massnahmen | Datum/Zeit, Maßnahmen-/Medikamententyp, Inhalt, Dosis, Weg, Wirkung |
+| uebergabe | Art, Datum/Zeit, Ziel, empfangende **Funktion**, SINNHAFT, Verweigerungsvermerk |
 
 NEWS2 wird **nicht** automatisch berechnet. Das PDF enthält auch
 Scores und eine unterschriebene Transportverweigerung; die erste Version
@@ -58,7 +58,7 @@ Append-only-Protokollversion innerhalb des Patientendokuments unter
 \`reason\`. Zusätzlich: nicht-medizinischer Sicherheits-Auditeintrag
 und anonymisierte SSE-Invalidierung.
 
-Die UI speichert **abschnittsweise**, nicht jede Tastatureingabe.
+Die UI speichert **abschnittsweise**, nicht jede Tastatureingabe. Ungespeicherte Entwürfe werden bei fremden Live-Änderungen nicht verworfen.
 Optimistisches Locking (\`expected_version\`) ergibt HTTP 409 bei
 konkurrierender Änderung. Dies verhindert stilles Überschreiben; die
 Benutzerin/der Benutzer muss neu laden und die Änderung prüfen.
@@ -89,3 +89,12 @@ ausgeführt werden. Dieses Feature ist bis dahin ein Review-/Staging-Kandidat.
 medizinische Archivkorrektur über das bestehende freigabepflichtige
 Archivkorrekturverfahren; außerdem optional strukturierter NEWS2-Score
 mit Skala-2-Indikationsprüfung und klinischer Freigabe.
+
+## Bestandsschutz für Archivkorrekturen
+
+Die bisherige generische Archivkorrektur erlaubte bei `patients` auch
+`name`, `vorname` und `nachname` (obwohl die normale Patientenanlage
+solche Felder nicht vorsieht). Dieser PR entfernt diese API-Freigabe.
+Die strukturierte Protokollkorrektur *nach Incident-Abschluss* ist noch
+nicht Teil dieses PR und muss gesondert, streng typisiert, in den bereits
+vorhandenen Archivkorrektur-Workflow integriert werden.
