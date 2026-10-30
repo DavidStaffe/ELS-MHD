@@ -55,6 +55,7 @@ const TYPES = [
 const cx = 'w-full min-h-10 rounded-md border border-border bg-background px-3 py-2 text-sm';
 const caption = 'mb-1 block text-xs font-medium text-muted-foreground';
 const nowTime = () => new Date().toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
+const today = () => { const d = new Date(); d.setMinutes(d.getMinutes() - d.getTimezoneOffset()); return d.toISOString().slice(0, 10); };
 const valueOf = (v) => v ?? '';
 
 function TextField({ label, value, onChange, type = 'text', rows, placeholder, ...rest }) {
@@ -238,6 +239,8 @@ export function PatientProtocol({ patient, onUpdate }) {
                 <button type="button" className="text-xs text-destructive" onClick={() => edit('werte', rows.filter((_, j) => j !== i))}>Entfernen</button>
               </div>
               <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 lg:grid-cols-6">
+                <TextField label="Datum" type="date" value={row.datum}
+                  onChange={(v) => edit('werte', setRow(rows, i, 'datum', v || null))} />
                 <TextField label="Uhrzeit" type="time" value={row.zeit}
                   onChange={(v) => edit('werte', setRow(rows, i, 'zeit', v))} />
                 {VITALS.map(([field, label, unit]) => (
@@ -254,7 +257,7 @@ export function PatientProtocol({ patient, onUpdate }) {
             </div>
           ))}
           <Button variant="outline" size="sm" type="button" disabled={rows.length >= 48}
-            onClick={() => edit('werte', [...rows, { zeit: nowTime() }])}>+ Messung hinzufügen</Button>
+            onClick={() => edit('werte', [...rows, { datum: today(), zeit: nowTime() }])}>+ Messung hinzufügen</Button>
           <TextField label="Verlaufsbemerkung" rows={3} value={draft.notiz} onChange={(v) => edit('notiz', v)} />
         </div>
       )}
@@ -268,6 +271,8 @@ export function PatientProtocol({ patient, onUpdate }) {
                 <button type="button" className="text-xs text-destructive" onClick={() => edit('eintraege', entries.filter((_, j) => j !== i))}>Entfernen</button>
               </div>
               <div className="grid gap-3 sm:grid-cols-3">
+                <TextField label="Datum" type="date" value={entry.datum}
+                  onChange={(v) => edit('eintraege', setRow(entries, i, 'datum', v || null))} />
                 <TextField label="Uhrzeit" type="time" value={entry.zeit}
                   onChange={(v) => edit('eintraege', setRow(entries, i, 'zeit', v))} />
                 <Pick label="Art" value={entry.typ || 'allgemein'} options={TYPES}
@@ -284,7 +289,7 @@ export function PatientProtocol({ patient, onUpdate }) {
             </div>
           ))}
           <Button type="button" size="sm" variant="outline" disabled={entries.length >= 48}
-            onClick={() => edit('eintraege', [...entries, { zeit: nowTime(), typ: 'allgemein', beschreibung: '' }])}>+ Maßnahme hinzufügen</Button>
+            onClick={() => edit('eintraege', [...entries, { datum: today(), zeit: nowTime(), typ: 'allgemein', beschreibung: '' }])}>+ Maßnahme hinzufügen</Button>
         </div>
       )}
 
@@ -294,6 +299,7 @@ export function PatientProtocol({ patient, onUpdate }) {
             <Pick label="Disposition / Verbleib laut Protokoll" value={draft.art || 'offen'}
               onChange={(v) => edit('art', v)}
               options={ [['offen', 'Offen'], ['transport', 'Transport'], ['uebergeben', 'Übergeben'], ['entlassen', 'Entlassen'], ['transportverweigerung', 'Transportverweigerung']] } />
+            <TextField label="Datum" type="date" value={draft.datum} onChange={(v) => edit('datum', v || null)} />
             <TextField label="Uhrzeit" type="time" value={draft.zeit} onChange={(v) => edit('zeit', v)} />
             <TextField label="Ziel / Einrichtung (keine Personennamen)" value={draft.ziel} onChange={(v) => edit('ziel', v)} />
             <TextField label="Empfangende Funktion / Team (keine Personennamen)" value={draft.empfangende_funktion}
